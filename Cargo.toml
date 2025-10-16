@@ -16,19 +16,10 @@ codegen-units = 1
 
 [workspace.dependencies]
 alloy = { version = "1.0.22", features = ["full"] }
-base64ct =  "1.8.0"
-anchor-client = { version = "0.31.1", features = ["async"] }
-anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
-anchor-spl = { version = "0.31.1", features = ["metadata"] }
 tokio = { version = "1.47.1", features = ["full"] }
 dotenv = "0.15.0"
 anyhow = "1.0.100"
-colored = "3.0.0"
 clap = { version = "4.5.48", features = ["derive"] }
-anchor-idl = "0.4.1"
-serde = "1.0.228"
 serde_json = "1.0.145"
-cfg-if = "1.0.0"
-hex = { version = "0.4.3", features = ["serde"] }
 ethers = "2.0.14"
 url = "2.5.4"

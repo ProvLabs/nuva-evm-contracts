@@ -10,3 +10,4 @@ dotenv.workspace = true
 ethers.workspace = true
 alloy.workspace = true
 url.workspace = true
+anyhow.workspace = true
