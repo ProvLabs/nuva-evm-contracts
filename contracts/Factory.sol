@@ -16,7 +16,6 @@ contract CustomToken is ERC20, ERC20Burnable, AccessControl {
     constructor(
         string memory _name,
         string memory _symbol,
-        uint256 _initialSupply,
         address _admin,
         uint8 _decimals
     ) ERC20(_name, _symbol) {
@@ -24,7 +23,7 @@ contract CustomToken is ERC20, ERC20Burnable, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(MINTER_ROLE, _admin);
         _grantRole(BURNER_ROLE, _admin);
-        _mint(_admin, _initialSupply * (10 ** _decimals));
+        _mint(_admin, 0);
     }
 
     function decimals() public view override returns (uint8) {
@@ -38,20 +37,6 @@ contract CustomToken is ERC20, ERC20Burnable, AccessControl {
     function burnAuthorized(address from, uint256 amount) external onlyRole(BURNER_ROLE) {
         _burn(from, amount);
     }
-
-    function transfer(address to, uint256 value) public override returns (bool) {
-        return super.transfer(to, value);
-    }
-
-    function approve(address spender, uint256 value) public override returns (bool) {
-        return super.approve(spender, value);
-    }
-
-    function transferChecked(address to, uint256 value) external returns (bool) {
-        bool ok = super.transfer(to, value);
-        require(ok, "Transfer failed");
-        return ok;
-    }
 }
 
 /// @title Token Factory Contract
@@ -59,17 +44,16 @@ contract TokenFactory {
     using SafeERC20 for IERC20;
     address[] public allTokens;
 
-    event TokenCreated(address tokenAddress, string name, string symbol, uint256 initialSupply, uint8 decimals, address owner);
+    event TokenCreated(address tokenAddress, string name, string symbol, uint8 decimals, address owner);
 
     function createToken(
         string memory _name,
         string memory _symbol,
-        uint256 _initialSupply,
         uint8 _decimals
     ) external {
-        CustomToken token = new CustomToken(_name, _symbol, _initialSupply, msg.sender, _decimals);
+        CustomToken token = new CustomToken(_name, _symbol, msg.sender, _decimals);
         allTokens.push(address(token));
-        emit TokenCreated(address(token), _name, _symbol, _initialSupply, _decimals, msg.sender);
+        emit TokenCreated(address(token), _name, _symbol, _decimals, msg.sender);
     }
 
     function getAllTokens() external view returns (address[] memory) {

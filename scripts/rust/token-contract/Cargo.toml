@@ -11,3 +11,5 @@ ethers.workspace = true
 alloy.workspace = true
 url.workspace = true
 anyhow.workspace = true
+clap.workspace = true
+alloy-sol-types.workspace = true

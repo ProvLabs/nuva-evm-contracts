@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{Address, Bytes},
+    primitives::{Address, Bytes, U256},
     providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
@@ -13,17 +13,13 @@ use url::Url;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Token name
+    /// Recipient address
     #[arg(short, long)]
-    name: String,
+    to: Address,
 
-    /// Token symbol
+    /// Token amount
     #[arg(short, long)]
-    symbol: String,
-
-    /// Number of decimals
-    #[arg(short, long, default_value_t = 9)]
-    decimals: u8,
+    amount: U256,
 }
 
 #[tokio::main]
@@ -44,25 +40,24 @@ async fn main() -> Result<(), anyhow::Error> {
         .wallet(signer)
         .connect_http(Url::parse(&rpc_url)?);
 
-    // Prepare calldata for TokenFactory.createToken(string,string,uint8) using sol!
+    // Prepare calldata for ERC20 transfer(address,uint256) using sol!
     sol! {
-        function createToken(string _name, string _symbol, uint8 _decimals);
+        function transfer(address to, uint256 amount);
     }
-    let calldata: Bytes = createTokenCall {
-        _name: args.name.clone(),
-        _symbol: args.symbol.clone(),
-        _decimals: args.decimals,
+    let calldata: Bytes = transferCall {
+        to: args.to,
+        amount: args.amount,
     }
     .abi_encode()
     .into();
 
-    // Send the createToken transaction to the deployed factory address
+    // Send the transfer transaction to the token contract address
     let tx = TransactionRequest::default()
         .to(contract)
         .input(calldata.clone().into());
-    let create_tx_hash = provider.send_transaction(tx).await?.watch().await?;
+    let tx_hash = provider.send_transaction(tx).await?.watch().await?;
 
-    println!("✅ Tx sent: {create_tx_hash:?}");
+    println!("✅ Tx sent: {tx_hash:?}");
 
     Ok(())
 }
