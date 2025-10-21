@@ -1,25 +1,15 @@
-use alloy::{
-    primitives::{Address, Bytes, U256},
-    providers::{Provider, ProviderBuilder},
-    rpc::types::TransactionRequest,
-    signers::local::PrivateKeySigner,
-};
-use alloy_sol_types::SolCall;
+use alloy::{primitives::Address, providers::ProviderBuilder, signers::local::PrivateKeySigner};
 use clap::Parser;
 use std::{env, str::FromStr};
-use token_contract::CustomToken::mintCall;
+use token_contract::CustomToken;
 use url::Url;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// To Address
+    /// Account Address
     #[arg(short, long)]
-    to: Address,
-
-    /// Token amount
-    #[arg(short, long)]
-    amount: U256,
+    address: Address,
 }
 
 #[tokio::main]
@@ -40,20 +30,9 @@ async fn main() -> Result<(), anyhow::Error> {
         .wallet(signer)
         .connect_http(Url::parse(&rpc_url)?);
 
-    let calldata: Bytes = mintCall {
-        to: args.to,
-        amount: args.amount,
-    }
-    .abi_encode()
-    .into();
-
-    // Send the mintToken transaction to the deployed factory address
-    let tx = TransactionRequest::default()
-        .to(contract)
-        .input(calldata.clone().into());
-    let tx_hash = provider.send_transaction(tx).await?.watch().await?;
-
-    println!("✅ Tx sent: {tx_hash:?}");
+    let factory = CustomToken::new(contract, provider);
+    let balance = factory.balanceOf(args.address).call().await?;
+    println!("✅ Balance: {balance:?}");
 
     Ok(())
 }
