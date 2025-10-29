@@ -1,15 +1,11 @@
-// scripts/createInstance.js
+// scripts/createDeposit.js
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-// 1. PASTE YOUR DEPLOYED FACTORY ADDRESS HERE
-const FACTORY_ADDRESS = "0x09f759EB39599c01086B7507AFC29A1291251315";
-
-// 2. DEFINE THE SHARE TOKEN (e.g., SteveCoin)
+const FACTORY_ADDRESS = "0x7d25B8aFB0D88B93fDB77b1E522e35fEd4184c77";
 const SHARE_TOKEN_ADDRESS = "0x792949BA096871c6411634b53183A7764f2244f8";
-
-// 3. DEFINE THE DEPOSIT TOKEN (e.g., USDC or DAI)
 const DEPOSIT_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+const AML_SIGNER_ADDRESS = "0x4A9C27513533b9Bd30498d22e644AC214dE9f3FE";
 // --- END: Configuration ---
 
 async function main() {
@@ -21,10 +17,11 @@ async function main() {
   );
 
   console.log("Sending transaction to createDepositor()...");
-  
+
   const tx = await depositorFactory.createDepositor(
     SHARE_TOKEN_ADDRESS,
-    DEPOSIT_TOKEN_ADDRESS
+    DEPOSIT_TOKEN_ADDRESS,
+    AML_SIGNER_ADDRESS
   );
 
   // Wait for the transaction to be mined
@@ -35,12 +32,12 @@ async function main() {
   // =================================================================
   // --- START: UPDATED CODE FOR ETHERS V6 ---
   // =================================================================
-  
+
   let cloneAddress = "";
 
   // Loop through the raw logs in the receipt
   for (const log of receipt.logs) {
-    
+
     // We only care about logs from our factory contract
     if (log.address.toLowerCase() !== depositorFactory.target.toLowerCase()) {
       continue;
@@ -52,7 +49,7 @@ async function main() {
 
     if (parsedLog && parsedLog.name === "DepositorCreated") {
       cloneAddress = parsedLog.args.depositorAddress;
-      
+
       console.log("-----------------------------------------");
       console.log("🎉 New Depositor Clone Created! 🎉");
       console.log("   Share Token:", parsedLog.args.shareToken);
@@ -66,7 +63,7 @@ async function main() {
   if (cloneAddress === "") {
     console.error("Could not find 'DepositorCreated' event in transaction logs.");
   }
-  
+
   // =================================================================
   // --- END: UPDATED CODE ---
   // =================================================================
