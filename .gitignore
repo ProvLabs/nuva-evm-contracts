@@ -1,5 +1,6 @@
 node_modules
 .env
+notes.txt
 
 # Hardhat files
 /cache
@@ -19,3 +20,6 @@ ignition/deployments/chain-31337
 # Rust Target Folder
 target
 Cargo.lock
+
+# Mac
+.DS_Store
