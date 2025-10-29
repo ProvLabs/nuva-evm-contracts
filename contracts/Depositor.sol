@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
@@ -18,6 +19,8 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
  * user-provided destination address.
  */
 contract Depositor is Initializable {
+    using SafeERC20 for IERC20;
+
     // --- State Variables ---
 
     IERC20 public depositToken;
@@ -145,12 +148,7 @@ contract Depositor is Initializable {
             "Destination cannot be zero"
         );
 
-        bool success = depositToken.transferFrom(
-            msg.sender,
-            _destinationAddress,
-            _amount
-        );
-        require(success, "Token transfer failed. Check allowance/permit.");
+        depositToken.safeTransferFrom(msg.sender, _destinationAddress, _amount);
 
         emit Deposit(msg.sender, _amount, shareToken, _destinationAddress);
     }

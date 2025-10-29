@@ -13,17 +13,17 @@ async function main() {
 
   console.log("✅ Implementation deployed to:", implementation.target);
 
-  // 3. Get the contract factory for the factory
-  const DepositorFactory = await ethers.getContractFactory("DepositorFactory");
+  // // 3. Get the contract factory for the factory
+  // const DepositorFactory = await ethers.getContractFactory("DepositorFactory");
 
-  // 4. Deploy the factory, passing the implementation address as a constructor argument
-  console.log("Deploying DepositorFactory...");
-  const factory = await DepositorFactory.deploy(
-    implementation.target // Pass the address here
-  );
-  await factory.waitForDeployment();
+  // // 4. Deploy the factory, passing the implementation address as a constructor argument
+  // console.log("Deploying DepositorFactory...");
+  // const factory = await DepositorFactory.deploy(
+  //   implementation.target // Pass the address here
+  // );
+  // await factory.waitForDeployment();
 
-  console.log("✅ Factory deployed to:", factory.target);
+  // console.log("✅ Factory deployed to:", factory.target);
 }
 
 // Standard Hardhat script runner
