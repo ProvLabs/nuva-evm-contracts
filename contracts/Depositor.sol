@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // TODO
-// safeerc20 instead?
 // access control list for multi admin functionality? read open zeppelin docs
 
 /**
