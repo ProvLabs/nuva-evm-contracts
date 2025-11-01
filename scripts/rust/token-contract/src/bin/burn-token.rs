@@ -3,11 +3,11 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
-    sol_types::sol,
 };
 use alloy_sol_types::SolCall;
 use clap::Parser;
 use std::{env, str::FromStr};
+use token_contract::CustomToken::burnCall;
 use url::Url;
 
 #[derive(Parser, Debug)]
@@ -23,7 +23,7 @@ async fn main() -> Result<(), anyhow::Error> {
     dotenv::dotenv().ok();
     let args = Args::parse();
 
-    let contract_str = std::env::var("FACTORY_ADDRESS")?;
+    let contract_str = std::env::var("TOKEN_ADDRESS")?;
     let contract = Address::from_str(&contract_str)?;
     let private_key = std::env::var("PRIVATE_KEY")?;
 
@@ -36,15 +36,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .wallet(signer)
         .connect_http(Url::parse(&rpc_url)?);
 
-    // Prepare calldata for ERC20 burn(uint256) using sol!
-    sol! {
-        function burn(uint256 amount);
-    }
-    let calldata: Bytes = burnCall {
-        amount: args.amount,
-    }
-    .abi_encode()
-    .into();
+    let calldata: Bytes = burnCall { value: args.amount }.abi_encode().into();
 
     // Send the burn transaction to the token contract address
     let tx = TransactionRequest::default()

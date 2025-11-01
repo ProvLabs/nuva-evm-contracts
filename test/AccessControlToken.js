@@ -14,11 +14,16 @@ describe("CustomToken AccessControl", function () {
     const initialSupply = 1_000_000n; // human units
     const decimals = 6;
 
-    const tx = await factory.createToken(name, symbol, initialSupply, decimals);
+    const tx = await factory.createToken(name, symbol, decimals);
     await tx.wait();
 
-    const tokenAddr = (await factory.getAllTokens()).pop();
+    const addresses = await factory.getAllTokens();
+    const tokenAddr = addresses[addresses.length - 1];
     const token = await ethers.getContractAt("CustomToken", tokenAddr);
+
+    // Mint initial balance to admin since the contract does not mint on deploy
+    const scale = BigInt(10 ** decimals);
+    await token.connect(admin).mint(await admin.getAddress(), initialSupply * scale);
 
     return { admin, alice, bob, factory, token, name, symbol, initialSupply: BigInt(initialSupply), decimals };
   }

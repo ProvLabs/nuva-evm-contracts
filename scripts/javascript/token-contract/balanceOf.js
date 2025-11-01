@@ -19,14 +19,15 @@ async function main() {
   const decimals = await token.decimals();
   console.log("decimals:", decimals);
 
-  const to = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
-  const amount = hre.ethers.parseUnits("1000000000000", decimals);
+  let address = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
+  // Call balanceof(address)
+  let balance = await token.balanceOf(address);
+  console.log("balance of", address, "is", balance);
 
-  // Call mint(to, amount)
-  const tx = await token.mint(to, amount);
-  const receipt = await tx.wait();
-
-  console.log("mint tx:", receipt.hash);
+  address = "0x69482E00b8Ab0a256E8eF99718CcD8a2C460C3f7";
+  // Call balanceof(address)
+  balance = await token.balanceOf(address);
+  console.log("balance of", address, "is", balance);
 }
 
 main()

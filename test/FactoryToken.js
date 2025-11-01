@@ -14,7 +14,7 @@ describe("CustomToken & TokenFactory", function () {
     const initialSupply = 1_000_000n; // human units
     const decimals = 6;
 
-    const tx = await factory.createToken(name, symbol, initialSupply, decimals);
+    const tx = await factory.createToken(name, symbol, decimals);
     const receipt = await tx.wait();
 
     // Read the created token from state (simpler than parsing logs)
@@ -22,6 +22,10 @@ describe("CustomToken & TokenFactory", function () {
     const tokenAddr = addresses[addresses.length - 1];
 
     const token = await ethers.getContractAt("CustomToken", tokenAddr);
+
+    // Mint initial supply to deployer since token does not mint on deploy
+    const scale = BigInt(10 ** decimals);
+    await token.connect(deployer).mint(await deployer.getAddress(), initialSupply * scale);
 
     return { deployer, user, spender, receiver, factory, token, name, symbol, initialSupply: BigInt(initialSupply), decimals };
   }
@@ -35,7 +39,6 @@ describe("CustomToken & TokenFactory", function () {
     const last = events[events.length - 1];
     expect(last.args.name).to.equal(name);
     expect(last.args.symbol).to.equal(symbol);
-    expect(last.args.initialSupply).to.equal(initialSupply);
     expect(last.args.decimals).to.equal(decimals);
 
     const all = await factory.getAllTokens();
@@ -57,7 +60,7 @@ describe("CustomToken & TokenFactory", function () {
 
     const amount = 1_000n * BigInt(10 ** decimals);
 
-    await expect(token.connect(user).mint(ownerAddr, amount)).to.be.revertedWith("Only owner");
+    await expect(token.connect(user).mint(ownerAddr, amount)).to.be.revertedWithCustomError(token, "AccessControlUnauthorizedAccount");
 
     const prev = await token.balanceOf(ownerAddr);
     await expect(token.connect(deployer).mint(ownerAddr, amount)).to.emit(token, "Transfer").withArgs(ethers.ZeroAddress, ownerAddr, amount);
@@ -83,7 +86,7 @@ describe("CustomToken & TokenFactory", function () {
     expect(await token.balanceOf(await user.getAddress())).to.equal(0);
   });
 
-  it("transfer and transferChecked move balances", async function () {
+  it("transfer moves balances", async function () {
     const { deployer, user, token, decimals } = await deployFixture();
 
     const amt = 123n * BigInt(10 ** decimals);
@@ -92,37 +95,27 @@ describe("CustomToken & TokenFactory", function () {
     await expect(token.connect(deployer).transfer(userAddr, amt))
       .to.emit(token, "Transfer");
 
-    await expect(token.connect(user).transferChecked(await deployer.getAddress(), amt))
+    await expect(token.connect(user).transfer(await deployer.getAddress(), amt))
       .to.emit(token, "Transfer");
   });
 
   it("approve and allowances via SafeERC20 helpers on factory", async function () {
     const { deployer, spender, receiver, token, factory, decimals } = await deployFixture();
 
-    // Send some tokens to factory so it can manage its own allowances and transfers
     const factoryAddr = await factory.getAddress();
     const ownerAddr = await deployer.getAddress();
     const amt = 1000n * BigInt(10 ** decimals);
-    await token.connect(deployer).transfer(factoryAddr, amt);
 
-    // forceApprove sets allowance owned by the factory to spender
-    await expect(factory.forceApproveToken(await token.getAddress(), await spender.getAddress(), amt))
-      .to.not.be.reverted;
-    expect(await token.allowance(factoryAddr, await spender.getAddress())).to.equal(amt);
+    // Owner approves factory to spend on their behalf
+    await token.connect(deployer).approve(factoryAddr, amt);
+    expect(await token.allowance(ownerAddr, factoryAddr)).to.equal(amt);
 
-    // increase/decrease allowance (still for factory as owner)
-    await factory.safeIncreaseAllowance(await token.getAddress(), await spender.getAddress(), 100n);
-    expect(await token.allowance(factoryAddr, await spender.getAddress())).to.equal(amt + 100n);
-
-    await factory.safeDecreaseAllowance(await token.getAddress(), await spender.getAddress(), 50n);
-    expect(await token.allowance(factoryAddr, await spender.getAddress())).to.equal(amt + 50n);
-
-    // spender pulls from factory using safeTransferFrom helper (factory initiates call)
-    // First, spender must be allowed by factory (already true). Pull a portion to receiver.
-    await expect(factory.safeTransferFromToken(await token.getAddress(), factoryAddr, await receiver.getAddress(), 200n))
+    // Factory pulls from owner to receiver using safeTransferFrom
+    await expect(factory.safeTransferFromToken(await token.getAddress(), ownerAddr, await receiver.getAddress(), 200n))
       .to.not.be.reverted;
 
-    // factory can also push using safeTransferToken
+    // Now send some tokens to factory and push using safeTransferToken
+    await token.connect(deployer).transfer(factoryAddr, 150n);
     await expect(factory.safeTransferToken(await token.getAddress(), await receiver.getAddress(), 100n))
       .to.not.be.reverted;
   });

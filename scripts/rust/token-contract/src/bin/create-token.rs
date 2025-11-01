@@ -3,11 +3,11 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
-    sol_types::sol,
 };
 use alloy_sol_types::SolCall;
 use clap::Parser;
 use std::{env, str::FromStr};
+use token_contract::TokenFactory::createTokenCall;
 use url::Url;
 
 #[derive(Parser, Debug)]
@@ -44,10 +44,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .wallet(signer)
         .connect_http(Url::parse(&rpc_url)?);
 
-    // Prepare calldata for TokenFactory.createToken(string,string,uint8) using sol!
-    sol! {
-        function createToken(string _name, string _symbol, uint8 _decimals);
-    }
     let calldata: Bytes = createTokenCall {
         _name: args.name.clone(),
         _symbol: args.symbol.clone(),
