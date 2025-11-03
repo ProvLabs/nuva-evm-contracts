@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "./CustomToken.sol";
 
 // TODO
 // access control list for multi admin functionality? read open zeppelin docs
@@ -18,11 +19,11 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
  * user-provided destination address.
  */
 contract Depositor is Initializable {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for CustomToken;
 
     // --- State Variables ---
 
-    IERC20 public depositToken;
+    CustomToken public depositToken;
     address public shareToken;
     address public amlSigner;
     mapping(bytes32 => bool) public usedSignatures;
@@ -62,7 +63,7 @@ contract Depositor is Initializable {
             "Aml signer address cannot be zero"
         );
 
-        depositToken = IERC20(_depositTokenAddress);
+        depositToken = CustomToken(_depositTokenAddress);
         shareToken = _shareTokenAddress;
         amlSigner = _amlSignerAddress;
     }

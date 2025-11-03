@@ -8,7 +8,6 @@ module.exports = {
       url: process.env.RPC_URL || "http://localhost:8545",
       accounts: [
         process.env.PRIVATE_KEY,
-        process.env.PRIVATE_KEY_2,
       ],
       chainId: 11155111,
     },
