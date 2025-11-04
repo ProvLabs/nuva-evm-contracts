@@ -12,7 +12,7 @@ async function main() {
   const factory = await hre.ethers.getContractAt("TokenFactory", factoryAddr);
 
   // Call createToken(name, symbol, decimals)
-  const tx = await factory.createToken("MyCoin", "MC", 6);
+  const tx = await factory.createToken("MyCoin", "MC", 18);
   const receipt = await tx.wait();
 
   console.log("createToken tx:", receipt.hash);
