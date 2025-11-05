@@ -1,23 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "./CustomToken.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IERC20Permit} from"@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {CustomToken} from "./CustomToken.sol";
 
 // TODO
 // access control list for multi admin functionality? read open zeppelin docs
 
-/**
+/*
  * @title Depositor
  * @dev This is the LOGIC contract. It will be "cloned" by the factory.
  * It accepts a specified token (depositToken) and sends it to a
  * user-provided destination address.
  */
+error InvalidAddress(string); // dev: Address cannot be zero
+error InvalidAmount(); // dev: Amount must be greater than zero
+error AmlSignatureExpired(); // dev: AML signature has expired
+error AmlSignatureAlreadyUsed(); // dev: AML signature has already been used
+error InvalidAmlSignature(); // dev: The AML signature is invalid
+error InvalidAmlSigner(); // dev: The AML signer is invalid
+
 contract Depositor is Initializable {
     using SafeERC20 for CustomToken;
 
@@ -50,18 +56,15 @@ contract Depositor is Initializable {
         address _shareTokenAddress,
         address _amlSignerAddress
     ) external initializer {
-        require(
-            _depositTokenAddress != address(0),
-            "Deposit token address cannot be zero"
-        );
-        require(
-            _shareTokenAddress != address(0),
-            "Share token address cannot be zero"
-        );
-        require(
-            _amlSignerAddress != address(0),
-            "Aml signer address cannot be zero"
-        );
+        if (_depositTokenAddress == address(0)) {
+            revert InvalidAddress("deposit token");
+        }
+        if (_shareTokenAddress == address(0)) {
+            revert InvalidAddress("share token");
+        }
+        if (_amlSignerAddress == address(0)) {
+            revert InvalidAddress("aml signer");
+        }
 
         depositToken = CustomToken(_depositTokenAddress);
         shareToken = _shareTokenAddress;
@@ -142,11 +145,12 @@ contract Depositor is Initializable {
      * @dev Internal function to perform the token transfer.
      */
     function _doDeposit(uint256 _amount, address _destinationAddress) private {
-        require(_amount > 0, "Amount must be greater than zero");
-        require(
-            _destinationAddress != address(0),
-            "Destination cannot be zero"
-        );
+        if (_amount == 0) {
+            revert InvalidAmount();
+        }
+        if (_destinationAddress == address(0)) {
+            revert InvalidAddress("destination");
+        }
 
         depositToken.safeTransferFrom(msg.sender, _destinationAddress, _amount);
 
@@ -162,10 +166,14 @@ contract Depositor is Initializable {
         uint256 _deadline
     ) private {
         // Check if the signature has expired
-        require(block.timestamp <= _deadline, "AML signature expired");
+        if (block.timestamp > _deadline) {
+            revert AmlSignatureExpired();
+        }
 
         // Replay Prevention
-        require(!usedSignatures[messageHash], "AML signature already used");
+        if (usedSignatures[messageHash]) {
+            revert AmlSignatureAlreadyUsed();
+        }
 
         // Recover the Signer
         bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
@@ -174,8 +182,12 @@ contract Depositor is Initializable {
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
         // Validate the Signer
-        require(recoveredSigner != address(0), "Invalid AML signature");
-        require(recoveredSigner == amlSigner, "Invalid AML signer");
+        if (recoveredSigner == address(0)) {
+            revert InvalidAmlSignature();
+        }
+        if (recoveredSigner != amlSigner) {
+            revert InvalidAmlSigner();
+        }
 
         // Mark Signature as Used
         usedSignatures[messageHash] = true;

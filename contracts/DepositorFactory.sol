@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "./Depositor.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Depositor} from "./Depositor.sol";
 
-/**
+/*
  * @title DepositorFactory
- * @dev Deploys clones of the Depositor implementation.
- * Stores clones by [shareToken][depositToken] pairs.
+ * @notice Deploys clones of the Depositor implementation.
+ * @dev Stores clones by [shareToken][depositToken] pairs.
  */
+// Errors
+error ZeroAddress();
+error DepositorAlreadyExists();
+error NoExistingDepositorToMigrate();
+
 contract DepositorFactory is Ownable {
     // --- State Variables ---
 
@@ -26,14 +31,25 @@ contract DepositorFactory is Ownable {
 
     // --- Events ---
 
+    /// @notice Emitted when the implementation address is updated
+    /// @param newImplementation The address of the new implementation contract
     event ImplementationUpdated(address indexed newImplementation);
 
+    /// @notice Emitted when a new depositor is created for a token pair
+    /// @param shareToken The address of the share token
+    /// @param depositToken The address of the deposit token
+    /// @param depositorAddress The address of the newly created depositor contract
     event DepositorCreated(
         address indexed shareToken,
         address indexed depositToken,
         address depositorAddress
     );
 
+    /// @notice Emitted when a depositor is migrated to a new implementation
+    /// @param shareToken The address of the share token
+    /// @param depositToken The address of the deposit token
+    /// @param oldDepositorAddress The address of the old depositor contract
+    /// @param newDepositorAddress The address of the new depositor contract
     event DepositorMigrated(
         address indexed shareToken,
         address indexed depositToken,
@@ -49,13 +65,15 @@ contract DepositorFactory is Ownable {
      * Depositor logic contract.
      */
     constructor(address _implementation) Ownable(msg.sender) {
-        require(_implementation != address(0), "Implementation cannot be zero");
+        if (_implementation == address(0)) {
+            revert ZeroAddress();
+        }
         implementation = _implementation;
     }
 
     // --- Public Functions ---
 
-    /**
+    /*
      * @notice Creates and initializes a new depositor clone for a specific pair.
      * @param _shareTokenAddress The (variable) share token for this new depositor.
      * @param _depositTokenAddress The (variable) input token (e.g., USDC) for this depositor.
@@ -67,24 +85,20 @@ contract DepositorFactory is Ownable {
         address _depositTokenAddress,
         address _amlSignerAddress
     ) external returns (address depositorAddress) {
-        require(
-            _shareTokenAddress != address(0),
-            "Share token address cannot be zero"
-        );
-        require(
-            _depositTokenAddress != address(0),
-            "Deposit address cannot be zero"
-        );
-        require(
-            _amlSignerAddress != address(0),
-            "Aml signer address cannot be zero"
-        );
+        if (_shareTokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_depositTokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_amlSignerAddress == address(0)) {
+            revert ZeroAddress();
+        }
 
         // Check for existence using the nested mapping
-        require(
-            depositors[_shareTokenAddress][_depositTokenAddress] == address(0),
-            "Depositor already exists for this pair"
-        );
+        if (depositors[_shareTokenAddress][_depositTokenAddress] != address(0)) {
+            revert DepositorAlreadyExists();
+        }
 
         // 1. Create the cheap EIP-1167 clone
         depositorAddress = Clones.clone(implementation);
@@ -107,9 +121,9 @@ contract DepositorFactory is Ownable {
         );
     }
 
-    // --- Admin Functions ---
+    /* --- Admin Functions --- */
 
-    /**
+    /*
      * @notice Creates a new clone for an *existing* pair.
      * @dev Overwrites the address in the 'depositors' map.
      */
@@ -123,7 +137,9 @@ contract DepositorFactory is Ownable {
         ];
 
         // This check ensures we are only migrating pairs that exist
-        require(oldDepositor != address(0), "No existing depositor to migrate");
+        if (oldDepositor == address(0)) {
+            revert NoExistingDepositorToMigrate();
+        }
 
         // Create a new clone pointing to the *current* implementation
         newDepositorAddress = Clones.clone(implementation);
@@ -148,7 +164,7 @@ contract DepositorFactory is Ownable {
         );
     }
 
-    /**
+    /*
      * @notice Allows the owner to point the factory to a new
      * implementation contract.
      * @dev All *new* clones will use this new address.
@@ -156,7 +172,9 @@ contract DepositorFactory is Ownable {
     function updateImplementation(
         address _newImplementation
     ) external onlyOwner {
-        require(_newImplementation != address(0), "Cannot be zero address");
+        if (_newImplementation == address(0)) {
+            revert ZeroAddress();
+        }
         implementation = _newImplementation;
         emit ImplementationUpdated(_newImplementation);
     }
