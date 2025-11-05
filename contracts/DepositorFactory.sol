@@ -15,12 +15,6 @@ error ZeroAddress();
 error DepositorAlreadyExists();
 error NoExistingDepositorToMigrate();
 
-/**
- * @title DepositorFactory
- * @notice Deploys clones of the Depositor implementation.
- * @dev Stores clones by [shareToken][depositToken] pairs.
- * @author NU Blockchain Technologies
- */
 contract DepositorFactory is Ownable {
     // --- State Variables ---
 
@@ -80,7 +74,7 @@ contract DepositorFactory is Ownable {
 
     // --- Public Functions ---
 
-    /**
+    /*
      * @notice Creates and initializes a new depositor clone for a specific pair.
      * @param _shareTokenAddress The (variable) share token for this new depositor.
      * @param _depositTokenAddress The (variable) input token (e.g., USDC) for this depositor.
@@ -173,7 +167,7 @@ contract DepositorFactory is Ownable {
         );
     }
 
-    /**
+    /*
      * @notice Allows the owner to point the factory to a new
      * implementation contract.
      * @dev All *new* clones will use this new address.
