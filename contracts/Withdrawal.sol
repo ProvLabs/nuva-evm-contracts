@@ -5,8 +5,22 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {CustomToken} from "./CustomToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AMLUtils} from "./libraries/AMLUtils.sol";
+
+/**
+ * @title ICustomToken
+ * @notice Minimal interface for CustomToken that only exposes the functions we need
+ * @author NU Blockchain Technologies
+ */
+interface ICustomToken is IERC20, IERC20Permit {
+    /**
+     * @notice Burns a specified amount of tokens from a specified address.
+     * @param from The address from which the tokens will be burned.
+     * @param amount The amount of tokens to burn.
+     */
+    function burnAuthorized(address from, uint256 amount) external;
+}
 
 
 /**
@@ -16,12 +30,12 @@ import {AMLUtils} from "./libraries/AMLUtils.sol";
  @author NU Blockchain Technologies
  */
 contract Withdrawal is Initializable, AccessControlUpgradeable {
-    using SafeERC20 for CustomToken;
+    using SafeERC20 for ICustomToken;
 
     // --- State Variables ---
 
     /// @notice The token that can be withdrawn from this contract.
-    CustomToken public withdrawalToken;
+    ICustomToken public withdrawalToken;
     /// @notice The address of the share token, used for logging purposes.
     address public shareToken;
     /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
@@ -81,7 +95,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
             revert InvalidAddress("Invalid AML signer");
         }
 
-        withdrawalToken = CustomToken(_withdrawalTokenAddress);
+        withdrawalToken = ICustomToken(_withdrawalTokenAddress);
         shareToken = _shareTokenAddress;
         amlSigner = _amlSignerAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -147,7 +161,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        IERC20Permit(address(withdrawalToken)).permit(
+withdrawalToken.permit(
             msg.sender,
             address(this),
             _amount,
