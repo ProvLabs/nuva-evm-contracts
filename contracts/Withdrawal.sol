@@ -5,11 +5,16 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CustomToken} from "./CustomToken.sol";
+import {AMLUtils} from "./libraries/AMLUtils.sol";
 
 
+/**
+ * @title Withdrawal Contract
+ * @notice Handles secure token withdrawals with AML verification and permit functionality.
+ * @dev This contract provides a secure way to withdraw tokens from the contract
+ @author NU Blockchain Technologies
+ */
 contract Withdrawal is Initializable, AccessControlUpgradeable {
     using SafeERC20 for CustomToken;
 
@@ -28,8 +33,8 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     // --- Errors ---
 
-    error InvalidAddress();
-    error AmountMustBeGreaterThanZero();
+    error InvalidAddress(string); // dev: Address cannot be zero
+    error InvalidAmount(); // dev: Amount must be greater than zero
     error AMLSignatureExpired();
     error AMLSignatureAlreadyUsed();
     error InvalidAMLSignature();
@@ -54,9 +59,10 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     // --- Initializer ---
 
     /**
-     * @dev Initializer. Replaces the constructor.
-     * @param _withdrawalTokenAddress The token contract this depositor will accept.
-     * @param _shareTokenAddress The token address to emit in the log.
+     * @notice Initializes the contract with the provided token addresses and AML signer.
+     * @dev Can only be called once during contract deployment.
+     * @param _withdrawalTokenAddress The address of the token that can be withdrawn.
+     * @param _shareTokenAddress The address of the share token for logging purposes.
      * @param _amlSignerAddress The address of the trusted AML signer.
      */
     function initialize(
@@ -66,13 +72,13 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
         if (_withdrawalTokenAddress == address(0)) {
-            revert InvalidAddress();
+            revert InvalidAddress("Invalid withdrawal token");
         }
         if (_shareTokenAddress == address(0)) {
-            revert InvalidAddress();
+            revert InvalidAddress("Invalid share token");
         }
         if (_amlSignerAddress == address(0)) {
-            revert InvalidAddress();
+            revert InvalidAddress("Invalid AML signer");
         }
 
         withdrawalToken = CustomToken(_withdrawalTokenAddress);
@@ -86,9 +92,10 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Allows a user to withdraw tokens after passing an AML check.
+     * @dev The function verifies the AML signature and deadline before processing the withdrawal.
      * @param _amount The amount of tokens to withdraw.
      * @param _amlSignature The signature from the AML signer.
-     * @param _amlDeadline The deadline for the AML signature.
+     * @param _amlDeadline The expiration timestamp for the AML signature.
      */
     function withdraw(
         uint256 _amount,
@@ -96,7 +103,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         uint256 _amlDeadline
     ) external {
         if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
+            revert InvalidAmount(); // dev: Amount must be greater than zero
         }
 
         bytes32 messageHash = _getMessageHash(
@@ -111,13 +118,14 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Allows a user to withdraw tokens using a permit, avoiding the need for a separate approval transaction.
+     * @dev Combines permit functionality with AML checks for gas-efficient withdrawals.
      * @param _amount The amount of tokens to withdraw.
      * @param _amlSignature The signature from the AML signer.
-     * @param _amlDeadline The deadline for the AML signature.
-     * @param _permitDeadline The deadline for the permit signature.
-     * @param _v The v component of the permit signature.
-     * @param _r The r component of the permit signature.
-     * @param _s The s component of the permit signature.
+     * @param _amlDeadline The expiration timestamp for the AML signature.
+     * @param _permitDeadline The expiration timestamp for the permit signature.
+     * @param _v The recovery byte of the permit signature.
+     * @param _r First 32 bytes of the permit signature.
+     * @param _s Second 32 bytes of the permit signature.
      */
     function withdrawWithPermit(
         uint256 _amount,
@@ -129,7 +137,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         bytes32 _s
     ) external {
         if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
+            revert InvalidAmount(); // dev: Amount must be greater than zero
         }
 
         bytes32 messageHash = _getMessageHash(
@@ -155,7 +163,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     // --- Private Helper Functions ---
 
     /**
-     * @dev Internal function to handle the withdrawal logic.
+     * @notice Handles the withdrawal logic by transferring tokens from the sender to this contract.
      * @param _amount The amount of tokens to withdraw.
      */
     function _doWithdraw(uint256 _amount) private {
@@ -166,70 +174,51 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Allows an address with the BURN_ROLE to burn tokens held by this contract.
+     * @dev Only callable by addresses with the BURN_ROLE.
      * @param _amount The amount of tokens to burn.
      */
     function burnLocked(uint256 _amount) external onlyRole(BURN_ROLE) {
         if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
+            revert InvalidAmount(); // dev: Amount must be greater than zero
         }
         withdrawalToken.burnAuthorized(address(this), _amount);
     }
 
     /**
+     * @notice Verifies an AML signature for a withdrawal.
      * @dev Internal function to verify the AML signature.
+     * @param messageHash The hash of the message to verify.
+     * @param _signature The signature to verify.
+     * @param _deadline The expiration timestamp for the signature.
      */
     function _verifyAML(
         bytes32 messageHash,
         bytes calldata _signature,
         uint256 _deadline
     ) private {
-        // Check if the signature has expired
-        if (block.timestamp > _deadline) {
-            revert AMLSignatureExpired();
-        }
-
-        // Replay Prevention
-        if (usedSignatures[messageHash]) {
-            revert AMLSignatureAlreadyUsed();
-        }
-
-        // Recover the Signer
-        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
-            messageHash
-        );
-        address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
-
-        // Validate the Signer
-        if (recoveredSigner == address(0)) {
-            revert InvalidAMLSignature();
-        }
-        if (recoveredSigner != amlSigner) {
-            revert InvalidAMLSigner();
-        }
-
-        // Mark Signature as Used
-        usedSignatures[messageHash] = true;
+        AMLUtils.verifyAML(usedSignatures, messageHash, _signature, _deadline, amlSigner);
     }
 
     /**
+     * @notice Generates a message hash for AML verification by hashing the withdrawal details.
      * @dev Internal function to build the AML message hash.
+     * @param _amount The amount of tokens for the withdrawal.
+     * @param _destinationAddress The address where tokens will be sent.
+     * @param _deadline The expiration timestamp for the message.
+     * @return The hashed message used for AML signature verification.
      */
     function _getMessageHash(
         uint256 _amount,
         address _destinationAddress,
         uint256 _deadline
     ) private view returns (bytes32) {
-        // This hash MUST match what the frontend AML signer signs
-        return
-            keccak256(
-                abi.encodePacked(
-                    msg.sender,
-                    address(withdrawalToken),
-                    shareToken,
-                    _amount,
-                    _destinationAddress,
-                    _deadline
-                )
-            );
+        return AMLUtils.getMessageHash(
+            msg.sender,
+            address(withdrawalToken),
+            shareToken,
+            _amount,
+            _destinationAddress,
+            _deadline
+        );
     }
 }

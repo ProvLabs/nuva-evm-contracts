@@ -14,8 +14,39 @@ module.exports = {
   },
   solidity: {
     compilers: [
-      { version: "0.8.28" },
-      { version: "0.8.20" },
+      {
+        version: "0.8.28",
+        settings: {
+          viaIR: true,
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          metadata: {
+            bytecodeHash: "none"
+          }
+        }
+      },
+      { 
+        version: "0.8.20",
+        settings: {
+          viaIR: true,
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          metadata: {
+            bytecodeHash: "none"
+          }
+        }
+      },
     ],
   },
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts"
+  },
+  defaultNetwork: "hardhat",
 };

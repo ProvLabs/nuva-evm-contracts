@@ -4,9 +4,8 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20Permit} from"@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CustomToken} from "./CustomToken.sol";
+import {AMLUtils} from "./libraries/AMLUtils.sol";
 
 // TODO
 // access control list for multi admin functionality? read open zeppelin docs
@@ -24,18 +23,39 @@ error AmlSignatureAlreadyUsed(); // dev: AML signature has already been used
 error InvalidAmlSignature(); // dev: The AML signature is invalid
 error InvalidAmlSigner(); // dev: The AML signer is invalid
 
+/**
+ * @title Depositor Contract
+ * @notice This contract is used to deposit tokens into the contract.
+ * @dev This contract handles token deposits with AML verification and permit functionality.
+ * It's designed to be cloned by a factory contract for multiple instances.
+ * @author NU Blockchain Technologies
+ */
 contract Depositor is Initializable {
     using SafeERC20 for CustomToken;
 
     // --- State Variables ---
 
+    /// @notice The token that can be deposited into this contract.
     CustomToken public depositToken;
+    
+    /// @notice The address of the share token, used for event emissions.
     address public shareToken;
+    
+    /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
     address public amlSigner;
+    
+    /// @notice Mapping to track used AML signatures to prevent replay attacks.
     mapping(bytes32 => bool) public usedSignatures;
 
     // --- Events ---
 
+    /**
+     * @notice Emitted when a deposit is made.
+     * @param user The address of the user making the deposit.
+     * @param amount The amount of tokens deposited.
+     * @param shareToken The address of the share token.
+     * @param destinationAddress The address where the tokens were sent.
+     */
     event Deposit(
         address indexed user,
         uint256 amount,
@@ -46,7 +66,8 @@ contract Depositor is Initializable {
     // --- Initializer ---
 
     /**
-     * @dev Initializer. Replaces the constructor.
+     * @notice Initializes the contract with the provided token addresses and AML signer.
+     * @dev Can only be called once during contract deployment.
      * @param _depositTokenAddress The token contract this depositor will accept.
      * @param _shareTokenAddress The token address to emit in the log.
      * @param _amlSignerAddress The address of the trusted AML signer.
@@ -100,13 +121,14 @@ contract Depositor is Initializable {
     /**
      * @notice Deposits tokens using an off-chain 'permit' signature.
      * @dev This allows for a single-transaction approve+deposit.
-     * @dev Requires AML signature.
      * @param _amount The amount of tokens to deposit.
      * @param _destinationAddress The address to send the tokens to.
      * @param _amlSignature The address to send the tokens to.
      * @param _amlDeadline The time at which the AML signature expires.
      * @param _permitDeadline The time at which the permit signature expires.
-     * @param _v, _r, _s The components of the EIP-712 permit signature from the user.
+     * @param _v The recovery byte of the EIP-712 permit signature.
+     * @param _r First 32 bytes of the EIP-712 permit signature.
+     * @param _s Second 32 bytes of the EIP-712 permit signature.
      */
     function depositWithPermit(
         uint256 _amount,
@@ -142,7 +164,10 @@ contract Depositor is Initializable {
     // --- Private Helper Functions ---
 
     /**
-     * @dev Internal function to perform the token transfer.
+     * @notice Internal function to perform the token transfer and emit the Deposit event.
+     * @dev This function is called by the public deposit and depositWithPermit functions.
+     * @param _amount The amount of tokens to deposit.
+     * @param _destinationAddress The address where tokens will be sent.
      */
     function _doDeposit(uint256 _amount, address _destinationAddress) private {
         if (_amount == 0) {
@@ -158,60 +183,40 @@ contract Depositor is Initializable {
     }
 
     /**
-     * @dev Internal function to verify the AML signature.
+     * @notice Internal function to verify the AML signature.
+     * @dev This function is called by the public deposit and depositWithPermit functions.
+     * @param messageHash The hash of the message to verify.
+     * @param _signature The signature to verify.
+     * @param _deadline The expiration timestamp for the signature.
      */
     function _verifyAML(
         bytes32 messageHash,
         bytes calldata _signature,
         uint256 _deadline
     ) private {
-        // Check if the signature has expired
-        if (block.timestamp > _deadline) {
-            revert AmlSignatureExpired();
-        }
-
-        // Replay Prevention
-        if (usedSignatures[messageHash]) {
-            revert AmlSignatureAlreadyUsed();
-        }
-
-        // Recover the Signer
-        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
-            messageHash
-        );
-        address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
-
-        // Validate the Signer
-        if (recoveredSigner == address(0)) {
-            revert InvalidAmlSignature();
-        }
-        if (recoveredSigner != amlSigner) {
-            revert InvalidAmlSigner();
-        }
-
-        // Mark Signature as Used
-        usedSignatures[messageHash] = true;
+        AMLUtils.verifyAML(usedSignatures, messageHash, _signature, _deadline, amlSigner);
     }
 
     /**
-     * @dev Internal function to build the AML message hash.
+     * @notice Internal function to build the AML message hash.
+     * @dev This function is called by the public deposit and depositWithPermit functions.
+     * @param _amount The amount of tokens for the deposit.
+     * @param _destinationAddress The address where tokens will be sent.
+     * @param _deadline The expiration timestamp for the message.
+     * @return The hashed message used for AML signature verification.
      */
     function _getMessageHash(
         uint256 _amount,
         address _destinationAddress,
         uint256 _deadline
     ) private view returns (bytes32) {
-        // This hash MUST match what the frontend AML signer signs
-        return
-            keccak256(
-                abi.encodePacked(
-                    msg.sender,
-                    address(depositToken),
-                    shareToken,
-                    _amount,
-                    _destinationAddress,
-                    _deadline
-                )
-            );
+        return AMLUtils.getMessageHash(
+            msg.sender,
+            address(depositToken),
+            shareToken,
+            _amount,
+            _destinationAddress,
+            _deadline
+        );
     }
 }

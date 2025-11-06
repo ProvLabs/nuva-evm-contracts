@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { deployAMLUtils, deployWithdrawal } = require("./helpers/fixtures");
 
 async function getAMLSignature({ amlSigner, user, token, shareToken, amount, destination, deadline }) {
   const hash = ethers.solidityPackedKeccak256(
@@ -55,8 +56,9 @@ describe("Withdrawal", function () {
     // shareToken can be any address to log; use token address for simplicity
     const shareToken = token.target;
 
-    const Withdrawal = await ethers.getContractFactory("Withdrawal");
-    const withdrawal = await Withdrawal.deploy();
+    // Deploy AMLUtils and Withdrawal with linked library
+    const amlUtils = await deployAMLUtils();
+    const withdrawal = await deployWithdrawal(amlUtils);
     await withdrawal.initialize(token.target, shareToken, amlSigner.address);
 
     // Grant BURNER_ROLE to the withdrawal contract

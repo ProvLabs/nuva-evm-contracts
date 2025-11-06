@@ -15,6 +15,12 @@ error ZeroAddress();
 error DepositorAlreadyExists();
 error NoExistingDepositorToMigrate();
 
+/**
+ * @title DepositorFactory
+ * @notice Deploys clones of the Depositor implementation.
+ * @dev Stores clones by [shareToken][depositToken] pairs.
+ * @author NU Blockchain Technologies
+ */
 contract DepositorFactory is Ownable {
     // --- State Variables ---
 
@@ -42,7 +48,7 @@ contract DepositorFactory is Ownable {
     event DepositorCreated(
         address indexed shareToken,
         address indexed depositToken,
-        address depositorAddress
+        address indexed depositorAddress
     );
 
     /// @notice Emitted when a depositor is migrated to a new implementation
@@ -60,7 +66,8 @@ contract DepositorFactory is Ownable {
     // --- Constructor ---
 
     /**
-     * @dev Sets the master logic contract address.
+     * @notice Initializes the contract with the provided implementation address.
+     * @dev Can only be called once during contract deployment.
      * @param _implementation The address of the *already deployed*
      * Depositor logic contract.
      */
@@ -73,7 +80,7 @@ contract DepositorFactory is Ownable {
 
     // --- Public Functions ---
 
-    /*
+    /**
      * @notice Creates and initializes a new depositor clone for a specific pair.
      * @param _shareTokenAddress The (variable) share token for this new depositor.
      * @param _depositTokenAddress The (variable) input token (e.g., USDC) for this depositor.
@@ -121,11 +128,13 @@ contract DepositorFactory is Ownable {
         );
     }
 
-    /* --- Admin Functions --- */
-
-    /*
+    /**
      * @notice Creates a new clone for an *existing* pair.
      * @dev Overwrites the address in the 'depositors' map.
+     * @param _shareTokenAddress The (variable) share token for this new depositor.
+     * @param _depositTokenAddress The (variable) input token (e.g., USDC) for this depositor.
+     * @param _amlSignerAddress The address of the trusted AML signer.
+     * @return newDepositorAddress The address of the newly created clone.  
      */
     function migrateDepositor(
         address _shareTokenAddress,
@@ -164,10 +173,11 @@ contract DepositorFactory is Ownable {
         );
     }
 
-    /*
+    /**
      * @notice Allows the owner to point the factory to a new
      * implementation contract.
      * @dev All *new* clones will use this new address.
+     * @param _newImplementation The address of the new implementation contract.
      */
     function updateImplementation(
         address _newImplementation

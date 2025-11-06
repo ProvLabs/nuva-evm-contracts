@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { deployAMLUtils, deployDepositor } = require("./helpers/fixtures");
 
 // Helpers
 async function latestTimestamp() {
@@ -63,10 +64,9 @@ describe("Depositor", function () {
     const scale = 10n ** BigInt(decimals);
     await token.connect(deployer).mint(await user.getAddress(), 1_000_000n * scale);
 
-    // Deploy Depositor implementation and factory
-    const DepositorImpl = await ethers.getContractFactory("Depositor");
-    const depositorImpl = await DepositorImpl.deploy();
-    await depositorImpl.waitForDeployment();
+    // Deploy AMLUtils and Depositor with linked library
+    const amlUtils = await deployAMLUtils();
+    const depositorImpl = await deployDepositor(amlUtils);
 
     const DepositorFactory = await ethers.getContractFactory("DepositorFactory");
     const depositorFactory = await DepositorFactory.deploy(await depositorImpl.getAddress());
