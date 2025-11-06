@@ -1,6 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { deployAMLUtils, deployDepositor } = require("./helpers/fixtures");
 
 // Helpers
 async function latestTimestamp() {
@@ -64,9 +63,19 @@ describe("Depositor", function () {
     const scale = 10n ** BigInt(decimals);
     await token.connect(deployer).mint(await user.getAddress(), 1_000_000n * scale);
 
-    // Deploy AMLUtils and Depositor with linked library
-    const amlUtils = await deployAMLUtils();
-    const depositorImpl = await deployDepositor(amlUtils);
+    // Deploy AMLUtils library first
+    const AMLUtils = await ethers.getContractFactory("AMLUtils");
+    const amlUtils = await AMLUtils.deploy();
+    await amlUtils.waitForDeployment();
+
+    // Deploy Depositor implementation with linked library
+    const DepositorImpl = await ethers.getContractFactory("Depositor", {
+      libraries: {
+        AMLUtils: await amlUtils.getAddress()
+      }
+    });
+    const depositorImpl = await DepositorImpl.deploy();
+    await depositorImpl.waitForDeployment();
 
     const DepositorFactory = await ethers.getContractFactory("DepositorFactory");
     const depositorFactory = await DepositorFactory.deploy(await depositorImpl.getAddress());
@@ -143,10 +152,14 @@ describe("Depositor", function () {
       destination: await destination.getAddress(),
       deadline: nowTs - 1n
     });
-    await expect(depositor.connect(user).deposit(amt, await destination.getAddress(), sigExpired, nowTs - 1n))
-      .to.be.revertedWith("AML signature expired");
+    
+    // Test expired signature - should revert with AMLUtils.AmlSignatureExpired
+    const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
+    await expect(
+      depositor.connect(user).deposit(amt, await destination.getAddress(), sigExpired, nowTs - 1n)
+    ).to.be.revertedWithCustomError(amlUtils, 'AmlSignatureExpired');
 
-    // wrong signer
+    // Test wrong signer
     const imposter = (await ethers.getSigners())[3];
     const deadline = nowTs + 3600n;
     const { signature: sigWrong } = await buildAmlSignature({
@@ -158,10 +171,11 @@ describe("Depositor", function () {
       destination: await destination.getAddress(),
       deadline
     });
-    await expect(depositor.connect(user).deposit(amt, await destination.getAddress(), sigWrong, deadline))
-      .to.be.revertedWith("Invalid AML signer");
+    await expect(
+      depositor.connect(user).deposit(amt, await destination.getAddress(), sigWrong, deadline)
+    ).to.be.revertedWithCustomError(amlUtils, 'InvalidAmlSigner');
 
-    // replay protection
+    // Test replay protection
     const { signature } = await buildAmlSignature({
       amlSigner,
       user,
@@ -171,10 +185,16 @@ describe("Depositor", function () {
       destination: await destination.getAddress(),
       deadline
     });
-    await expect(depositor.connect(user).deposit(amt, await destination.getAddress(), signature, deadline))
-      .to.emit(depositor, "Deposit");
-    await expect(depositor.connect(user).deposit(amt, await destination.getAddress(), signature, deadline))
-      .to.be.revertedWith("AML signature already used");
+    
+    // First deposit should succeed
+    await expect(
+      depositor.connect(user).deposit(amt, await destination.getAddress(), signature, deadline)
+    ).to.emit(depositor, "Deposit");
+    
+    // Second deposit with same signature should fail
+    await expect(
+      depositor.connect(user).deposit(amt, await destination.getAddress(), signature, deadline)
+    ).to.be.revertedWithCustomError(amlUtils, 'AmlSignatureAlreadyUsed');
   });
 
   it("validates amount and destination", async function () {
@@ -194,18 +214,23 @@ describe("Depositor", function () {
       deadline
     });
 
-    // zero amount
+    // Test zero amount
     {
       const { signature } = await build(0n, await destination.getAddress());
-      await expect(depositor.connect(user).deposit(0n, await destination.getAddress(), signature, deadline))
-        .to.be.revertedWith("Amount must be greater than zero");
+      // This is a contract-level error, not from AMLUtils
+      await expect(
+        depositor.connect(user).deposit(0n, await destination.getAddress(), signature, deadline)
+      ).to.be.revertedWithCustomError(depositor, 'InvalidAmount');
     }
 
-    // zero destination
+    // Test zero destination
     {
       const { signature } = await build(1n, ethers.ZeroAddress);
-      await expect(depositor.connect(user).deposit(1n, ethers.ZeroAddress, signature, deadline))
-        .to.be.revertedWith("Destination cannot be zero");
+      // This is a contract-level error, not from AMLUtils
+      await expect(
+        depositor.connect(user).deposit(1n, ethers.ZeroAddress, signature, deadline)
+      ).to.be.revertedWithCustomError(depositor, 'InvalidAddress')
+        .withArgs("destination");
     }
   });
 

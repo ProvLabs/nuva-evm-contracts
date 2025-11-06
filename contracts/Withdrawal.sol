@@ -34,7 +34,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     // --- Errors ---
 
     error InvalidAddress(string); // dev: Address cannot be zero
-    error InvalidAmount(); // dev: Amount must be greater than zero
+    error AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
     error AMLSignatureExpired();
     error AMLSignatureAlreadyUsed();
     error InvalidAMLSignature();
@@ -103,7 +103,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         uint256 _amlDeadline
     ) external {
         if (_amount == 0) {
-            revert InvalidAmount(); // dev: Amount must be greater than zero
+            revert AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
         }
 
         bytes32 messageHash = _getMessageHash(
@@ -137,7 +137,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         bytes32 _s
     ) external {
         if (_amount == 0) {
-            revert InvalidAmount(); // dev: Amount must be greater than zero
+            revert AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
         }
 
         bytes32 messageHash = _getMessageHash(
@@ -179,7 +179,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      */
     function burnLocked(uint256 _amount) external onlyRole(BURN_ROLE) {
         if (_amount == 0) {
-            revert InvalidAmount(); // dev: Amount must be greater than zero
+            revert AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
         }
         withdrawalToken.burnAuthorized(address(this), _amount);
     }
