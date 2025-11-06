@@ -1,6 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { deployAMLUtils, deployDepositor } = require("./helpers/fixtures");
 
 // Helpers
 async function latestTimestamp() {
