@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
@@ -11,20 +10,23 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
  * @notice Minimal ERC20 token with mint and burn functionality.
  * @author NU Blockchain Technologies
  */
-contract CustomToken is ERC20, ERC20Burnable, ERC20Permit, AccessControl {
+contract CustomToken is ERC20, ERC20Permit, AccessControl {
     /**
      * @notice Role for minting tokens.
      */
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     /**
-     * @notice Role for burning tokens.
-     */
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
-    /**
      * @notice Custom decimals for the token.
      */
     uint8 private _customDecimals;
 
+    /**
+     * @notice Event emitted when tokens are burned.
+     * @param from The address that burned the tokens.
+     * @param amount The amount of tokens burned.
+     */
+    event TokensBurned(address indexed from, uint256 indexed amount);
+    
     /**
      * @notice Initializes the contract with the provided token name, symbol, admin, and decimals.
      * @param _name The name of the token.
@@ -41,7 +43,6 @@ contract CustomToken is ERC20, ERC20Burnable, ERC20Permit, AccessControl {
         _customDecimals = _decimals;
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(MINTER_ROLE, _admin);
-        _grantRole(BURNER_ROLE, _admin);
         _mint(_admin, 0);
     }
 
@@ -63,11 +64,23 @@ contract CustomToken is ERC20, ERC20Burnable, ERC20Permit, AccessControl {
     }
 
     /**
-     * @notice Burns a specified amount of tokens from a specified address.
-     * @param from The address from which the tokens will be burned.
+     * @notice Burns a specified amount of tokens from the caller's balance.
      * @param amount The amount of tokens to burn.
      */
-    function burnAuthorized(address from, uint256 amount) external onlyRole(BURNER_ROLE) {
-        _burn(from, amount);
+    function burn(uint256 amount) public virtual {
+        _burn(_msgSender(), amount);
+        emit TokensBurned(_msgSender(), amount);
+    }
+
+    /**
+     * @notice Burns a specified amount of tokens from a specified address.
+     * @dev The caller must have been approved to spend at least `amount` tokens on behalf of `account`.
+     * @param account The address to burn tokens from.
+     * @param amount The amount of tokens to burn.
+     */
+    function burnFrom(address account, uint256 amount) public virtual {
+        _spendAllowance(account, _msgSender(), amount);
+        _burn(account, amount);
+        emit TokensBurned(account, amount);
     }
 }

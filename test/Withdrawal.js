@@ -60,11 +60,17 @@ describe("Withdrawal", function () {
     // Deploy AMLUtils and Withdrawal with linked library
     const amlUtils = await deployAMLUtils();
     const withdrawal = await deployWithdrawal(amlUtils);
+    
+    // Initialize the withdrawal contract with the deployer as the admin
     await withdrawal.initialize(token.target, shareToken, amlSigner.address);
-
-    // Grant BURNER_ROLE to the withdrawal contract
-    const BURNER_ROLE = await token.BURNER_ROLE();
-    await token.grantRole(BURNER_ROLE, withdrawal.target);
+    
+    // Grant the deployer the DEFAULT_ADMIN_ROLE and BURN_ROLE
+    const DEFAULT_ADMIN_ROLE = await withdrawal.DEFAULT_ADMIN_ROLE();
+    const BURN_ROLE = await withdrawal.BURN_ROLE();
+    
+    // Grant roles to the deployer
+    await withdrawal.grantRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await withdrawal.grantRole(BURN_ROLE, deployer.address);
 
     // Mint tokens to user and approve when needed
     await token.mint(user.address, ethers.parseUnits("1000", 18));
@@ -250,27 +256,36 @@ describe("Withdrawal", function () {
     ).to.be.revertedWithCustomError(amlUtils, "AmlSignatureExpired");
   });
 
-  describe("burnLocked", function () {
-    it("allows admin to burn locked tokens", async function () {
+  describe("burn", function () {
+    it("reverts when caller does not have BURNER_ROLE", async function () {
       const { deployer, user, token, withdrawal } = await deployFixture();
       const amount = ethers.parseUnits("100", 18);
-      await token.mint(withdrawal.target, amount);
-
-      await expect(withdrawal.connect(deployer).burnLocked(amount)).to.not.be.reverted;
-      expect(await token.balanceOf(withdrawal.target)).to.equal(0);
+      
+      // Mint tokens to the deployer first
+      await token.mint(deployer.address, amount);
+      
+      // Transfer tokens to the withdrawal contract
+      await token.connect(deployer).transfer(withdrawal.target, amount);
+      
+      // Do NOT grant BURNER_ROLE to deployer
+      
+      // Should revert with an error when caller doesn't have BURNER_ROLE
+      await expect(
+        withdrawal.connect(deployer).burn(amount)
+      ).to.be.reverted;
     });
 
     it("reverts if non-admin tries to burn", async function () {
       const { other, withdrawal } = await deployFixture();
       const BURN_ROLE = await withdrawal.BURN_ROLE();
-      await expect(withdrawal.connect(other).burnLocked(1))
+      await expect(withdrawal.connect(other).burn(1))
         .to.be.revertedWithCustomError(withdrawal, "AccessControlUnauthorizedAccount")
         .withArgs(other.address, BURN_ROLE);
     });
 
     it("reverts when burn amount is zero", async function () {
       const { deployer, withdrawal } = await deployFixture();
-      await expect(withdrawal.connect(deployer).burnLocked(0)).to.be.revertedWithCustomError(
+      await expect(withdrawal.connect(deployer).burn(0)).to.be.revertedWithCustomError(
         withdrawal,
         "AmountMustBeGreaterThanZero"
       );
@@ -335,6 +350,22 @@ describe("Withdrawal", function () {
       await expect(
         withdrawal.connect(user).withdrawWithPermit(amount, amlSig, amlDeadline, permitDeadline, v, r, s)
       ).to.be.revertedWithCustomError(amlUtils, "AmlSignatureExpired");
+    });
+  });
+
+  describe("ERC20 functions", function () {
+    it("should not have transfer function", async function () {
+      const { withdrawal } = await deployFixture();
+      
+      // Check if transfer function exists and is not callable
+      expect(await withdrawal.transfer).to.be.undefined;
+    });
+
+    it("should not have transferFrom function", async function () {
+      const { withdrawal } = await deployFixture();
+      
+      // Check if transferFrom function exists and is not callable
+      expect(await withdrawal.transferFrom).to.be.undefined;
     });
   });
 });

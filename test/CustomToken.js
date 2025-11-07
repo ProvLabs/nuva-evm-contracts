@@ -50,21 +50,82 @@ describe("CustomToken", function () {
     expect(after).to.equal(prev + amount);
   });
 
-  it("burn and burnFrom reduce balances and totalSupply", async function () {
-    const { deployer, user, token, decimals } = await deployFixture();
-    const ownerAddr = await deployer.getAddress();
+  describe("Burn Functionality", function () {
+    it("should allow token holder to burn their own tokens", async function () {
+      const { deployer, token, decimals } = await deployFixture();
+      const burnAmount = 100n * BigInt(10 ** decimals);
+      const initialBalance = await token.balanceOf(await deployer.getAddress());
+      const initialSupply = await token.totalSupply();
 
-    const burnAmt = 10n * BigInt(10 ** decimals);
-    const supplyBefore = await token.totalSupply();
-    await token.connect(deployer).burn(burnAmt);
-    const supplyAfter = await token.totalSupply();
-    expect(supplyAfter).to.equal(supplyBefore - burnAmt);
+      await expect(token.connect(deployer).burn(burnAmount))
+        .to.emit(token, "TokensBurned")
+        .withArgs(await deployer.getAddress(), burnAmount);
 
-    await token.connect(deployer).transfer(await user.getAddress(), burnAmt);
-    await token.connect(user).approve(ownerAddr, burnAmt);
-    await token.connect(deployer).burnFrom(await user.getAddress(), burnAmt);
+      const finalBalance = await token.balanceOf(await deployer.getAddress());
+      const finalSupply = await token.totalSupply();
 
-    expect(await token.balanceOf(await user.getAddress())).to.equal(0);
+      expect(finalBalance).to.equal(initialBalance - burnAmount);
+      expect(finalSupply).to.equal(initialSupply - burnAmount);
+    });
+
+    it("should revert when burning more tokens than balance", async function () {
+      const { deployer, token, decimals } = await deployFixture();
+      const balance = await token.balanceOf(await deployer.getAddress());
+      const burnAmount = balance + 1n;
+
+      await expect(token.connect(deployer).burn(burnAmount))
+        .to.be.revertedWithCustomError(token, "ERC20InsufficientBalance")
+        .withArgs(await deployer.getAddress(), balance, burnAmount);
+    });
+
+    it("should allow approved spender to burn tokens using burnFrom", async function () {
+      const { deployer, user, token, decimals } = await deployFixture();
+      const userAddr = await user.getAddress();
+      const burnAmount = 50n * BigInt(10 ** decimals);
+      
+      // Transfer tokens to user
+      await token.connect(deployer).transfer(userAddr, burnAmount);
+      
+      // Approve deployer to spend user's tokens
+      await token.connect(user).approve(await deployer.getAddress(), burnAmount);
+      
+      const initialBalance = await token.balanceOf(userAddr);
+      const initialSupply = await token.totalSupply();
+
+      await expect(token.connect(deployer).burnFrom(userAddr, burnAmount))
+        .to.emit(token, "TokensBurned")
+        .withArgs(userAddr, burnAmount);
+
+      const finalBalance = await token.balanceOf(userAddr);
+      const finalSupply = await token.totalSupply();
+
+      expect(finalBalance).to.equal(initialBalance - burnAmount);
+      expect(finalSupply).to.equal(initialSupply - burnAmount);
+    });
+
+    it("should revert when burning more than allowance with burnFrom", async function () {
+      const { deployer, user, token, decimals } = await deployFixture();
+      const userAddr = await user.getAddress();
+      const transferAmount = 100n * BigInt(10 ** decimals);
+      const burnAmount = 150n * BigInt(10 ** decimals);
+      
+      await token.connect(deployer).transfer(userAddr, transferAmount);
+      await token.connect(user).approve(await deployer.getAddress(), transferAmount);
+      
+      await expect(token.connect(deployer).burnFrom(userAddr, burnAmount))
+        .to.be.revertedWithCustomError(token, "ERC20InsufficientAllowance")
+        .withArgs(await deployer.getAddress(), transferAmount, burnAmount);
+    });
+
+    it("should emit Transfer event when burning tokens", async function () {
+      const { deployer, token, decimals } = await deployFixture();
+      const burnAmount = 10n * BigInt(10 ** decimals);
+      const deployerAddr = await deployer.getAddress();
+      
+      await expect(token.connect(deployer).burn(burnAmount))
+        .to.emit(token, "Transfer")
+        .withArgs(deployerAddr, ethers.ZeroAddress, burnAmount);
+    });
   });
 
   it("transfer moves balances", async function () {

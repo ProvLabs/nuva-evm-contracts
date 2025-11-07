@@ -15,11 +15,18 @@ import {AMLUtils} from "./libraries/AMLUtils.sol";
  */
 interface ICustomToken is IERC20, IERC20Permit {
     /**
-     * @notice Burns a specified amount of tokens from a specified address.
-     * @param from The address from which the tokens will be burned.
+     * @notice Burns a specified amount of tokens from the caller's balance.
      * @param amount The amount of tokens to burn.
      */
-    function burnAuthorized(address from, uint256 amount) external;
+    function burn(uint256 amount) external;
+
+    /**
+     * @notice Burns a specified amount of tokens from a specified address.
+     * @dev The caller must have been approved to spend at least `amount` tokens on behalf of `account`.
+     * @param account The address to burn tokens from.
+     * @param amount The amount of tokens to burn.
+     */
+    function burnFrom(address account, uint256 amount) external;
 }
 
 
@@ -32,9 +39,14 @@ interface ICustomToken is IERC20, IERC20Permit {
 contract Withdrawal is Initializable, AccessControlUpgradeable {
     using SafeERC20 for ICustomToken;
 
+    // --- Constants ---
+    
+    /// @notice Role for burning locked tokens
+    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
+
     // --- State Variables ---
 
-    /// @notice The token that can be withdrawn from this contract.
+    /// @notice The token being withdrawn and burned withdrawn from this contract.
     ICustomToken public withdrawalToken;
     /// @notice The address of the share token, used for logging purposes.
     address public shareToken;
@@ -42,13 +54,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     address public amlSigner;
     /// @notice A mapping to prevent the reuse of AML signatures.
     mapping(bytes32 => bool) public usedSignatures;
-    /// @notice The role required to burn locked tokens.
-    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
 
     // --- Errors ---
 
     error InvalidAddress(string); // dev: Address cannot be zero
     error AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
+    error InsufficientBalance(); // dev: Contract does not have enough tokens to burn
     error AMLSignatureExpired();
     error AMLSignatureAlreadyUsed();
     error InvalidAMLSignature();
@@ -187,15 +198,38 @@ withdrawalToken.permit(
     }
 
     /**
-     * @notice Allows an address with the BURN_ROLE to burn tokens held by this contract.
-     * @dev Only callable by addresses with the BURN_ROLE.
-     * @param _amount The amount of tokens to burn.
+     * @notice Emitted when tokens are burned from the contract.
+     * @param amount The amount of tokens burned.
+     * @param burner The address that initiated the burn.
      */
-    function burnLocked(uint256 _amount) external onlyRole(BURN_ROLE) {
+    event TokensBurned(uint256 indexed amount, address indexed burner);
+
+    /**
+     * @notice Burns a specified amount of tokens held by this contract.
+     * @dev Only callable by addresses with the BURN_ROLE. This function is part of the
+     * manual burn/mint model to maintain token supply across different chains.
+     * @param _amount The amount of tokens to burn. Must be greater than zero and not exceed
+     * the contract's token balance.
+     * @custom:requirements
+     * - Caller must have BURN_ROLE
+     * - `_amount` must be greater than zero
+     * - Contract must have sufficient token balance
+     */
+    function burn(uint256 _amount) external onlyRole(BURN_ROLE) {
         if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
+            revert AmountMustBeGreaterThanZero();
         }
-        withdrawalToken.burnAuthorized(address(this), _amount);
+        
+        // Ensure the contract has enough tokens to burn
+        uint256 contractBalance = withdrawalToken.balanceOf(address(this));
+        if (_amount > contractBalance) {
+            revert InsufficientBalance();
+        }
+        
+        // Burn the tokens using the CustomToken's burnAuthorized function
+        withdrawalToken.burnFrom(address(this), _amount);
+        
+        emit TokensBurned(_amount, msg.sender);
     }
 
     /**
