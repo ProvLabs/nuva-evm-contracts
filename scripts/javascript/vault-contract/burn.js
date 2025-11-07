@@ -6,7 +6,7 @@ const CLONE_ADDRESS = "0x8aAef1A980Da6B5a26FD8ee9Ebd13c5e60055188"; // Replace w
 const WITHDRAWAL_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // The token held by the contract
 
 // NOTE: Change '18' if your token has different decimals
-const AMOUNT_TO_BURN = ethers.parseUnits("5.0", 18);
+const AMOUNT_TO_BURN = ethers.parseUnits("1.0", 16);
 // --- END: Configuration ---
 
 async function main() {

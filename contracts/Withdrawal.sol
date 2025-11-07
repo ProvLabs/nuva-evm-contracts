@@ -69,6 +69,18 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Emitted when a user withdraws tokens.
+     * @param withdrawalTokenAddress The address of the withdrawal token.
+     * @param shareTokenAddress The address of the share token.
+     * @param amlSignerAddress The address of the AML signer.
+     */
+    event WithdrawalInitialized(
+        address indexed withdrawalTokenAddress,
+        address indexed shareTokenAddress,
+        address indexed amlSignerAddress
+    );
+
+    /**
+     * @notice Emitted when a user withdraws tokens.
      * @param user The address of the user who initiated the withdrawal.
      * @param amount The amount of tokens withdrawn.
      * @param shareToken The address of the share token associated with the withdrawal.
@@ -111,6 +123,8 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         amlSigner = _amlSignerAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(BURN_ROLE, msg.sender);
+
+        emit WithdrawalInitialized(_withdrawalTokenAddress, _shareTokenAddress, _amlSignerAddress);
     }
 
     // --- Public Functions ---
@@ -172,7 +186,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-withdrawalToken.permit(
+        withdrawalToken.permit(
             msg.sender,
             address(this),
             _amount,

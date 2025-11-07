@@ -40,10 +40,10 @@ const AMOUNT_TO_DEPOSIT_STRING = "0.2"; // The amount in human-readable form
 
 // --- Helper: Load AML Signer ---
 function getAmlSigner() {
-    const amlPrivateKey = process.env.AML_SIGNER_PRIVATE_KEY;
+    const amlPrivateKey = process.env.AML_SIGNER_KEY;
     if (!amlPrivateKey || amlPrivateKey.length !== 66) { // 0x + 64 hex chars
         throw new Error(
-            "Invalid or missing AML_SIGNER_PRIVATE_KEY in .env file. " +
+            "Invalid or missing AML_SIGNER_KEY in .env file. " +
             "It should be a 66-character hex string (starting with 0x)."
         );
     }

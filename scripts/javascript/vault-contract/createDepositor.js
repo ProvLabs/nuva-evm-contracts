@@ -39,17 +39,17 @@ async function main() {
     );
   }
 
-  const amlSignerAddr = process.env.AML_SIGNER_PRIVATE_KEY;
+  const amlSignerAddr = process.env.AML_SIGNER_KEY;
   if (!amlSignerAddr) {
     throw new Error(
-      "AML_SIGNER_PRIVATE_KEY is not set."
+      "AML_SIGNER_KEY is not set."
     );
   }
+
   // 5. Initialize a new Depositor instance through the factory
-  const depositTokenAddress = tokenAddr;
-  const shareTokenAddress = shareTokenAddr;
-  const amlSignerWallet = new ethers.Wallet(amlSignerAddr);
-  const amlSignerAddress = await amlSignerWallet.getAddress();
+  const depositTokenAddress = ethers.getAddress(tokenAddr);
+  const shareTokenAddress = ethers.getAddress(shareTokenAddr);
+  const amlSignerAddress = ethers.getAddress(amlSignerAddr);
 
   console.log("depositTokenAddress:", depositTokenAddress);
   console.log("shareTokenAddress:", shareTokenAddress);
