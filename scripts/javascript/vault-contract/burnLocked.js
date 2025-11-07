@@ -1,4 +1,4 @@
-// scripts/burnLocked.js
+// scripts/burn.js
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
@@ -31,10 +31,10 @@ async function main() {
   }
 
   // --- BURN --- 
-  console.log(`\n1. Calling burnLocked() on the clone contract to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 18)} tokens...`);
+  console.log(`\n1. Calling burn() on the clone contract to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 18)} tokens...`);
 
   // Note: We connect the 'burner' to the 'withdrawal' contract
-  const burnTx = await withdrawal.connect(burner).burnLocked(AMOUNT_TO_BURN);
+  const burnTx = await withdrawal.connect(burner).burn(AMOUNT_TO_BURN);
   const receipt = await burnTx.wait();
 
   console.log("   ✅ Burn successful! Transaction hash:", receipt.hash);
