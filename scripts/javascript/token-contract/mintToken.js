@@ -1,18 +1,12 @@
 const hre = require("hardhat");
 
 async function main() {
-  // Replace with your deployed factory address
-  const factoryAddr = process.env.FACTORY_ADDRESS;
-  if (!factoryAddr) {
+  const tokenAddr = process.env.SHARED_TOKEN_ADDRESS;
+  if (!tokenAddr) {
     throw new Error(
-      "FACTORY_ADDRESS is not set."
+      "SHARED_TOKEN_ADDRESS is not set."
     );
   }
-
-  const factory = await hre.ethers.getContractAt("TokenFactory", factoryAddr);
-  const tokens = await factory.getAllTokens();
-
-  const tokenAddr = tokens[tokens.length - 1];
   console.log("Using token:", tokenAddr);
 
   const token = await hre.ethers.getContractAt("CustomToken", tokenAddr);
@@ -20,7 +14,7 @@ async function main() {
   console.log("decimals:", decimals);
 
   const to = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
-  const amount = hre.ethers.parseUnits("1000000000000", decimals);
+  const amount = hre.ethers.parseUnits("100000000000000", decimals);
 
   // Call mint(to, amount)
   const tx = await token.mint(to, amount);

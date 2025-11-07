@@ -45,10 +45,10 @@ async function main() {
     );
   }
 
-  const amlSignerAddr = process.env.PUBLIC_KEY;
+  const amlSignerAddr = process.env.AML_SIGNER_PRIVATE_KEY;
   if (!amlSignerAddr) {
     throw new Error(
-      "PUBLIC_KEY is not set."
+      "AML_SIGNER_PRIVATE_KEY is not set."
     );
   }
   // 5. Initialize a new Depositor instance through the factory
@@ -62,12 +62,78 @@ async function main() {
     shareTokenAddress,
     amlSignerAddress
   );
+  console.log("\nTransaction hash:", tx.hash);
   const receipt = await tx.wait();
   
-  // Get the address of the newly created Depositor
-  const event = receipt.events?.find((e) => e.event === "DepositorCreated");
-  const depositorAddress = event?.args?.depositorAddress;
+  // Log all events for debugging
+  console.log("\nAll events in receipt:", receipt.events?.map(e => e.event) || []);
+  
+  // Try to find the DepositorCreated event
+  let depositorAddress;
+  
+  // Method 1: Try to find by event name
+  let event = receipt.logs?.find(log => {
+    try {
+      const parsedLog = factory.interface.parseLog(log);
+      return parsedLog && parsedLog.name === 'DepositorCreated';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // If we found an event, parse it
+  if (event) {
+    const parsedLog = factory.interface.parseLog(event);
+    depositorAddress = parsedLog.args[0]; // First argument is the depositor address
+    
+    console.log("✅ Found DepositorCreated event:", {
+      event: parsedLog.name,
+      args: parsedLog.args,
+      depositorAddress: depositorAddress
+    });
+  } else {
+    // Fallback: Try to find any event with the depositor address
+    const potentialEvents = receipt.logs?.map(log => {
+      try {
+        return factory.interface.parseLog(log);
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+    
+    console.log("All parsed events:", potentialEvents);
+    
+    // Look for any event where the first argument is an address (potential depositor address)
+    for (const e of potentialEvents) {
+      if (e.args.length > 0 && ethers.isAddress(e.args[0])) {
+        depositorAddress = e.args[0];
+        console.log("ℹ️ Found potential depositor address in event:", {
+          event: e.name,
+          depositorAddress: depositorAddress,
+          args: e.args
+        });
+        break;
+      }
+    }
+    
+    if (!depositorAddress) {
+      console.error("❌ Could not find DepositorCreated event in receipt");
+      console.log("Raw logs:", receipt.logs);
+    }
+  }
+  
+  if (!depositorAddress) {
+    throw new Error("Failed to get depositor address from transaction receipt");
+  }
+  
   console.log("✅ New Depositor instance created at:", depositorAddress);
+  
+  // Verify the contract was deployed correctly
+  const code = await ethers.provider.getCode(depositorAddress);
+  if (code === '0x') {
+    throw new Error("No code at the deployed address. Contract deployment may have failed.");
+  }
+  console.log("✅ Contract code verified at the address");
 }
 
 // Standard Hardhat script runner
