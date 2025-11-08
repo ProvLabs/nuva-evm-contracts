@@ -64,6 +64,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     error AMLSignatureAlreadyUsed();
     error InvalidAMLSignature();
     error InvalidAMLSigner();
+    error InvalidMintTransactionHash();
 
     // --- Events ---
 
@@ -211,35 +212,42 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @notice Emitted when tokens are burned from the contract.
      * @param amount The amount of tokens burned.
      * @param burner The address that initiated the burn.
+     * @param mintTransactionHash The hash of the mint transaction.
      */
-    event TokensBurned(uint256 indexed amount, address indexed burner);
+    event TokensBurned(uint256 indexed amount, address indexed burner, string indexed mintTransactionHash);
 
     /**
      * @notice Burns a specified amount of tokens held by this contract.
      * @dev Only callable by addresses with the BURN_ROLE. This function is part of the
      * manual burn/mint model to maintain token supply across different chains.
-     * @param _amount The amount of tokens to burn. Must be greater than zero and not exceed
+     * @param amount The amount of tokens to burn. Must be greater than zero and not exceed
      * the contract's token balance.
+     * @param mintTransactionHash The hash of the mint transaction.
      * @custom:requirements
      * - Caller must have BURN_ROLE
-     * - `_amount` must be greater than zero
+     * - `amount` must be greater than zero
+     * - `mintTransactionHash` must not be empty
      * - Contract must have sufficient token balance
      */
-    function burn(uint256 _amount) external onlyRole(BURN_ROLE) {
-        if (_amount == 0) {
+    function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
+        if (amount == 0) {
             revert AmountMustBeGreaterThanZero();
         }
         
+        if (bytes(mintTransactionHash).length == 0) {
+            revert InvalidMintTransactionHash();
+        }
+
         // Ensure the contract has enough tokens to burn
         uint256 contractBalance = withdrawalToken.balanceOf(address(this));
-        if (_amount > contractBalance) {
+        if (amount > contractBalance) {
             revert InsufficientBalance();
         }
         
         // Burn the tokens using the CustomToken's burnAuthorized function
-        withdrawalToken.burnFrom(address(this), _amount);
+        withdrawalToken.burnFrom(address(this), amount);
         
-        emit TokensBurned(_amount, msg.sender);
+        emit TokensBurned(amount, msg.sender, mintTransactionHash);
     }
 
     /**

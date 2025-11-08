@@ -270,24 +270,33 @@ describe("Withdrawal", function () {
       // Do NOT grant BURNER_ROLE to deployer
       
       // Should revert with an error when caller doesn't have BURNER_ROLE
+      const mintTransactionHash = "0x1234567890123456789012345678901234567890123456789012345678901234";
       await expect(
-        withdrawal.connect(deployer).burn(amount)
+        withdrawal.connect(deployer).burn(amount, mintTransactionHash)
       ).to.be.reverted;
     });
 
     it("reverts if non-admin tries to burn", async function () {
       const { other, withdrawal } = await deployFixture();
       const BURN_ROLE = await withdrawal.BURN_ROLE();
-      await expect(withdrawal.connect(other).burn(1))
+      await expect(withdrawal.connect(other).burn(1, "0x1234567890123456789012345678901234567890123456789012345678901234"))
         .to.be.revertedWithCustomError(withdrawal, "AccessControlUnauthorizedAccount")
         .withArgs(other.address, BURN_ROLE);
     });
 
     it("reverts when burn amount is zero", async function () {
       const { deployer, withdrawal } = await deployFixture();
-      await expect(withdrawal.connect(deployer).burn(0)).to.be.revertedWithCustomError(
+      await expect(withdrawal.connect(deployer).burn(0, "0x1234567890123456789012345678901234567890123456789012345678901234")).to.be.revertedWithCustomError(
         withdrawal,
         "AmountMustBeGreaterThanZero"
+      );
+    });
+
+    it("reverts when mint transaction hash is empty", async function () {
+      const { deployer, withdrawal } = await deployFixture();
+      await expect(withdrawal.connect(deployer).burn(1, "")).to.be.revertedWithCustomError(
+        withdrawal,
+        "InvalidMintTransactionHash"
       );
     });
   });

@@ -34,7 +34,8 @@ async function main() {
   console.log(`\n1. Calling burn() on the clone contract to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 18)} tokens...`);
 
   // Note: We connect the 'burner' to the 'withdrawal' contract
-  const burnTx = await withdrawal.connect(burner).burn(AMOUNT_TO_BURN);
+  const mintTransactionHash = "0x12345678912212234235435465675765";
+  const burnTx = await withdrawal.connect(burner).burn(AMOUNT_TO_BURN, mintTransactionHash);
   const receipt = await burnTx.wait();
 
   console.log("   ✅ Burn successful! Transaction hash:", receipt.hash);
