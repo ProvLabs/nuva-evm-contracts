@@ -3,10 +3,10 @@ const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { deployAMLUtils, deployWithdrawal } = require("./helpers/fixtures");
 
-async function getAMLSignature({ amlSigner, user, token, shareToken, amount, destination, deadline }) {
+async function getAMLSignature({ amlSigner, user, token, paymentToken, amount, destination, deadline }) {
   const hash = ethers.solidityPackedKeccak256(
     ["address", "address", "address", "uint256", "address", "uint256"],
-    [user.address, token.target, shareToken, amount, destination, deadline]
+    [user.address, token.target, paymentToken, amount, destination, deadline]
   );
   const sig = await amlSigner.signMessage(ethers.getBytes(hash));
   return sig;
@@ -54,15 +54,15 @@ describe("Withdrawal", function () {
     const CustomToken = await ethers.getContractFactory("CustomToken");
     const token = await CustomToken.deploy("Nu Token", "NU", deployer.address, 18);
 
-    // shareToken can be any address to log; use token address for simplicity
-    const shareToken = token.target;
+    // paymentToken can be any address to log; use token address for simplicity
+    const paymentToken = token.target;
 
     // Deploy AMLUtils and Withdrawal with linked library
     const amlUtils = await deployAMLUtils();
     const withdrawal = await deployWithdrawal(amlUtils);
     
     // Initialize the withdrawal contract with the deployer as the admin
-    await withdrawal.initialize(token.target, shareToken, amlSigner.address);
+    await withdrawal.initialize(token.target, paymentToken, amlSigner.address);
     
     // Grant the deployer the DEFAULT_ADMIN_ROLE and BURN_ROLE
     const DEFAULT_ADMIN_ROLE = await withdrawal.DEFAULT_ADMIN_ROLE();
@@ -75,11 +75,11 @@ describe("Withdrawal", function () {
     // Mint tokens to user and approve when needed
     await token.mint(user.address, ethers.parseUnits("1000", 18));
 
-    return { deployer, amlSigner, user, other, token, withdrawal, shareToken };
+    return { deployer, amlSigner, user, other, token, withdrawal, paymentToken };
   }
 
   it("withdraw: locks tokens with valid AML signature", async function () {
-    const { user, amlSigner, token, withdrawal, shareToken } = await deployFixture();
+    const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
 
     const amount = ethers.parseUnits("100", 18);
     const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
@@ -91,7 +91,7 @@ describe("Withdrawal", function () {
       amlSigner,
       user,
       token,
-      shareToken,
+      paymentToken,
       amount,
       destination: withdrawal.target,
       deadline: amlDeadline,
@@ -101,14 +101,14 @@ describe("Withdrawal", function () {
       withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)
     )
       .to.emit(withdrawal, "Withdraw")
-      .withArgs(user.address, amount, shareToken, withdrawal.target);
+      .withArgs(user.address, amount, paymentToken);
 
     expect(await token.balanceOf(withdrawal.target)).to.equal(amount);
     expect(await token.balanceOf(user.address)).to.equal(ethers.parseUnits("900", 18));
   });
 
   it("withdrawWithPermit: locks tokens with AML and permit", async function () {
-    const { user, amlSigner, token, withdrawal, shareToken } = await deployFixture();
+    const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
 
     const amount = ethers.parseUnits("50", 18);
     const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
@@ -118,7 +118,7 @@ describe("Withdrawal", function () {
       amlSigner,
       user,
       token,
-      shareToken,
+      paymentToken,
       amount,
       destination: withdrawal.target,
       deadline: amlDeadline,
@@ -138,13 +138,13 @@ describe("Withdrawal", function () {
         .withdrawWithPermit(amount, amlSig, amlDeadline, permitDeadline, v, r, s)
     )
       .to.emit(withdrawal, "Withdraw")
-      .withArgs(user.address, amount, shareToken, withdrawal.target);
+      .withArgs(user.address, amount, paymentToken);
 
     expect(await token.balanceOf(withdrawal.target)).to.equal(amount);
   });
 
   it("reverts when AML signature expired", async function () {
-    const { user, amlSigner, token, withdrawal, shareToken } = await deployFixture();
+    const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
 
     const amount = ethers.parseUnits("10", 18);
     const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp - 1; // past
@@ -155,7 +155,7 @@ describe("Withdrawal", function () {
       amlSigner,
       user,
       token,
-      shareToken,
+      paymentToken,
       amount,
       destination: withdrawal.target,
       deadline: amlDeadline,
@@ -169,7 +169,7 @@ describe("Withdrawal", function () {
   });
 
   it("reverts on AML signature replay", async function () {
-    const { user, amlSigner, token, withdrawal, shareToken } = await deployFixture();
+    const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
 
     const amount = ethers.parseUnits("5", 18);
     const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
@@ -180,7 +180,7 @@ describe("Withdrawal", function () {
       amlSigner,
       user,
       token,
-      shareToken,
+      paymentToken,
       amount,
       destination: withdrawal.target,
       deadline: amlDeadline,
@@ -196,7 +196,7 @@ describe("Withdrawal", function () {
   });
 
   it("reverts for invalid AML signer", async function () {
-    const { user, other, token, withdrawal, shareToken } = await deployFixture();
+    const { user, other, token, withdrawal, paymentToken } = await deployFixture();
 
     const amount = ethers.parseUnits("20", 18);
     const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
@@ -208,7 +208,7 @@ describe("Withdrawal", function () {
       amlSigner: other,
       user,
       token,
-      shareToken,
+      paymentToken,
       amount,
       destination: withdrawal.target,
       deadline: amlDeadline,
@@ -222,7 +222,7 @@ describe("Withdrawal", function () {
   });
 
   it("reverts when permit deadline expired", async function () {
-    const { user, amlSigner, token, withdrawal, shareToken, _amlUtils } = await loadFixture(deployFixture);
+    const { user, amlSigner, token, withdrawal, paymentToken, _amlUtils } = await loadFixture(deployFixture);
 
     const amount = ethers.parseUnits("15", 18);
     const now = (await ethers.provider.getBlock("latest")).timestamp;
@@ -233,7 +233,7 @@ describe("Withdrawal", function () {
       amlSigner,
       user,
       token,
-      shareToken,
+      paymentToken,
       amount,
       destination: withdrawal.target,
       deadline: amlDeadline,
@@ -294,7 +294,7 @@ describe("Withdrawal", function () {
 
   describe("withdrawWithPermit edge cases", function () {
     it("reverts when amount is zero", async function () {
-      const { user, amlSigner, token, withdrawal, shareToken } = await deployFixture();
+      const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
       const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
       const permitDeadline = amlDeadline + 1000;
 
@@ -302,7 +302,7 @@ describe("Withdrawal", function () {
         amlSigner,
         user,
         token,
-        shareToken,
+        paymentToken,
         amount: 0,
         destination: withdrawal.target,
         deadline: amlDeadline,
@@ -322,7 +322,7 @@ describe("Withdrawal", function () {
     });
 
     it("reverts with expired AML signature", async function () {
-      const { user, amlSigner, token, withdrawal, shareToken } = await deployFixture();
+      const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
       const amount = ethers.parseUnits("10", 18);
       const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp - 1; // In the past
       const permitDeadline = amlDeadline + 1000;
@@ -331,7 +331,7 @@ describe("Withdrawal", function () {
         amlSigner,
         user,
         token,
-        shareToken,
+        paymentToken,
         amount,
         destination: withdrawal.target,
         deadline: amlDeadline,

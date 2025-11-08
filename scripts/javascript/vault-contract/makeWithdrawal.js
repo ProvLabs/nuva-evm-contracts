@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
 // --- START: Configuration ---
 const CLONE_ADDRESS = "0x8aAef1A980Da6B5a26FD8ee9Ebd13c5e60055188"; // Replace with your Withdrawal clone address
 const WITHDRAWAL_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // The token being withdrawn (e.g., the vault's share token)
-const SHARE_TOKEN_ADDRESS = "0x792949BA096871c6411634b53183A7764f2244f8";  // The corresponding share token (for event logging)
+const PAYMENT_TOKEN_ADDRESS = "0x792949BA096871c6411634b53183A7764f2244f8";  // The corresponding share token (for event logging)
 
 // NOTE: Change '18' if your token has different decimals
 const AMOUNT_TO_WITHDRAW = ethers.parseUnits("10.0", 18);
@@ -56,7 +56,7 @@ async function main() {
     [
       user.address,               // msg.sender
       WITHDRAWAL_TOKEN_ADDRESS,   // address(withdrawalToken)
-      SHARE_TOKEN_ADDRESS,        // shareToken
+      PAYMENT_TOKEN_ADDRESS,        // paymentToken
       AMOUNT_TO_WITHDRAW,         // _amount
       CLONE_ADDRESS,              // _destinationAddress (the contract itself)
       amlDeadline                 // _deadline

@@ -48,8 +48,8 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     /// @notice The token being withdrawn and burned withdrawn from this contract.
     ICustomToken public withdrawalToken;
-    /// @notice The address of the share token, used for logging purposes.
-    address public shareToken;
+    /// @notice The address of the payment token, used for logging purposes.
+    address public paymentToken;
     /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
     address public amlSigner;
     /// @notice A mapping to prevent the reuse of AML signatures.
@@ -70,12 +70,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     /**
      * @notice Emitted when a user withdraws tokens.
      * @param withdrawalTokenAddress The address of the withdrawal token.
-     * @param shareTokenAddress The address of the share token.
+     * @param paymentTokenAddress The address of the payment token.
      * @param amlSignerAddress The address of the AML signer.
      */
     event WithdrawalInitialized(
         address indexed withdrawalTokenAddress,
-        address indexed shareTokenAddress,
+        address indexed paymentTokenAddress,
         address indexed amlSignerAddress
     );
 
@@ -83,14 +83,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @notice Emitted when a user withdraws tokens.
      * @param user The address of the user who initiated the withdrawal.
      * @param amount The amount of tokens withdrawn.
-     * @param shareToken The address of the share token associated with the withdrawal.
-     * @param destinationAddress The address where the withdrawn tokens are sent.
+     * @param paymentToken The address of the payment token associated with the withdrawal.
      */
     event Withdraw(
         address indexed user,
-        uint256 amount,
-        address indexed shareToken,
-        address indexed destinationAddress
+        uint256 indexed amount,
+        address indexed paymentToken
     );
 
     // --- Initializer ---
@@ -99,32 +97,32 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @notice Initializes the contract with the provided token addresses and AML signer.
      * @dev Can only be called once during contract deployment.
      * @param _withdrawalTokenAddress The address of the token that can be withdrawn.
-     * @param _shareTokenAddress The address of the share token for logging purposes.
+     * @param _paymentTokenAddress The address of the payment token for logging purposes.
      * @param _amlSignerAddress The address of the trusted AML signer.
      */
     function initialize(
         address _withdrawalTokenAddress,
-        address _shareTokenAddress,
+        address _paymentTokenAddress,
         address _amlSignerAddress
     ) external initializer {
         __AccessControl_init();
         if (_withdrawalTokenAddress == address(0)) {
             revert InvalidAddress("Invalid withdrawal token");
         }
-        if (_shareTokenAddress == address(0)) {
-            revert InvalidAddress("Invalid share token");
+        if (_paymentTokenAddress == address(0)) {
+            revert InvalidAddress("Invalid payment token");
         }
         if (_amlSignerAddress == address(0)) {
             revert InvalidAddress("Invalid AML signer");
         }
 
         withdrawalToken = ICustomToken(_withdrawalTokenAddress);
-        shareToken = _shareTokenAddress;
+        paymentToken = _paymentTokenAddress;
         amlSigner = _amlSignerAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(BURN_ROLE, msg.sender);
 
-        emit WithdrawalInitialized(_withdrawalTokenAddress, _shareTokenAddress, _amlSignerAddress);
+        emit WithdrawalInitialized(_withdrawalTokenAddress, _paymentTokenAddress, _amlSignerAddress);
     }
 
     // --- Public Functions ---
@@ -147,7 +145,6 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
         bytes32 messageHash = _getMessageHash(
             _amount,
-            address(this),
             _amlDeadline
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
@@ -181,7 +178,6 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
         bytes32 messageHash = _getMessageHash(
             _amount,
-            address(this),
             _amlDeadline
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
@@ -208,7 +204,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     function _doWithdraw(uint256 _amount) private {
         withdrawalToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-        emit Withdraw(msg.sender, _amount, shareToken, address(this));
+        emit Withdraw(msg.sender, _amount, paymentToken);
     }
 
     /**
@@ -265,21 +261,19 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @notice Generates a message hash for AML verification by hashing the withdrawal details.
      * @dev Internal function to build the AML message hash.
      * @param _amount The amount of tokens for the withdrawal.
-     * @param _destinationAddress The address where tokens will be sent.
      * @param _deadline The expiration timestamp for the message.
      * @return The hashed message used for AML signature verification.
      */
     function _getMessageHash(
         uint256 _amount,
-        address _destinationAddress,
         uint256 _deadline
     ) private view returns (bytes32) {
         return AMLUtils.getMessageHash(
             msg.sender,
             address(withdrawalToken),
-            shareToken,
+            paymentToken,
             _amount,
-            _destinationAddress,
+            address(this),
             _deadline
         );
     }
