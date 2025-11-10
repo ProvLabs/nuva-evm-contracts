@@ -15,17 +15,11 @@ async function main() {
     // 1. Get the factory contract instance
     // We don't need the full ABI, just the part Hardhat
     // can find in its artifacts.
-    const factory = await ethers.getContractAt(
-        "DepositorFactory",
-        FACTORY_ADDRESS
-    );
+    const factory = await ethers.getContractAt("DepositorFactory", FACTORY_ADDRESS);
 
     // 2. Call the 'depositors' getter function
     // This is a free, read-only call.
-    const cloneAddress = await factory.depositors(
-        SHARE_TOKEN_ADDRESS,
-        DEPOSIT_TOKEN_ADDRESS
-    );
+    const cloneAddress = await factory.depositors(SHARE_TOKEN_ADDRESS, DEPOSIT_TOKEN_ADDRESS);
 
     // 3. Log the result
     if (cloneAddress === ethers.ZeroAddress) {

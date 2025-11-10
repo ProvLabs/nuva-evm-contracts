@@ -24,7 +24,7 @@ async function main() {
     console.log("\n1. Generating Permit Signature...");
 
     const permitNonce = await withdrawalToken.nonces(user.address);
-    const permitDeadline = Math.floor(Date.now() / 1000) + (20 * 60);
+    const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60;
     const tokenName = await withdrawalToken.name();
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
@@ -32,7 +32,7 @@ async function main() {
         name: tokenName,
         version: "1", // Correct for the CustomToken.sol you provided
         chainId: chainId,
-        verifyingContract: WITHDRAWAL_TOKEN_ADDRESS
+        verifyingContract: WITHDRAWAL_TOKEN_ADDRESS,
     };
 
     const types = {
@@ -41,8 +41,8 @@ async function main() {
             { name: "spender", type: "address" },
             { name: "value", type: "uint256" },
             { name: "nonce", type: "uint256" },
-            { name: "deadline", type: "uint256" }
-        ]
+            { name: "deadline", type: "uint256" },
+        ],
     };
 
     const value = {
@@ -50,7 +50,7 @@ async function main() {
         spender: spenderAddress,
         value: amountToWithdraw,
         nonce: permitNonce,
-        deadline: permitDeadline
+        deadline: permitDeadline,
     };
 
     const permitSignature = await user.signTypedData(domain, types, value);
@@ -60,26 +60,20 @@ async function main() {
     // --- 2. Check Allowance BEFORE ---
     let currentAllowance = await withdrawalToken.allowance(user.address, spenderAddress);
     console.log(`\n2. Allowance BEFORE: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
-    
+
     // --- 3. Call permit() ---
     console.log("\n3. Calling token.permit() directly...");
     try {
-        const tx = await withdrawalToken.connect(user).permit(
-            user.address,
-            spenderAddress,
-            amountToWithdraw,
-            permitDeadline,
-            v,
-            r,
-            s
-        );
+        const tx = await withdrawalToken
+            .connect(user)
+            .permit(user.address, spenderAddress, amountToWithdraw, permitDeadline, v, r, s);
         console.log("   Transaction sent, waiting for receipt...");
         const receipt = await tx.wait();
         console.log(`   ✅ Permit call successful. Tx hash: ${receipt.hash}`);
     } catch (error) {
         console.error("\n❌ Error calling permit():");
         console.error("Error data:", error.data);
-        
+
         // Check if the error is the one we're looking for
         if (error.data && error.data.includes("d1cc7385")) {
             console.error("\n*** DEBUGGER: The 'permit' function itself is reverting with 0xd1cc7385! ***");
@@ -102,7 +96,9 @@ async function main() {
         console.log("The problem IS in the AML check (AMLUtils.sol) in your main script.");
     } else {
         console.log("\n❌ FAILURE: The permit() call succeeded, but the allowance was NOT set.");
-        console.log("This confirms the bug is inside your CustomToken's permit implementation (it's not calling _approve).");
+        console.log(
+            "This confirms the bug is inside your CustomToken's permit implementation (it's not calling _approve).",
+        );
     }
 }
 

@@ -3,9 +3,7 @@ const { ethers } = require("hardhat");
 
 const WITHDRAWAL_CLONE_ADDRESS = process.env.WITHDRAWAL_CLONE_ADDRESS;
 if (!WITHDRAWAL_CLONE_ADDRESS) {
-    throw new Error(
-      "WITHDRAWAL_CLONE_ADDRESS is not set."
-    );
+    throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
 }
 
 // --- Main Script ---
