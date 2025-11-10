@@ -54,7 +54,7 @@ library AMLUtils {
         // Validate the Signer
         if (recoveredSigner == address(0)) {
             revert InvalidAmlSignature();
-        }
+        }  
         if (recoveredSigner != expectedSigner) {
             revert InvalidAmlSigner();
         }

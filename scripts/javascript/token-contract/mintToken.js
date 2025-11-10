@@ -1,10 +1,10 @@
 const hre = require("hardhat");
 
 async function main() {
-  const tokenAddr = process.env.SHARED_TOKEN_ADDRESS;
+  const tokenAddr = process.env.TOKEN_ADDRESS;
   if (!tokenAddr) {
     throw new Error(
-      "SHARED_TOKEN_ADDRESS is not set."
+      "TOKEN_ADDRESS is not set."
     );
   }
   console.log("Using token:", tokenAddr);

@@ -12,14 +12,14 @@ const AMOUNT_TO_WITHDRAW = ethers.parseUnits("10.0", 18);
 
 // --- Helper: Load AML Signer ---
 function getAmlSigner() {
-  const amlPrivateKey = process.env.AML_SIGNER_KEY;
-  if (!amlPrivateKey || amlPrivateKey.length !== 66) { // 0x + 64 hex chars
-    throw new Error(
-      "Invalid or missing AML_SIGNER_KEY in .env file. " +
-      "It should be a 66-character hex string (starting with 0x)."
-    );
-  }
-  return new ethers.Wallet(amlPrivateKey, ethers.provider);
+    const amlPrivateKey = process.env.AML_PRIVATE_KEY;
+    if (!amlPrivateKey || amlPrivateKey.length !== 66) { // 0x + 64 hex chars
+        throw new Error(
+            "Invalid or missing AML_PRIVATE_KEY in .env file. " +
+            "It should be a 66-character hex string (starting with 0x)."
+        );
+    }
+    return new ethers.Wallet(amlPrivateKey, ethers.provider);
 }
 
 async function main() {

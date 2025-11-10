@@ -40,10 +40,10 @@ const AMOUNT_TO_DEPOSIT_STRING = "0.2"; // The amount in human-readable form
 
 // --- Helper: Load AML Signer ---
 function getAmlSigner() {
-    const amlPrivateKey = process.env.AML_SIGNER_KEY;
+    const amlPrivateKey = process.env.AML_PRIVATE_KEY;
     if (!amlPrivateKey || amlPrivateKey.length !== 66) { // 0x + 64 hex chars
         throw new Error(
-            "Invalid or missing AML_SIGNER_KEY in .env file. " +
+            "Invalid or missing AML_PRIVATE_KEY in .env file. " +
             "It should be a 66-character hex string (starting with 0x)."
         );
     }
@@ -130,7 +130,7 @@ async function main() {
 
     const domain = {
         name: tokenName,
-        version: "2", // Note: USDC on Eth Sepolia is version 2
+        version: "1",
         chainId: chainId,
         verifyingContract: DEPOSIT_TOKEN_ADDRESS
     };
@@ -190,29 +190,18 @@ async function main() {
         console.log("❌ Token may not fully support EIP-2612 (DOMAIN_SEPARATOR not found)");
     }
     
-    // 5. Verify the approval was successful
-    const newAllowance = await depositToken.allowance(user.address, depositor.target);
-    console.log(`New allowance: ${ethers.formatUnits(newAllowance, TOKEN_DECIMALS)}`);
+    // // 5. Verify the approval was successful
+    // const newAllowance = await depositToken.allowance(user.address, depositor.target);
+    // console.log(`New allowance: ${ethers.formatUnits(newAllowance, TOKEN_DECIMALS)}`);
     
-    if (newAllowance < amountToDeposit) {
-        throw new Error("Failed to set sufficient allowance");
-    }
+    // if (newAllowance < amountToDeposit) {
+    //     throw new Error("Failed to set sufficient allowance");
+    // }
 
     // --- STEP 4: Call the Contract ---
     console.log("\n4. Attempting deposit...");
     
     try {
-        // Since we've already set an infinite approval, we can use the standard deposit function
-        console.log("Using standard deposit function with pre-approved allowance...");
-        
-        // Verify the allowance one more time
-        const finalAllowance = await depositToken.allowance(user.address, depositor.target);
-        console.log("Final allowance:", ethers.formatUnits(finalAllowance, TOKEN_DECIMALS));
-        
-        if (finalAllowance < amountToDeposit) {
-            throw new Error("Insufficient allowance for depositor");
-        }
-        
         // Get the current block timestamp to ensure AML deadline is valid
         const currentBlock = await ethers.provider.getBlock('latest');
         console.log("Current block timestamp:", currentBlock.timestamp);
@@ -221,14 +210,18 @@ async function main() {
         if (currentBlock.timestamp > amlDeadline) {
             throw new Error("AML deadline has already passed");
         }
-        
+
         // Estimate gas for the standard deposit function
         console.log("\nEstimating gas for deposit...");
-        const estimatedGas = await depositor.connect(user).deposit.estimateGas(
+        const estimatedGas = await depositor.connect(user).depositWithPermit.estimateGas(
             amountToDeposit,
             DESTINATION_ADDRESS,
             amlSignature,
-            amlDeadline
+            amlDeadline,
+            permitDeadline,
+            v,
+            r,
+            s,
         );
         
         // Convert to BigInt and add 20% buffer
@@ -251,11 +244,15 @@ async function main() {
             gasPrice: feeData.gasPrice.toString()
         });
         
-        const tx = await depositor.connect(user).deposit(
+        const tx = await depositor.connect(user).depositWithPermit(
             amountToDeposit,
             DESTINATION_ADDRESS,
             amlSignature,
             amlDeadline,
+            permitDeadline,
+            v,
+            r,
+            s,
             { 
                 gasLimit: gasLimit,
                 gasPrice: feeData.gasPrice
