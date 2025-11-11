@@ -22,6 +22,10 @@ async function main() {
     const depositor = await ethers.getContractAt("DepositorFactory", DEPOSITOR_FACTORY_ADDRESS);
     console.log("Depositor contract:", depositor.target);
     console.log("impl:", await depositor.implementation());
+
+    const depositToken = DEPOSIT_TOKEN_ADDRESS;
+    const shareToken = SHARE_TOKEN_ADDRESS;
+    console.log("Deposit address:", await depositor.depositors(shareToken, depositToken));
 }
 
 main()

@@ -6,6 +6,11 @@ async function main() {
         throw new Error("AML_UTILS_CONTRACT is not set.");
     }
 
+    const user = process.env.PUBLIC_KEY;
+    if (!user) {
+        throw new Error("PUBLIC_KEY is not set.");
+    }
+
     // 1. Get the contract factory for the Withdrawal
     const withdrawal = await ethers.getContractFactory("Withdrawal", {
         libraries: {
@@ -49,7 +54,7 @@ async function main() {
     const amlSignerAddress = ethers.getAddress(amlSignerAddr);
 
     console.log("Creating new Withdrawal instance...");
-    const tx = await factory.createWithdrawal(paymentTokenAddress, withdrawalTokenAddress, amlSignerAddress);
+    const tx = await factory.createWithdrawal(paymentTokenAddress, withdrawalTokenAddress, amlSignerAddress, user);
     console.log("\nTransaction hash:", tx.hash);
     const receipt = await tx.wait();
 

@@ -3,18 +3,18 @@ const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
 // 1. PASTE YOUR FACTORY ADDRESS HERE
-const FACTORY_ADDRESS = process.env.DEPOSITOR_FACTORY_CONTRACT;
+const FACTORY_ADDRESS = process.env.WITHDRAWAL_FACTORY_CONTRACT;
 if (!FACTORY_ADDRESS) {
-    throw new Error("DEPOSITOR_FACTORY_CONTRACT is not set.");
+    throw new Error("WITHDRAWAL_FACTORY_CONTRACT is not set.");
 }
 
 // 2. DEFINE THE TOKEN PAIR YOU WANT TO MIGRATE
-const DEPOSIT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-if (!DEPOSIT_TOKEN_ADDRESS) {
+const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
+if (!WITHDRAWAL_TOKEN_ADDRESS) {
     throw new Error("TOKEN_ADDRESS is not set.");
 }
-const SHARE_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
-if (!SHARE_TOKEN_ADDRESS) {
+const PAYMENT_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+if (!PAYMENT_TOKEN_ADDRESS) {
     throw new Error("SHARED_TOKEN_ADDRESS is not set.");
 }
 
@@ -26,9 +26,9 @@ if (!NEW_AML_SIGNER_ADDRESS) {
 }
 // --- END: Configuration ---
 
-const NEW_CLONE_ADDRESS = process.env.DEPOSITOR_CONTRACT;
+const NEW_CLONE_ADDRESS = process.env.WITHDRAWAL_CONTRACT;
 if (!NEW_CLONE_ADDRESS) {
-    throw new Error("DEPOSITOR_CONTRACT is not set.");
+    throw new Error("WITHDRAWAL_CONTRACT is not set.");
 }
 
 async function main() {
@@ -41,14 +41,14 @@ async function main() {
     console.log(`Running migration as factory owner: ${owner.address}`);
 
     // 2. Get the factory contract
-    const factory = await ethers.getContractAt("DepositorFactory", FACTORY_ADDRESS);
+    const factory = await ethers.getContractAt("WithdrawalFactory", FACTORY_ADDRESS);
 
     // 3. --- PRE-MIGRATION CHECK ---
     console.log("Checking for existing (v1) clone...");
-    const oldCloneAddress = await factory.depositors(SHARE_TOKEN_ADDRESS, DEPOSIT_TOKEN_ADDRESS);
+    const oldCloneAddress = await factory.withdrawals(PAYMENT_TOKEN_ADDRESS, WITHDRAWAL_TOKEN_ADDRESS);
 
     if (oldCloneAddress === ethers.ZeroAddress) {
-        throw new Error("No existing depositor found for this pair. Nothing to migrate.");
+        throw new Error("No existing withdrawal found for this pair. Nothing to migrate.");
     }
     console.log(`   Found v1 clone at: ${oldCloneAddress}`);
 
@@ -59,11 +59,11 @@ async function main() {
     console.log(`   ✅ Migration transaction successful! Hash: ${clone_tx.hash}`);
 
     // 4. --- CALL MIGRATE FUNCTION ---
-    console.log("Sending transaction to migrateDepositor()...");
+    console.log("Sending transaction to migrateWithdrawal()...");
 
     const tx = await factory
         .connect(owner)
-        .migrateDepositor(SHARE_TOKEN_ADDRESS, DEPOSIT_TOKEN_ADDRESS, NEW_AML_SIGNER_ADDRESS);
+        .migrateWithdrawal(PAYMENT_TOKEN_ADDRESS, WITHDRAWAL_TOKEN_ADDRESS, NEW_AML_SIGNER_ADDRESS, owner);
 
     // Wait for the transaction to be mined
     const receipt = await tx.wait();
@@ -81,33 +81,33 @@ async function main() {
 
         const parsedLog = factory.interface.parseLog(log);
 
-        if (parsedLog && parsedLog.name === "DepositorMigrated") {
-            newCloneAddress = parsedLog.args.newDepositorAddress;
+        if (parsedLog && parsedLog.name === "WithdrawalMigrated") {
+            newCloneAddress = parsedLog.args.newWithdrawalAddress;
 
             // Sanity check
-            if (parsedLog.args.oldDepositorAddress !== oldCloneAddress) {
-                console.warn("Warning: Event 'oldDepositorAddress' does not match the one we had mapped.");
+            if (parsedLog.args.oldWithdrawal !== oldCloneAddress) {
+                console.warn("Warning: Event 'oldWithdrawalAddress' does not match the one we had mapped.");
             }
             break;
         }
     }
 
     if (newCloneAddress === "") {
-        throw new Error("Migration failed: Could not find 'DepositorMigrated' event in transaction logs.");
+        throw new Error("Migration failed: Could not find 'WithdrawalMigrated' event in transaction logs.");
     }
 
     // Final check: Query the map again to ensure it was updated
-    const mappedAddress = await factory.depositors(SHARE_TOKEN_ADDRESS, DEPOSIT_TOKEN_ADDRESS);
+    const mappedAddress = await factory.withdrawals(PAYMENT_TOKEN_ADDRESS, WITHDRAWAL_TOKEN_ADDRESS);
 
     if (mappedAddress !== newCloneAddress) {
-        throw new Error("CRITICAL ERROR: The 'depositors' map was not updated correctly!");
+        throw new Error("CRITICAL ERROR: The 'withdrawals' map was not updated correctly!");
     }
 
     console.log("-----------------------------------------");
     console.log("🎉 Migration Complete! 🎉");
     console.log(`   Old (v1) Clone: ${oldCloneAddress}`);
     console.log(`   New (v2) Clone: ${newCloneAddress}`);
-    console.log("   The 'depositors' map is now pointing to the new v2 clone.");
+    console.log("   The 'withdrawals' map is now pointing to the new v2 clone.");
     console.log("-----------------------------------------");
 }
 

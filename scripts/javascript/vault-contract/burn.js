@@ -2,54 +2,78 @@
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = "0x8aAef1A980Da6B5a26FD8ee9Ebd13c5e60055188"; // Replace with your Withdrawal clone address
-const WITHDRAWAL_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // The token held by the contract
+const CLONE_ADDRESS = process.env.WITHDRAWAL_CLONE_ADDRESS;
+if (!CLONE_ADDRESS) {
+    throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
+}
+
+const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
+if (!WITHDRAWAL_TOKEN_ADDRESS) {
+    throw new Error("TOKEN_ADDRESS is not set.");
+}
 
 // NOTE: Change '18' if your token has different decimals
-const AMOUNT_TO_BURN = ethers.parseUnits("1.0", 16);
+const AMOUNT_TO_BURN = ethers.parseUnits("1", 4);
 // --- END: Configuration ---
 
 async function main() {
-    // 1. Get our "burner" (signer 0, the deployer/admin with BURN_ROLE)
-    const [burner] = await ethers.getSigners();
+    const userPrivateKey = process.env.PRIVATE_KEY;
+    if (!userPrivateKey) {
+        throw new Error("PRIVATE_KEY is not set.");
+    }
+    const burner = new ethers.Wallet(userPrivateKey, ethers.provider);
 
     console.log(`Simulating burn as admin: ${burner.address}`);
     console.log(`Targeting clone: ${CLONE_ADDRESS}`);
 
     // 2. Get contract instances
     const withdrawal = await ethers.getContractAt("Withdrawal", CLONE_ADDRESS);
-    const withdrawalToken = await ethers.getContractAt("IERC20", WITHDRAWAL_TOKEN_ADDRESS);
+    const withdrawalToken = await ethers.getContractAt("CustomToken", WITHDRAWAL_TOKEN_ADDRESS);
 
     // 3. Check the contract's current balance
     const initialBalance = await withdrawalToken.balanceOf(CLONE_ADDRESS);
-    console.log(`Contract's initial balance: ${ethers.formatUnits(initialBalance, 18)} tokens.`);
+    console.log(`Contract's initial balance: ${ethers.formatUnits(initialBalance, 6)} tokens.`);
 
+    console.log("initialBalance", initialBalance);
+    console.log("AMOUNT_TO_BURN", AMOUNT_TO_BURN);
     if (initialBalance < AMOUNT_TO_BURN) {
         console.error("❌ Error: Contract does not have enough tokens to burn the specified amount.");
-        console.error(`  Amount to Burn: ${ethers.formatUnits(AMOUNT_TO_BURN, 18)}`);
+        console.error(`  Amount to Burn: ${ethers.formatUnits(AMOUNT_TO_BURN, 6)}`);
         return;
     }
 
     // --- BURN ---
-    console.log(
-        `\n1. Calling burn() on the clone contract to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 18)} tokens...`,
-    );
+    console.log(`\n1. Calling burn() on the clone contract to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 6)} tokens...`);
 
     // Note: We connect the 'burner' to the 'withdrawal' contract
-    const mintTransactionHash = "0x12345678912212234235435465675765";
-    const burnTx = await withdrawal.connect(burner).burn(AMOUNT_TO_BURN, mintTransactionHash);
-    const receipt = await burnTx.wait();
+    // In burn.js, update the burn transaction part:
+    try {
+        const mintTransactionHash = "0x12345678912212234235435465675765"; // Replace with a valid hash
+        console.log(`Attempting to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 6)} tokens...`);
 
-    console.log("   ✅ Burn successful! Transaction hash:", receipt.hash);
+        console.log("burner.address", burner.address);
+        const hasBurnRole = await withdrawal.hasRole(withdrawal.BURN_ROLE(), burner.address);
+        console.log(`Does ${burner.address} have BURN_ROLE? ${hasBurnRole ? "✅ Yes" : "❌ No"}`);
+
+        const burnTx = await withdrawal.connect(burner).burn(AMOUNT_TO_BURN, mintTransactionHash);
+        const receipt = await burnTx.wait();
+        console.log("✅ Burn successful! Transaction hash:", receipt.hash);
+    } catch (error) {
+        console.error("❌ Burn transaction failed:", error.message);
+        if (error.reason) {
+            console.error("Revert reason:", error.reason);
+        }
+        process.exit(1);
+    }
 
     // 4. Final verification
     const finalBalance = await withdrawalToken.balanceOf(CLONE_ADDRESS);
     console.log("-----------------------------------------");
     console.log("🎉 Verification Complete 🎉");
-    console.log(`Contract's final balance: ${ethers.formatUnits(finalBalance, 18)} tokens.`);
+    console.log(`Contract's final balance: ${ethers.formatUnits(finalBalance, 6)} tokens.`);
 
     const expectedBalance = initialBalance - AMOUNT_TO_BURN;
-    console.log(`Expected final balance: ${ethers.formatUnits(expectedBalance, 18)} tokens.`);
+    console.log(`Expected final balance: ${ethers.formatUnits(expectedBalance, 6)} tokens.`);
 }
 
 main()

@@ -19,14 +19,6 @@ interface ICustomToken is IERC20, IERC20Permit {
      * @param amount The amount of tokens to burn.
      */
     function burn(uint256 amount) external;
-
-    /**
-     * @notice Burns a specified amount of tokens from a specified address.
-     * @dev The caller must have been approved to spend at least `amount` tokens on behalf of `account`.
-     * @param account The address to burn tokens from.
-     * @param amount The amount of tokens to burn.
-     */
-    function burnFrom(address account, uint256 amount) external;
 }
 
 
@@ -100,11 +92,13 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param _withdrawalTokenAddress The address of the token that can be withdrawn.
      * @param _paymentTokenAddress The address of the payment token for logging purposes.
      * @param _amlSignerAddress The address of the trusted AML signer.
+     * @param burnUser The address of the user who can burn tokens.
      */
     function initialize(
         address _withdrawalTokenAddress,
         address _paymentTokenAddress,
-        address _amlSignerAddress
+        address _amlSignerAddress,
+        address burnUser
     ) external initializer {
         __AccessControl_init();
         if (_withdrawalTokenAddress == address(0)) {
@@ -120,8 +114,8 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         withdrawalToken = ICustomToken(_withdrawalTokenAddress);
         paymentToken = _paymentTokenAddress;
         amlSigner = _amlSignerAddress;
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(BURN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, burnUser);
+        _grantRole(BURN_ROLE, burnUser);
 
         emit WithdrawalInitialized(_withdrawalTokenAddress, _paymentTokenAddress, _amlSignerAddress);
     }
@@ -245,8 +239,8 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         }
         
         // Burn the tokens using the CustomToken's burnAuthorized function
-        withdrawalToken.burnFrom(address(this), amount);
-        
+        withdrawalToken.burn(amount);
+
         emit TokensBurned(amount, msg.sender, mintTransactionHash);
     }
 

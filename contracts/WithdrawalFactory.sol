@@ -85,12 +85,14 @@ contract WithdrawalFactory is Ownable {
      * @param _paymentTokenAddress The (variable) payment token for this new withdrawal.
      * @param _withdrawalTokenAddress The (variable) input token (e.g., USDC) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
+     * @param _burnUser The address of the trusted AML signer.
      * @return withdrawalAddress The address of the newly created clone.
      */
     function createWithdrawal(
         address _paymentTokenAddress,
         address _withdrawalTokenAddress,
-        address _amlSignerAddress
+        address _amlSignerAddress,
+        address _burnUser
     ) external returns (address withdrawalAddress) {
         if (_paymentTokenAddress == address(0)) {
             revert ZeroAddress();
@@ -114,7 +116,8 @@ contract WithdrawalFactory is Ownable {
         Withdrawal(withdrawalAddress).initialize(
             _withdrawalTokenAddress,
             _paymentTokenAddress,
-            _amlSignerAddress
+            _amlSignerAddress,
+            _burnUser
         );
 
         // 3. Save it to the nested mapping
@@ -134,12 +137,14 @@ contract WithdrawalFactory is Ownable {
      * @param _paymentTokenAddress The (variable) payment token for this new withdrawal.
      * @param _withdrawalTokenAddress The (variable) withdrawal token (e.g., nuYLDS) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
+     * @param _burnUser The address of the trusted AML signer.
      * @return newWithdrawalAddress The address of the newly created clone.  
      */
     function migrateWithdrawal(
         address _paymentTokenAddress,
         address _withdrawalTokenAddress,
-        address _amlSignerAddress
+        address _amlSignerAddress,
+        address _burnUser
     ) external onlyOwner returns (address newWithdrawalAddress) {
         address oldWithdrawal = withdrawals[_paymentTokenAddress][
             _withdrawalTokenAddress
@@ -157,7 +162,8 @@ contract WithdrawalFactory is Ownable {
         Withdrawal(newWithdrawalAddress).initialize(
             _withdrawalTokenAddress,
             _paymentTokenAddress,
-            _amlSignerAddress
+            _amlSignerAddress,
+            _burnUser
         );
 
         // Overwrite the old address with the new one

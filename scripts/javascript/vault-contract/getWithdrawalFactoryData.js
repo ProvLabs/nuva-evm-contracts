@@ -41,7 +41,7 @@ async function main() {
 
     const withdrawalToken = WITHDRAWAL_TOKEN_ADDRESS;
     const paymentToken = PAYMENT_TOKEN_ADDRESS;
-    console.log("Withdrawal address:", await withdrawal.withdrawals(withdrawalToken, paymentToken));
+    console.log("Withdrawal address:", await withdrawal.withdrawals(paymentToken, withdrawalToken));
 }
 
 main()

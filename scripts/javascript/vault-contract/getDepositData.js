@@ -2,9 +2,9 @@
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = process.env.CLONE_ADDRESS;
+const CLONE_ADDRESS = process.env.DEPOSITOR_CLONE_ADDRESS;
 if (!CLONE_ADDRESS) {
-    throw new Error("CLONE_ADDRESS is not set.");
+    throw new Error("DEPOSITOR_CLONE_ADDRESS is not set.");
 }
 
 const DEPOSIT_FACTRORY_ADDR = process.env.DEPOSITOR_FACTORY_CONTRACT;
