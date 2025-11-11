@@ -28,15 +28,13 @@ describe("CustomToken AccessControl", function () {
     return { admin, alice, bob, factory, token, name, symbol, initialSupply: BigInt(initialSupply), decimals };
   }
 
-  it("assigns DEFAULT_ADMIN, MINTER, BURNER to creator", async function () {
+  it("assigns DEFAULT_ADMIN, MINTER to creator", async function () {
     const { admin, token } = await deploy();
     const ADMIN_ROLE = await token.DEFAULT_ADMIN_ROLE();
     const MINTER_ROLE = await token.MINTER_ROLE();
-    const BURNER_ROLE = await token.BURNER_ROLE();
 
     expect(await token.hasRole(ADMIN_ROLE, await admin.getAddress())).to.equal(true);
     expect(await token.hasRole(MINTER_ROLE, await admin.getAddress())).to.equal(true);
-    expect(await token.hasRole(BURNER_ROLE, await admin.getAddress())).to.equal(true);
   });
 
   it("mint requires MINTER_ROLE and is transferrable via grant/revoke", async function () {
@@ -65,46 +63,21 @@ describe("CustomToken AccessControl", function () {
     );
   });
 
-  it("burnAuthorized requires BURNER_ROLE and is transferrable via grant/revoke", async function () {
-    const { admin, alice, bob, token, decimals } = await deploy();
-    const BURNER_ROLE = await token.BURNER_ROLE();
-
-    const amount = 500n * BigInt(10 ** decimals);
-    // fund Alice
-    await token.connect(admin).transfer(await alice.getAddress(), amount);
-
-    // non-burner cannot call burnAuthorized
-    await expect(token.connect(bob).burnAuthorized(await alice.getAddress(), amount)).to.be.revertedWithCustomError(
-      token,
-      "AccessControlUnauthorizedAccount"
-    );
-
-    // grant role and burn
-    await expect(token.connect(admin).grantRole(BURNER_ROLE, await bob.getAddress()))
-      .to.emit(token, "RoleGranted");
-
-    const prev = await token.balanceOf(await alice.getAddress());
-    await expect(token.connect(bob).burnAuthorized(await alice.getAddress(), amount))
-      .to.emit(token, "Transfer");
-    const after = await token.balanceOf(await alice.getAddress());
-    expect(after).to.equal(prev - amount);
-
-    // revoke role and ensure it reverts
-    await token.connect(admin).revokeRole(BURNER_ROLE, await bob.getAddress());
-    await expect(token.connect(bob).burnAuthorized(await alice.getAddress(), 1n)).to.be.revertedWithCustomError(
-      token,
-      "AccessControlUnauthorizedAccount"
-    );
-  });
-
-  it("holders can still burn their own tokens via burn()", async function () {
-    const { admin, alice, token, decimals } = await deploy();
-    const amt = 42n * BigInt(10 ** decimals);
-
-    await token.connect(admin).transfer(await alice.getAddress(), amt);
-    const totalBefore = await token.totalSupply();
-    await expect(token.connect(alice).burn(amt)).to.emit(token, "Transfer");
-    const totalAfter = await token.totalSupply();
-    expect(totalAfter).to.equal(totalBefore - amt);
+  it("should allow token holders to burn their own tokens", async function () {
+    const { token, admin, alice } = await deploy();
+    
+    // Mint some tokens to alice first
+    const mintAmount = 1000n * 10n ** 18n;
+    await token.connect(admin).mint(await alice.getAddress(), mintAmount);
+    
+    // Verify alice can burn their own tokens
+    const burnAmount = 100n * 10n ** 18n;
+    await expect(token.connect(alice).burn(burnAmount))
+      .to.emit(token, "TokensBurned")
+      .withArgs(await alice.getAddress(), burnAmount);
+    
+    // Verify balance was reduced
+    const balance = await token.balanceOf(await alice.getAddress());
+    expect(balance).to.equal(mintAmount - burnAmount);
   });
 });
