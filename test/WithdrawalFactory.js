@@ -11,7 +11,7 @@ describe("WithdrawalFactory", function () {
     async function deployNewFactory() {
         // Get Withdrawal contract factory
         Withdrawal = await ethers.getContractFactory("Withdrawal");
-        
+
         // Deploy new implementation
         withdrawalImplementation = await Withdrawal.deploy();
         await withdrawalImplementation.waitForDeployment();
@@ -30,7 +30,6 @@ describe("WithdrawalFactory", function () {
 
         // Get Token contract factory
         Token = await ethers.getContractFactory("CustomToken");
-
     });
 
     // Deploy a fresh factory and fresh token instances before each test
@@ -73,12 +72,14 @@ describe("WithdrawalFactory", function () {
 
     describe("createWithdrawal", function () {
         it("Should create a new withdrawal contract", async function () {
-            const tx = await withdrawalFactory.connect(owner).createWithdrawal(
-                await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
-                amlSigner.address,
-                owner.address
-            );
+            const tx = await withdrawalFactory
+                .connect(owner)
+                .createWithdrawal(
+                    await paymentToken.getAddress(),
+                    await withdrawalToken.getAddress(),
+                    amlSigner.address,
+                    owner.address,
+                );
 
             const txReceipt = await tx.wait();
             const withdrawalCreatedEvent = txReceipt.logs.find((log) => log.fragment?.name === "WithdrawalCreated");
@@ -98,54 +99,64 @@ describe("WithdrawalFactory", function () {
 
         it("Should revert if payment token is zero address", async function () {
             await expect(
-                withdrawalFactory.connect(owner).createWithdrawal(
-                    ethers.ZeroAddress,
-                    await withdrawalToken.getAddress(),
-                    amlSigner.address,
-                    owner.address
-                )
+                withdrawalFactory
+                    .connect(owner)
+                    .createWithdrawal(
+                        ethers.ZeroAddress,
+                        await withdrawalToken.getAddress(),
+                        amlSigner.address,
+                        owner.address,
+                    ),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
 
         it("Should revert if withdrawal token is zero address", async function () {
             await expect(
-                withdrawalFactory.connect(owner).createWithdrawal(
-                    await paymentToken.getAddress(),
-                    ethers.ZeroAddress,
-                    amlSigner.address,
-                    owner.address
-                )
+                withdrawalFactory
+                    .connect(owner)
+                    .createWithdrawal(
+                        await paymentToken.getAddress(),
+                        ethers.ZeroAddress,
+                        amlSigner.address,
+                        owner.address,
+                    ),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
 
         it("Should revert if AML signer is zero address", async function () {
             await expect(
-                withdrawalFactory.connect(owner).createWithdrawal(
-                    await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
-                    ethers.ZeroAddress,
-                    owner.address
-                )
+                withdrawalFactory
+                    .connect(owner)
+                    .createWithdrawal(
+                        await paymentToken.getAddress(),
+                        await withdrawalToken.getAddress(),
+                        ethers.ZeroAddress,
+                        owner.address,
+                    ),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
 
         it("Should revert if withdrawal already exists", async function () {
             // First creation should succeed
-            await withdrawalFactory.connect(owner).createWithdrawal(
-                await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
-                amlSigner.address,
-                owner.address
-            );
-
-            // Second creation should fail
-            await expect(
-                withdrawalFactory.connect(owner).createWithdrawal(
+            await withdrawalFactory
+                .connect(owner)
+                .createWithdrawal(
                     await paymentToken.getAddress(),
                     await withdrawalToken.getAddress(),
                     amlSigner.address,
-                    owner.address
-                )
+                    owner.address,
+                );
+
+            // Second creation should fail
+            await expect(
+                withdrawalFactory
+                    .connect(owner)
+                    .createWithdrawal(
+                        await paymentToken.getAddress(),
+                        await withdrawalToken.getAddress(),
+                        amlSigner.address,
+                        owner.address,
+                    ),
             ).to.be.revertedWithCustomError(withdrawalFactory, "WithdrawalAlreadyExists");
         });
     });
@@ -153,17 +164,19 @@ describe("WithdrawalFactory", function () {
     describe("migrateWithdrawal", function () {
         it("Should migrate to a new withdrawal contract", async function () {
             // First create a withdrawal
-            const createTx = await withdrawalFactory.connect(owner).createWithdrawal(
-                await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
-                amlSigner.address,
-                owner.address
-            );
+            const createTx = await withdrawalFactory
+                .connect(owner)
+                .createWithdrawal(
+                    await paymentToken.getAddress(),
+                    await withdrawalToken.getAddress(),
+                    amlSigner.address,
+                    owner.address,
+                );
             await createTx.wait();
 
             const oldWithdrawalAddress = await withdrawalFactory.withdrawals(
                 await paymentToken.getAddress(),
-                await withdrawalToken.getAddress()
+                await withdrawalToken.getAddress(),
             );
 
             // Deploy a new implementation
@@ -172,18 +185,20 @@ describe("WithdrawalFactory", function () {
             await newImplementation.waitForDeployment();
 
             // Migrate to the new implementation
-            const migrateTx = await withdrawalFactory.connect(owner).migrateWithdrawal(
-                await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
-                amlSigner.address,
-                await newImplementation.getAddress()
-            );
+            const migrateTx = await withdrawalFactory
+                .connect(owner)
+                .migrateWithdrawal(
+                    await paymentToken.getAddress(),
+                    await withdrawalToken.getAddress(),
+                    amlSigner.address,
+                    await newImplementation.getAddress(),
+                );
             await migrateTx.wait();
 
             // Check that the withdrawal address has changed
             const newWithdrawalAddress = await withdrawalFactory.withdrawals(
                 await paymentToken.getAddress(),
-                await withdrawalToken.getAddress()
+                await withdrawalToken.getAddress(),
             );
 
             expect(newWithdrawalAddress).to.not.equal(oldWithdrawalAddress);
@@ -203,23 +218,27 @@ describe("WithdrawalFactory", function () {
             await testImplementation.waitForDeployment();
 
             await expect(
-                withdrawalFactory.connect(owner).migrateWithdrawal(
-                    await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
-                    amlSigner.address,
-                    await testImplementation.getAddress()
-                )
+                withdrawalFactory
+                    .connect(owner)
+                    .migrateWithdrawal(
+                        await paymentToken.getAddress(),
+                        await withdrawalToken.getAddress(),
+                        amlSigner.address,
+                        await testImplementation.getAddress(),
+                    ),
             ).to.be.revertedWithCustomError(withdrawalFactory, "NoExistingWithdrawalToMigrate");
         });
 
         it("Should revert if not called by owner", async function () {
             // Create a withdrawal
-            const createTx = await withdrawalFactory.connect(owner).createWithdrawal(
-                await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
-                amlSigner.address,
-                owner.address
-            );
+            const createTx = await withdrawalFactory
+                .connect(owner)
+                .createWithdrawal(
+                    await paymentToken.getAddress(),
+                    await withdrawalToken.getAddress(),
+                    amlSigner.address,
+                    owner.address,
+                );
             await createTx.wait();
 
             // Deploy a new implementation for testing
@@ -234,8 +253,8 @@ describe("WithdrawalFactory", function () {
                         await paymentToken.getAddress(),
                         await withdrawalToken.getAddress(),
                         amlSigner.address,
-                        await testImplementation.getAddress()
-                    )
+                        await testImplementation.getAddress(),
+                    ),
             ).to.be.revertedWithCustomError(withdrawalFactory, "OwnableUnauthorizedAccount");
         });
     });
@@ -256,13 +275,13 @@ describe("WithdrawalFactory", function () {
             const newImplementation = user.address;
 
             await expect(
-                withdrawalFactory.connect(user).updateImplementation(newImplementation)
+                withdrawalFactory.connect(user).updateImplementation(newImplementation),
             ).to.be.revertedWithCustomError(withdrawalFactory, "OwnableUnauthorizedAccount");
         });
 
         it("Should revert if new implementation is zero address", async function () {
             await expect(
-                withdrawalFactory.connect(owner).updateImplementation(ethers.ZeroAddress)
+                withdrawalFactory.connect(owner).updateImplementation(ethers.ZeroAddress),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
     });

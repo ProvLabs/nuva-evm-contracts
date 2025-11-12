@@ -4,10 +4,10 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { deployWithdrawal } = require("./helpers/fixtures");
 
 // Helper function to get AML signature for Withdrawal contract
-async function getAMLSignature({ amlSigner, user, token, amount, destination, deadline }) {
+async function getAMLSignature({ amlSigner, user, token, paymentToken, amount, destination, deadline }) {
     const hash = ethers.solidityPackedKeccak256(
-        ["address", "address", "uint256", "address", "uint256"],
-        [user.address, token.target, amount, destination, deadline],
+        ["address", "address", "address", "uint256", "address", "uint256"],
+        [user.address, token.target, paymentToken, amount, destination, deadline],
     );
     const sig = await amlSigner.signMessage(ethers.getBytes(hash));
     return sig;
@@ -71,16 +71,16 @@ describe("Withdrawal", function () {
         // Mint tokens to user and approve when needed
         await token.mint(user.address, ethers.parseUnits("1000", 18));
 
-        return { 
-            deployer, 
-            amlSigner, 
-            user, 
-            other, 
-            token, 
-            withdrawal, 
+        return {
+            deployer,
+            amlSigner,
+            user,
+            other,
+            token,
+            withdrawal,
             paymentToken,
             DEFAULT_ADMIN_ROLE,
-            BURN_ROLE
+            BURN_ROLE,
         };
     }
 
@@ -92,7 +92,7 @@ describe("Withdrawal", function () {
 
         // Pre approve for withdraw (non-permit flow)
         await token.connect(user).approve(withdrawal.target, amount);
-        
+
         // Grant BURN_ROLE to withdrawal contract if needed
         const BURN_ROLE = await withdrawal.BURN_ROLE();
         if (!(await withdrawal.hasRole(BURN_ROLE, withdrawal.target))) {
@@ -103,6 +103,7 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
+            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -118,7 +119,7 @@ describe("Withdrawal", function () {
 
     it("withdrawWithPermit: allows withdrawal with permit and valid AML signature", async function () {
         const { user, amlSigner, token, withdrawal, paymentToken, deployer } = await deployFixture();
-        
+
         // Grant BURN_ROLE to withdrawal contract if needed
         const BURN_ROLE = await withdrawal.BURN_ROLE();
         if (!(await withdrawal.hasRole(BURN_ROLE, withdrawal.target))) {
@@ -133,6 +134,7 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
+            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -165,15 +167,17 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
+            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
         });
 
         // Test expired signature - should revert with AmlSignatureExpired
-        await expect(
-            withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)
-        ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureExpired");
+        await expect(withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)).to.be.revertedWithCustomError(
+            withdrawal,
+            "AmlSignatureExpired",
+        );
     });
 
     it("reverts on AML signature replay", async function () {
@@ -188,6 +192,7 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
+            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -196,14 +201,15 @@ describe("Withdrawal", function () {
         await withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline);
 
         // Test replay protection - should revert with AmlSignatureAlreadyUsed
-        await expect(
-            withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)
-        ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureAlreadyUsed");
+        await expect(withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)).to.be.revertedWithCustomError(
+            withdrawal,
+            "AmlSignatureAlreadyUsed",
+        );
     });
 
     it("reverts for invalid AML signer", async function () {
         const { user, other, token, withdrawal, paymentToken, deployer } = await deployFixture();
-        
+
         // Grant BURN_ROLE to withdrawal contract if needed
         const BURN_ROLE = await withdrawal.BURN_ROLE();
         if (!(await withdrawal.hasRole(BURN_ROLE, withdrawal.target))) {
@@ -220,6 +226,7 @@ describe("Withdrawal", function () {
             amlSigner: other,
             user,
             token,
+            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -244,6 +251,7 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
+            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -267,21 +275,19 @@ describe("Withdrawal", function () {
         it("reverts when caller does not have BURNER_ROLE", async function () {
             const { deployer, withdrawal, token, BURN_ROLE } = await loadFixture(deployFixture);
             const amount = ethers.parseUnits("100", 18);
-            
+
             // Mint tokens to the withdrawal contract
             await token.mint(deployer.address, amount);
             await token.connect(deployer).transfer(withdrawal.target, amount);
 
             // Revoke BURN_ROLE from deployer for this test
             await withdrawal.revokeRole(BURN_ROLE, deployer.address);
-            
-            const mintTransactionHash = "0x1234567890123456789012345678901234567890123456789012345678901234";
-            
-            await expect(
-                withdrawal.connect(deployer).burn(amount, mintTransactionHash)
-            ).to.be.revertedWithCustomError(withdrawal, "AccessControlUnauthorizedAccount")
-             .withArgs(deployer.address, BURN_ROLE);
 
+            const mintTransactionHash = "0x1234567890123456789012345678901234567890123456789012345678901234";
+
+            await expect(withdrawal.connect(deployer).burn(amount, mintTransactionHash))
+                .to.be.revertedWithCustomError(withdrawal, "AccessControlUnauthorizedAccount")
+                .withArgs(deployer.address, BURN_ROLE);
         });
 
         it("reverts if non-admin tries to burn", async function () {
@@ -322,6 +328,7 @@ describe("Withdrawal", function () {
                 amlSigner,
                 user,
                 token,
+                paymentToken,
                 amount: 0,
                 destination: withdrawal.target,
                 deadline: amlDeadline,
@@ -348,11 +355,15 @@ describe("Withdrawal", function () {
 
             // Create an expired signature
             const expiredDeadline = (await ethers.provider.getBlock("latest")).timestamp - 1;
-            
+
+            // paymentToken can be any address to log; use token address for simplicity
+            const paymentToken = token.target;
+
             const amlSig = await getAMLSignature({
                 amlSigner: user,
                 user,
                 token,
+                paymentToken,
                 amount,
                 destination: await user.getAddress(),
                 deadline: expiredDeadline,
@@ -360,7 +371,7 @@ describe("Withdrawal", function () {
 
             // Test expired signature - should revert with AmlSignatureExpired
             await expect(
-                withdrawal.connect(user).withdraw(amount, amlSig, expiredDeadline)
+                withdrawal.connect(user).withdraw(amount, amlSig, expiredDeadline),
             ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureExpired");
         });
     });
@@ -368,7 +379,7 @@ describe("Withdrawal", function () {
     describe("ERC20 functions", function () {
         it("should have the correct initial state", async function () {
             const { withdrawal, token, paymentToken, amlSigner, deployer } = await loadFixture(deployFixture);
-            
+
             const DEFAULT_ADMIN_ROLE = await withdrawal.DEFAULT_ADMIN_ROLE();
             const BURN_ROLE = await withdrawal.BURN_ROLE();
 
