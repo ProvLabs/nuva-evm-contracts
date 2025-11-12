@@ -22,7 +22,11 @@ if (!SHARE_TOKEN_ADDRESS) {
     throw new Error("SHARED_TOKEN_ADDRESS is not set.");
 }
 
-const DESTINATION_ADDRESS = "0x69482E00b8Ab0a256E8eF99718CcD8a2C460C3f7"; // Wallet to receive tokens
+// Wallet to receive tokens
+const DESTINATION_ADDRESS = process.env.PUBLIC_KEY_1;
+if (!DESTINATION_ADDRESS) {
+    throw new Error("PUBLIC_KEY_1 is not set.");
+}
 
 // NOTE: Change '18' if your token has different decimals (e.g., 6 for USDC)
 const TOKEN_DECIMALS = 6;
@@ -100,7 +104,7 @@ async function main() {
         ],
     );
 
-    const amlMessageHash = ethers.keccak256(packedData);
+    const amlMessageHash = ethers.solidityPackedKeccak256(packedData);
     console.log("AML Message Hash:", amlMessageHash);
 
     // Sign the hash directly (the contract will prepend the prefix)

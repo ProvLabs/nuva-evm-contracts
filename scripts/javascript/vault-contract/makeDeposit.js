@@ -2,10 +2,26 @@
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = "0x8aAef1A980Da6B5a26FD8ee9Ebd13c5e60055188";
-const DEPOSIT_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // e.g., USDC
-const SHARE_TOKEN_ADDRESS = "0x792949BA096871c6411634b53183A7764f2244f8"; // e.g., SteveCoin
-const DESTINATION_ADDRESS = "0xB037CDb5b9e92237657f5F6ae7c7F13e533fC539"; // Wallet to receive tokens
+const CLONE_ADDRESS = process.env.DEPOSITOR_CLONE_ADDRESS;
+if (!CLONE_ADDRESS) {
+    throw new Error("DEPOSITOR_CLONE_ADDRESS is not set.");
+}
+
+const DEPOSIT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
+if (!DEPOSIT_TOKEN_ADDRESS) {
+    throw new Error("TOKEN_ADDRESS is not set.");
+}
+
+const SHARE_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+if (!SHARE_TOKEN_ADDRESS) {
+    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+}
+
+// Wallet to receive tokens
+const DESTINATION_ADDRESS = process.env.PUBLIC_KEY_1;
+if (!DESTINATION_ADDRESS) {
+    throw new Error("PUBLIC_KEY_1 is not set.");
+}
 
 // NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
 const AMOUNT_TO_DEPOSIT = ethers.parseUnits("0.15", 6);
@@ -26,7 +42,7 @@ function getAmlSigner() {
 
 async function main() {
     // 1. Get our "user" (signer 1)
-    const [_, user] = await ethers.getSigners();
+    const [user] = await ethers.getSigners();
     const amlSigner = getAmlSigner();
 
     console.log(`Simulating deposit as user: ${user.address}`);

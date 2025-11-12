@@ -7,6 +7,16 @@ async function latestTimestamp() {
     return BigInt(block.timestamp);
 }
 
+// Helper function to get AML signature
+async function getAMLSignature({ amlSigner, user, token, shareToken, amount, destination, deadline }) {
+    const hash = ethers.solidityPackedKeccak256(
+        ["address", "address", "address", "uint256", "address", "uint256"],
+        [user.address, token.target, shareToken, amount, destination, deadline],
+    );
+    const sig = await amlSigner.signMessage(ethers.getBytes(hash));
+    return sig;
+}
+
 async function buildAmlSignature({ amlSigner, user, depositToken, shareToken, amount, destination, deadline }) {
     const msgHash = ethers.solidityPackedKeccak256(
         ["address", "address", "address", "uint256", "address", "uint256"],
@@ -63,17 +73,8 @@ describe("Depositor", function () {
         const scale = 10n ** BigInt(decimals);
         await token.connect(deployer).mint(await user.getAddress(), 1_000_000n * scale);
 
-        // Deploy AMLUtils library first
-        const AMLUtils = await ethers.getContractFactory("AMLUtils");
-        const amlUtils = await AMLUtils.deploy();
-        await amlUtils.waitForDeployment();
-
         // Deploy Depositor implementation with linked library
-        const DepositorImpl = await ethers.getContractFactory("Depositor", {
-            libraries: {
-                AMLUtils: await amlUtils.getAddress(),
-            },
-        });
+        const DepositorImpl = await ethers.getContractFactory("Depositor");
         const depositorImpl = await DepositorImpl.deploy();
         await depositorImpl.waitForDeployment();
 
@@ -133,21 +134,20 @@ describe("Depositor", function () {
         const nowTs = await latestTimestamp();
 
         // expired
-        const { signature: sigExpired } = await buildAmlSignature({
+        const sigExpired = await getAMLSignature({
             amlSigner,
             user,
-            depositToken: token,
-            shareToken,
+            token,
+            shareToken: await depositor.shareToken(),
             amount: amt,
             destination: await destination.getAddress(),
             deadline: nowTs - 1n,
         });
 
-        // Test expired signature - should revert with AMLUtils.AmlSignatureExpired
-        const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
+        // Test expired signature - should revert with AmlSignatureExpired
         await expect(
             depositor.connect(user).deposit(amt, await destination.getAddress(), sigExpired, nowTs - 1n),
-        ).to.be.revertedWithCustomError(amlUtils, "AmlSignatureExpired");
+        ).to.be.revertedWithCustomError(depositor, "AmlSignatureExpired");
 
         // Test wrong signer
         const imposter = (await ethers.getSigners())[3];
@@ -156,14 +156,14 @@ describe("Depositor", function () {
             amlSigner: imposter,
             user,
             depositToken: token,
-            shareToken,
+            shareToken: await depositor.shareToken(),
             amount: amt,
             destination: await destination.getAddress(),
             deadline,
         });
         await expect(
             depositor.connect(user).deposit(amt, await destination.getAddress(), sigWrong, deadline),
-        ).to.be.revertedWithCustomError(amlUtils, "InvalidAmlSigner");
+        ).to.be.revertedWithCustomError(depositor, "InvalidAmlSigner");
 
         // Test replay protection
         const { signature } = await buildAmlSignature({
@@ -185,7 +185,7 @@ describe("Depositor", function () {
         // Second deposit with same signature should fail
         await expect(
             depositor.connect(user).deposit(amt, await destination.getAddress(), signature, deadline),
-        ).to.be.revertedWithCustomError(amlUtils, "AmlSignatureAlreadyUsed");
+        ).to.be.revertedWithCustomError(depositor, "AmlSignatureAlreadyUsed");
     });
 
     it("validates amount and destination", async function () {
@@ -237,7 +237,7 @@ describe("Depositor", function () {
             amlSigner,
             user,
             depositToken: token,
-            shareToken,
+            shareToken: await depositor.shareToken(),
             amount: amt,
             destination: await destination.getAddress(),
             deadline: nowTs + 3600n,

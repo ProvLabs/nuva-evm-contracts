@@ -3,17 +3,7 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    // 1. Get the contract factory for the implementation
-    const amlUtilsAddr = process.env.AML_UTILS_CONTRACT;
-    if (!amlUtilsAddr) {
-        throw new Error("AML_UTILS_CONTRACT is not set.");
-    }
-
-    const depositor = await ethers.getContractFactory("Depositor", {
-        libraries: {
-            AMLUtils: amlUtilsAddr,
-        },
-    });
+    const depositor = await ethers.getContractFactory("Depositor");
 
     // 2. Deploy the implementation contract
     console.log("Deploying Depositor (implementation)...");

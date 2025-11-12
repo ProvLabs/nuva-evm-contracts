@@ -1,17 +1,8 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const amlUtilsAddr = process.env.AML_UTILS_CONTRACT;
-    if (!amlUtilsAddr) {
-        throw new Error("AML_UTILS_CONTRACT is not set.");
-    }
-
     // 1. Get the contract factory for the Withdrawal
-    const withdrawal = await ethers.getContractFactory("Withdrawal", {
-        libraries: {
-            AMLUtils: amlUtilsAddr,
-        },
-    });
+    const withdrawal = await ethers.getContractFactory("Withdrawal");
 
     // 2. Deploy the implementation contract
     console.log("Deploying Withdrawal implementation...");

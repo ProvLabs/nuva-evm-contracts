@@ -1,11 +1,6 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const amlUtilsAddr = process.env.AML_UTILS_CONTRACT;
-    if (!amlUtilsAddr) {
-        throw new Error("AML_UTILS_CONTRACT is not set.");
-    }
-
     const DEPOSITOR_CONTRACT_ADDR = process.env.DEPOSITOR_CONTRACT;
     if (!DEPOSITOR_CONTRACT_ADDR) {
         throw new Error("DEPOSITOR_CONTRACT is not set.");

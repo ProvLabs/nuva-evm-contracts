@@ -3,26 +3,15 @@ const { ethers } = require("hardhat");
 
 describe("WithdrawalFactory", function () {
     let owner, user, amlSigner;
-    let Withdrawal, WithdrawalFactory, Token, AMLUtils, amlUtils;
+    let Withdrawal, WithdrawalFactory, Token;
     let withdrawalFactory, withdrawalImplementation;
     let paymentToken, withdrawalToken;
 
     // Helper function to deploy a new instance of the factory for each test
     async function deployNewFactory() {
-        // Deploy AMLUtils library if not already deployed
-        if (!AMLUtils) {
-            AMLUtils = await ethers.getContractFactory("AMLUtils");
-            amlUtils = await AMLUtils.deploy();
-            await amlUtils.waitForDeployment();
-        }
-
-        // Link AMLUtils library to Withdrawal contract
-        Withdrawal = await ethers.getContractFactory("Withdrawal", {
-            libraries: {
-                AMLUtils: await amlUtils.getAddress(),
-            },
-        });
-
+        // Get Withdrawal contract factory
+        Withdrawal = await ethers.getContractFactory("Withdrawal");
+        
         // Deploy new implementation
         withdrawalImplementation = await Withdrawal.deploy();
         await withdrawalImplementation.waitForDeployment();
@@ -42,10 +31,6 @@ describe("WithdrawalFactory", function () {
         // Get Token contract factory
         Token = await ethers.getContractFactory("CustomToken");
 
-        // Deploy AMLUtils library
-        AMLUtils = await ethers.getContractFactory("AMLUtils");
-        amlUtils = await AMLUtils.deploy();
-        await amlUtils.waitForDeployment();
     });
 
     // Deploy a fresh factory and fresh token instances before each test
@@ -182,11 +167,7 @@ describe("WithdrawalFactory", function () {
             );
 
             // Deploy a new implementation
-            const Withdrawal = await ethers.getContractFactory("Withdrawal", {
-                libraries: {
-                    AMLUtils: await amlUtils.getAddress(),
-                },
-            });
+            const Withdrawal = await ethers.getContractFactory("Withdrawal");
             const newImplementation = await Withdrawal.deploy();
             await newImplementation.waitForDeployment();
 
@@ -217,11 +198,7 @@ describe("WithdrawalFactory", function () {
 
         it("Should revert if no withdrawal exists to migrate", async function () {
             // Deploy a new implementation for testing
-            const Withdrawal = await ethers.getContractFactory("Withdrawal", {
-                libraries: {
-                    AMLUtils: await amlUtils.getAddress(),
-                },
-            });
+            const Withdrawal = await ethers.getContractFactory("Withdrawal");
             const testImplementation = await Withdrawal.deploy();
             await testImplementation.waitForDeployment();
 
@@ -246,11 +223,7 @@ describe("WithdrawalFactory", function () {
             await createTx.wait();
 
             // Deploy a new implementation for testing
-            const Withdrawal = await ethers.getContractFactory("Withdrawal", {
-                libraries: {
-                    AMLUtils: await amlUtils.getAddress(),
-                },
-            });
+            const Withdrawal = await ethers.getContractFactory("Withdrawal");
             const testImplementation = await Withdrawal.deploy();
             await testImplementation.waitForDeployment();
 

@@ -11,17 +11,8 @@ describe("DepositorFactory", function () {
         // Get signers
         [owner, user, amlSigner] = await ethers.getSigners();
 
-        // Deploy AMLUtils library first
-        const AMLUtils = await ethers.getContractFactory("AMLUtils");
-        const amlUtils = await AMLUtils.deploy();
-        await amlUtils.waitForDeployment();
-
-        // Deploy implementation contract with linked library
-        Depositor = await ethers.getContractFactory("Depositor", {
-            libraries: {
-                AMLUtils: await amlUtils.getAddress(),
-            },
-        });
+        // Deploy implementation contract
+        Depositor = await ethers.getContractFactory("Depositor");
         depositorImplementation = await Depositor.deploy();
         await depositorImplementation.waitForDeployment();
 

@@ -1,12 +1,13 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployAMLUtils, deployWithdrawal } = require("./helpers/fixtures");
+const { deployWithdrawal } = require("./helpers/fixtures");
 
-async function getAMLSignature({ amlSigner, user, token, paymentToken, amount, destination, deadline }) {
+// Helper function to get AML signature for Withdrawal contract
+async function getAMLSignature({ amlSigner, user, token, amount, destination, deadline }) {
     const hash = ethers.solidityPackedKeccak256(
-        ["address", "address", "address", "uint256", "address", "uint256"],
-        [user.address, token.target, paymentToken, amount, destination, deadline],
+        ["address", "address", "uint256", "address", "uint256"],
+        [user.address, token.target, amount, destination, deadline],
     );
     const sig = await amlSigner.signMessage(ethers.getBytes(hash));
     return sig;
@@ -57,15 +58,8 @@ describe("Withdrawal", function () {
         // paymentToken can be any address to log; use token address for simplicity
         const paymentToken = token.target;
 
-        // Deploy AMLUtils and Withdrawal with linked library
-        const amlUtils = await deployAMLUtils();
-        const Withdrawal = await ethers.getContractFactory("Withdrawal", {
-            libraries: {
-                AMLUtils: await amlUtils.getAddress(),
-            },
-        });
-        const withdrawal = await Withdrawal.deploy();
-        await withdrawal.waitForDeployment();
+        // Deploy Withdrawal contract
+        const withdrawal = await deployWithdrawal();
 
         // Get role hashes
         const DEFAULT_ADMIN_ROLE = await withdrawal.DEFAULT_ADMIN_ROLE();
@@ -109,7 +103,6 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
-            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -140,7 +133,6 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
-            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -173,18 +165,15 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
-            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
         });
 
-        // Test expired signature - should revert with AMLUtils.AmlSignatureExpired
-        const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
-        await expect(withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)).to.be.revertedWithCustomError(
-            amlUtils,
-            "AmlSignatureExpired",
-        );
+        // Test expired signature - should revert with AmlSignatureExpired
+        await expect(
+            withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)
+        ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureExpired");
     });
 
     it("reverts on AML signature replay", async function () {
@@ -199,7 +188,6 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
-            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -207,12 +195,10 @@ describe("Withdrawal", function () {
 
         await withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline);
 
-        // Test expired signature - should revert with AMLUtils.AmlSignatureExpired
-        const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
-        await expect(withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)).to.be.revertedWithCustomError(
-            amlUtils,
-            "AmlSignatureAlreadyUsed",
-        );
+        // Test replay protection - should revert with AmlSignatureAlreadyUsed
+        await expect(
+            withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)
+        ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureAlreadyUsed");
     });
 
     it("reverts for invalid AML signer", async function () {
@@ -234,22 +220,20 @@ describe("Withdrawal", function () {
             amlSigner: other,
             user,
             token,
-            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
         });
 
         // Test invalid AML signer
-        const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
         await expect(withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline)).to.be.revertedWithCustomError(
-            amlUtils,
+            withdrawal,
             "InvalidAmlSigner",
         );
     });
 
     it("reverts when permit deadline expired", async function () {
-        const { user, amlSigner, token, withdrawal, paymentToken, _amlUtils } = await loadFixture(deployFixture);
+        const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
 
         const amount = ethers.parseUnits("15", 18);
         const now = (await ethers.provider.getBlock("latest")).timestamp;
@@ -260,7 +244,6 @@ describe("Withdrawal", function () {
             amlSigner,
             user,
             token,
-            paymentToken,
             amount,
             destination: withdrawal.target,
             deadline: amlDeadline,
@@ -275,10 +258,9 @@ describe("Withdrawal", function () {
         });
 
         // Test that the transaction reverts with the expected error
-        const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
         await expect(
             withdrawal.connect(user).withdrawWithPermit(amount, amlSig, amlDeadline, permitDeadline, v, r, s),
-        ).to.be.revertedWithCustomError(amlUtils, "AmlSignatureExpired");
+        ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureExpired");
     });
 
     describe("burn", function () {
@@ -340,7 +322,6 @@ describe("Withdrawal", function () {
                 amlSigner,
                 user,
                 token,
-                paymentToken,
                 amount: 0,
                 destination: withdrawal.target,
                 deadline: amlDeadline,
@@ -360,34 +341,27 @@ describe("Withdrawal", function () {
         });
 
         it("reverts with expired AML signature", async function () {
-            const { user, amlSigner, token, withdrawal, paymentToken } = await deployFixture();
-            const amount = ethers.parseUnits("10", 18);
-            const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp - 1; // In the past
+            const { user, withdrawal, token } = await loadFixture(deployFixture);
+            const amount = ethers.parseUnits("100", 18);
+            const amlDeadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
             const permitDeadline = amlDeadline + 1000;
 
+            // Create an expired signature
+            const expiredDeadline = (await ethers.provider.getBlock("latest")).timestamp - 1;
+            
             const amlSig = await getAMLSignature({
-                amlSigner,
+                amlSigner: user,
                 user,
                 token,
-                paymentToken,
                 amount,
-                destination: withdrawal.target,
-                deadline: amlDeadline,
+                destination: await user.getAddress(),
+                deadline: expiredDeadline,
             });
 
-            const { v, r, s } = await getPermitSignature({
-                token,
-                owner: user,
-                spender: withdrawal.target,
-                value: amount,
-                deadline: permitDeadline,
-            });
-
-            // Test expired signature - should revert with AMLUtils.AmlSignatureExpired
-            const amlUtils = await (await ethers.getContractFactory("AMLUtils")).deploy();
+            // Test expired signature - should revert with AmlSignatureExpired
             await expect(
-                withdrawal.connect(user).withdrawWithPermit(amount, amlSig, amlDeadline, permitDeadline, v, r, s),
-            ).to.be.revertedWithCustomError(amlUtils, "AmlSignatureExpired");
+                withdrawal.connect(user).withdraw(amount, amlSig, expiredDeadline)
+            ).to.be.revertedWithCustomError(withdrawal, "AmlSignatureExpired");
         });
     });
 
