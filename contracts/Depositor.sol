@@ -59,11 +59,11 @@ contract Depositor is Initializable {
      * @param destinationAddress The address where the tokens were sent.
      */
     event Deposit(
-        address user,
+        address indexed user,
         uint256 amount,
-        address indexed depositToken,
-        address indexed shareToken,
-        address indexed destinationAddress
+        address depositToken,
+        address shareToken,
+        address destinationAddress
     );
 
     // --- Initializer ---

@@ -46,8 +46,8 @@ contract DepositorFactory is Ownable {
     /// @param depositToken The address of the deposit token
     /// @param depositorAddress The address of the newly created depositor contract
     event DepositorCreated(
-        address indexed shareToken,
-        address indexed depositToken,
+        address shareToken,
+        address depositToken,
         address indexed depositorAddress
     );
 
@@ -57,8 +57,8 @@ contract DepositorFactory is Ownable {
     /// @param oldDepositorAddress The address of the old depositor contract
     /// @param newDepositorAddress The address of the new depositor contract
     event DepositorMigrated(
-        address indexed shareToken,
-        address indexed depositToken,
+        address shareToken,
+        address depositToken,
         address indexed oldDepositorAddress,
         address newDepositorAddress
     );

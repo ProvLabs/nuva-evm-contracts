@@ -46,8 +46,8 @@ contract WithdrawalFactory is Ownable {
     /// @param shareToken The address of the shared token
     /// @param withdrawalAddress The address of the newly created withdrawal contract
     event WithdrawalCreated(
-        address indexed paymentToken,
-        address indexed shareToken,
+        address paymentToken,
+        address shareToken,
         address indexed withdrawalAddress
     );
 
@@ -57,8 +57,8 @@ contract WithdrawalFactory is Ownable {
     /// @param oldWithdrawalAddress The address of the old withdrawal contract
     /// @param newWithdrawalAddress The address of the new withdrawal contract
     event WithdrawalMigrated(
-        address indexed paymentToken,
-        address indexed shareToken,
+        address paymentToken,
+        address shareToken,
         address indexed oldWithdrawalAddress,
         address newWithdrawalAddress
     );

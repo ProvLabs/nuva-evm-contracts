@@ -25,8 +25,8 @@ contract CustomToken is ERC20, ERC20Permit, AccessControl {
      * @param from The address that burned the tokens.
      * @param amount The amount of tokens burned.
      */
-    event TokensBurned(address indexed from, uint256 indexed amount);
-    
+    event TokensBurned(address indexed from, uint256 amount);
+
     /**
      * @notice Initializes the contract with the provided token name, symbol, admin, and decimals.
      * @param _name The name of the token.

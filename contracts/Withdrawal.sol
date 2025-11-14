@@ -69,9 +69,9 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param amlSignerAddress The address of the AML signer.
      */
     event WithdrawalInitialized(
-        address indexed shareTokenAddress,
-        address indexed paymentTokenAddress,
-        address indexed amlSignerAddress
+        address shareTokenAddress,
+        address paymentTokenAddress,
+        address amlSignerAddress
     );
 
     /**
@@ -84,8 +84,8 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     event Withdraw(
         address indexed user,
         uint256 amount,
-        address indexed shareToken,
-        address indexed paymentToken
+        address shareToken,
+        address paymentToken
     );
 
     // --- Initializer ---
@@ -213,7 +213,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param burner The address that initiated the burn.
      * @param mintTransactionHash The hash of the mint transaction.
      */
-    event TokensBurned(uint256 amount, address indexed shareToken, address indexed burner, string indexed mintTransactionHash);
+    event TokensBurned(uint256 amount, address shareToken, address burner, string indexed mintTransactionHash);
 
     /**
      * @notice Burns a specified amount of tokens held by this contract.
