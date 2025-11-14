@@ -41,7 +41,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     // --- State Variables ---
 
     /// @notice The token being withdrawn and burned withdrawn from this contract.
-    ICustomToken public withdrawalToken;
+    ICustomToken public shareToken;
     /// @notice The address of the payment token, used for logging purposes.
     address public paymentToken;
     /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
@@ -64,12 +64,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Emitted when a user withdraws tokens.
-     * @param withdrawalTokenAddress The address of the withdrawal token.
+     * @param shareTokenAddress The address of the withdrawal token.
      * @param paymentTokenAddress The address of the payment token.
      * @param amlSignerAddress The address of the AML signer.
      */
     event WithdrawalInitialized(
-        address indexed withdrawalTokenAddress,
+        address indexed shareTokenAddress,
         address indexed paymentTokenAddress,
         address indexed amlSignerAddress
     );
@@ -78,11 +78,13 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @notice Emitted when a user withdraws tokens.
      * @param user The address of the user who initiated the withdrawal.
      * @param amount The amount of tokens withdrawn.
+     * @param shareToken The address of the shared token associated with the withdrawal.
      * @param paymentToken The address of the payment token associated with the withdrawal.
      */
     event Withdraw(
         address indexed user,
-        uint256 indexed amount,
+        uint256 amount,
+        address indexed shareToken,
         address indexed paymentToken
     );
 
@@ -91,19 +93,19 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     /**
      * @notice Initializes the contract with the provided token addresses and AML signer.
      * @dev Can only be called once during contract deployment.
-     * @param _withdrawalTokenAddress The address of the token that can be withdrawn.
+     * @param _shareTokenAddress The address of the token that can be withdrawn.
      * @param _paymentTokenAddress The address of the payment token for logging purposes.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param burnUser The address of the user who can burn tokens.
      */
     function initialize(
-        address _withdrawalTokenAddress,
+        address _shareTokenAddress,
         address _paymentTokenAddress,
         address _amlSignerAddress,
         address burnUser
     ) external initializer {
         __AccessControl_init();
-        if (_withdrawalTokenAddress == address(0)) {
+        if (_shareTokenAddress == address(0)) {
             revert InvalidAddress("Invalid withdrawal token");
         }
         if (_paymentTokenAddress == address(0)) {
@@ -113,13 +115,13 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
             revert InvalidAddress("Invalid AML signer");
         }
 
-        withdrawalToken = ICustomToken(_withdrawalTokenAddress);
+        shareToken = ICustomToken(_shareTokenAddress);
         paymentToken = _paymentTokenAddress;
         amlSigner = _amlSignerAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, burnUser);
         _grantRole(BURN_ROLE, burnUser);
 
-        emit WithdrawalInitialized(_withdrawalTokenAddress, _paymentTokenAddress, _amlSignerAddress);
+        emit WithdrawalInitialized(_shareTokenAddress, _paymentTokenAddress, _amlSignerAddress);
     }
 
     // --- Public Functions ---
@@ -179,7 +181,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        withdrawalToken.permit(
+        shareToken.permit(
             msg.sender,
             address(this),
             _amount,
@@ -199,18 +201,19 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param _amount The amount of tokens to withdraw.
      */
     function _doWithdraw(uint256 _amount) private {
-        withdrawalToken.safeTransferFrom(msg.sender, address(this), _amount);
+        shareToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-        emit Withdraw(msg.sender, _amount, paymentToken);
+        emit Withdraw(msg.sender, _amount, address(shareToken), paymentToken);
     }
 
     /**
      * @notice Emitted when tokens are burned from the contract.
      * @param amount The amount of tokens burned.
+     * @param shareToken The shared token address.
      * @param burner The address that initiated the burn.
      * @param mintTransactionHash The hash of the mint transaction.
      */
-    event TokensBurned(uint256 indexed amount, address indexed burner, string indexed mintTransactionHash);
+    event TokensBurned(uint256 amount, address indexed shareToken, address indexed burner, string indexed mintTransactionHash);
 
     /**
      * @notice Burns a specified amount of tokens held by this contract.
@@ -235,15 +238,15 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         }
 
         // Ensure the contract has enough tokens to burn
-        uint256 contractBalance = withdrawalToken.balanceOf(address(this));
+        uint256 contractBalance = shareToken.balanceOf(address(this));
         if (amount > contractBalance) {
             revert InsufficientBalance();
         }
         
         // Burn the tokens using the CustomToken's burnAuthorized function
-        withdrawalToken.burn(amount);
+        shareToken.burn(amount);
 
-        emit TokensBurned(amount, msg.sender, mintTransactionHash);
+        emit TokensBurned(amount, address(shareToken), msg.sender, mintTransactionHash);
     }
 
     /**
@@ -344,7 +347,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
             keccak256(
                 abi.encodePacked(
                     sender,
-                    address(withdrawalToken),
+                    address(shareToken),
                     paymentToken,
                     _amount,
                     _destinationAddress,

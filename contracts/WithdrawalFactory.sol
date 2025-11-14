@@ -8,7 +8,7 @@ import {Withdrawal} from "./Withdrawal.sol";
 /*
  * @title WithdrawalFactory
  * @notice Deploys clones of the Withdrawal implementation.
- * @dev Stores clones by [paymentToken][withdrawalToken] pairs.
+ * @dev Stores clones by [paymentToken][shareToken] pairs.
  */
 // Errors
 error ZeroAddress();
@@ -18,7 +18,7 @@ error NoExistingWithdrawalToMigrate();
 /**
  * @title WithdrawalFactory
  * @notice Deploys clones of the Withdrawal implementation.
- * @dev Stores clones by [paymentToken][withdrawalToken] pairs.
+ * @dev Stores clones by [paymentToken][shareToken] pairs.
  * @author NU Blockchain Technologies
  */
 contract WithdrawalFactory is Ownable {
@@ -31,7 +31,7 @@ contract WithdrawalFactory is Ownable {
 
     /**
      * @notice A nested mapping to find the withdrawal for a given pair.
-     * @dev (Payment Token Address => (withdrawal Token Address => Cloned Withdrawal Address))
+     * @dev (Payment Token Address => (Shared Token Address => Cloned Withdrawal Address))
      */
     mapping(address => mapping(address => address)) public withdrawals;
 
@@ -43,22 +43,22 @@ contract WithdrawalFactory is Ownable {
 
     /// @notice Emitted when a new withdrawal is created for a token pair
     /// @param paymentToken The address of the payment token
-    /// @param withdrawalToken The address of the withdrawal token
+    /// @param shareToken The address of the shared token
     /// @param withdrawalAddress The address of the newly created withdrawal contract
     event WithdrawalCreated(
         address indexed paymentToken,
-        address indexed withdrawalToken,
+        address indexed shareToken,
         address indexed withdrawalAddress
     );
 
     /// @notice Emitted when a withdrawal is migrated to a new implementation
     /// @param paymentToken The address of the payment token
-    /// @param withdrawalToken The address of the withdrawal token
+    /// @param shareToken The address of the shared token
     /// @param oldWithdrawalAddress The address of the old withdrawal contract
     /// @param newWithdrawalAddress The address of the new withdrawal contract
     event WithdrawalMigrated(
         address indexed paymentToken,
-        address indexed withdrawalToken,
+        address indexed shareToken,
         address indexed oldWithdrawalAddress,
         address newWithdrawalAddress
     );
@@ -83,21 +83,21 @@ contract WithdrawalFactory is Ownable {
     /**
      * @notice Creates and initializes a new withdrawal clone for a specific pair.
      * @param _paymentTokenAddress The (variable) payment token for this new withdrawal.
-     * @param _withdrawalTokenAddress The (variable) input token (e.g., USDC) for this withdrawal.
+     * @param _shareTokenAddress The (variable) input token (e.g., USDC) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _burnUser The address of the trusted AML signer.
      * @return withdrawalAddress The address of the newly created clone.
      */
     function createWithdrawal(
         address _paymentTokenAddress,
-        address _withdrawalTokenAddress,
+        address _shareTokenAddress,
         address _amlSignerAddress,
         address _burnUser
     ) external returns (address withdrawalAddress) {
         if (_paymentTokenAddress == address(0)) {
             revert ZeroAddress();
         }
-        if (_withdrawalTokenAddress == address(0)) {
+        if (_shareTokenAddress == address(0)) {
             revert ZeroAddress();
         }
         if (_amlSignerAddress == address(0)) {
@@ -105,7 +105,7 @@ contract WithdrawalFactory is Ownable {
         }
 
         // Check for existence using the nested mapping
-        if (withdrawals[_paymentTokenAddress][_withdrawalTokenAddress] != address(0)) {
+        if (withdrawals[_paymentTokenAddress][_shareTokenAddress] != address(0)) {
             revert WithdrawalAlreadyExists();
         }
 
@@ -114,19 +114,19 @@ contract WithdrawalFactory is Ownable {
 
         // 2. Initialize the new clone with its unique state
         Withdrawal(withdrawalAddress).initialize(
-            _withdrawalTokenAddress,
+            _shareTokenAddress,
             _paymentTokenAddress,
             _amlSignerAddress,
             _burnUser
         );
 
         // 3. Save it to the nested mapping
-        withdrawals[_paymentTokenAddress][_withdrawalTokenAddress] = withdrawalAddress;
+        withdrawals[_paymentTokenAddress][_shareTokenAddress] = withdrawalAddress;
 
         // 4. Emit the event
         emit WithdrawalCreated(
             _paymentTokenAddress,
-            _withdrawalTokenAddress,
+            _shareTokenAddress,
             withdrawalAddress
         );
     }
@@ -135,19 +135,19 @@ contract WithdrawalFactory is Ownable {
      * @notice Creates a new clone for an *existing* withdrawal.
      * @dev Overwrites the address in the 'withdrawals' map.
      * @param _paymentTokenAddress The (variable) payment token for this new withdrawal.
-     * @param _withdrawalTokenAddress The (variable) withdrawal token (e.g., nuYLDS) for this withdrawal.
+     * @param _shareTokenAddress The (variable) shared token (e.g., nuYLDS) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _burnUser The address of the trusted AML signer.
      * @return newWithdrawalAddress The address of the newly created clone.  
      */
     function migrateWithdrawal(
         address _paymentTokenAddress,
-        address _withdrawalTokenAddress,
+        address _shareTokenAddress,
         address _amlSignerAddress,
         address _burnUser
     ) external onlyOwner returns (address newWithdrawalAddress) {
         address oldWithdrawal = withdrawals[_paymentTokenAddress][
-            _withdrawalTokenAddress
+            _shareTokenAddress
         ];
 
         // This check ensures we are only migrating pairs that exist
@@ -160,7 +160,7 @@ contract WithdrawalFactory is Ownable {
 
         // Initialize the new clone
         Withdrawal(newWithdrawalAddress).initialize(
-            _withdrawalTokenAddress,
+            _shareTokenAddress,
             _paymentTokenAddress,
             _amlSignerAddress,
             _burnUser
@@ -168,12 +168,12 @@ contract WithdrawalFactory is Ownable {
 
         // Overwrite the old address with the new one
         withdrawals[_paymentTokenAddress][
-            _withdrawalTokenAddress
+            _shareTokenAddress
         ] = newWithdrawalAddress;
 
         emit WithdrawalMigrated(
             _paymentTokenAddress,
-            _withdrawalTokenAddress,
+            _shareTokenAddress,
             oldWithdrawal,
             newWithdrawalAddress
         );

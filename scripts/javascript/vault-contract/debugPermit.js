@@ -2,7 +2,7 @@ const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
 const CLONE_ADDRESS = process.env.WITHDRAWAL_CLONE_ADDRESS;
-const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
 const TOKEN_DECIMALS = 6;
 const AMOUNT_TO_WITHDRAW_STRING = "0.2";
 // --- END: Configuration ---
@@ -12,27 +12,27 @@ async function main() {
     if (!privateKey) throw new Error("PRIVATE_KEY is not set.");
 
     const user = new ethers.Wallet(privateKey, ethers.provider);
-    const withdrawalToken = await ethers.getContractAt("IFullERC20", WITHDRAWAL_TOKEN_ADDRESS);
+    const shareToken = await ethers.getContractAt("IFullERC20", SHARE_TOKEN_ADDRESS);
     const amountToWithdraw = ethers.parseUnits(AMOUNT_TO_WITHDRAW_STRING, TOKEN_DECIMALS);
     const spenderAddress = CLONE_ADDRESS; // The address of the Withdrawal clone
 
     console.log(`User: ${user.address}`);
-    console.log(`Token: ${WITHDRAWAL_TOKEN_ADDRESS}`);
+    console.log(`Token: ${SHARE_TOKEN_ADDRESS}`);
     console.log(`Spender: ${spenderAddress}`);
 
     // --- 1. Generate EIP-2612 Permit Signature ---
     console.log("\n1. Generating Permit Signature...");
 
-    const permitNonce = await withdrawalToken.nonces(user.address);
+    const permitNonce = await shareToken.nonces(user.address);
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60;
-    const tokenName = await withdrawalToken.name();
+    const tokenName = await shareToken.name();
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
     const domain = {
         name: tokenName,
         version: "1", // Correct for the CustomToken.sol you provided
         chainId: chainId,
-        verifyingContract: WITHDRAWAL_TOKEN_ADDRESS,
+        verifyingContract: SHARE_TOKEN_ADDRESS,
     };
 
     const types = {
@@ -58,13 +58,13 @@ async function main() {
     console.log("   ✅ Permit Signature created.");
 
     // --- 2. Check Allowance BEFORE ---
-    let currentAllowance = await withdrawalToken.allowance(user.address, spenderAddress);
+    let currentAllowance = await shareToken.allowance(user.address, spenderAddress);
     console.log(`\n2. Allowance BEFORE: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
 
     // --- 3. Call permit() ---
     console.log("\n3. Calling token.permit() directly...");
     try {
-        const tx = await withdrawalToken
+        const tx = await shareToken
             .connect(user)
             .permit(user.address, spenderAddress, amountToWithdraw, permitDeadline, v, r, s);
         console.log("   Transaction sent, waiting for receipt...");
@@ -87,7 +87,7 @@ async function main() {
     }
 
     // --- 4. Check Allowance AFTER ---
-    currentAllowance = await withdrawalToken.allowance(user.address, spenderAddress);
+    currentAllowance = await shareToken.allowance(user.address, spenderAddress);
     console.log(`\n4. Allowance AFTER: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
 
     if (currentAllowance >= amountToWithdraw) {

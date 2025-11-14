@@ -5,7 +5,7 @@ describe("WithdrawalFactory", function () {
     let owner, user, amlSigner;
     let Withdrawal, WithdrawalFactory, Token;
     let withdrawalFactory, withdrawalImplementation;
-    let paymentToken, withdrawalToken;
+    let paymentToken, shareToken;
 
     // Helper function to deploy a new instance of the factory for each test
     async function deployNewFactory() {
@@ -43,9 +43,9 @@ describe("WithdrawalFactory", function () {
         await paymentToken.mint(ownerAddress, ethers.parseEther("1000000"));
 
         // Deploy new withdrawal token
-        withdrawalToken = await Token.deploy("Withdrawal Token", "WTH", ownerAddress, 6);
-        await withdrawalToken.waitForDeployment();
-        await withdrawalToken.mint(ownerAddress, ethers.parseUnits("1000000", 6));
+        shareToken = await Token.deploy("Withdrawal Token", "WTH", ownerAddress, 6);
+        await shareToken.waitForDeployment();
+        await shareToken.mint(ownerAddress, ethers.parseUnits("1000000", 6));
 
         // Deploy fresh factory
         await deployNewFactory();
@@ -76,7 +76,7 @@ describe("WithdrawalFactory", function () {
                 .connect(owner)
                 .createWithdrawal(
                     await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
+                    await shareToken.getAddress(),
                     amlSigner.address,
                     owner.address,
                 );
@@ -86,13 +86,13 @@ describe("WithdrawalFactory", function () {
 
             expect(withdrawalCreatedEvent).to.not.be.undefined;
             expect(withdrawalCreatedEvent.args.paymentToken).to.equal(await paymentToken.getAddress());
-            expect(withdrawalCreatedEvent.args.withdrawalToken).to.equal(await withdrawalToken.getAddress());
+            expect(withdrawalCreatedEvent.args.shareToken).to.equal(await shareToken.getAddress());
             expect(ethers.isAddress(withdrawalCreatedEvent.args.withdrawalAddress)).to.be.true;
 
             // Verify the withdrawal address is stored correctly
             const withdrawalAddress = await withdrawalFactory.withdrawals(
                 await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
+                await shareToken.getAddress(),
             );
             expect(withdrawalAddress).to.not.equal(ethers.ZeroAddress);
         });
@@ -103,7 +103,7 @@ describe("WithdrawalFactory", function () {
                     .connect(owner)
                     .createWithdrawal(
                         ethers.ZeroAddress,
-                        await withdrawalToken.getAddress(),
+                        await shareToken.getAddress(),
                         amlSigner.address,
                         owner.address,
                     ),
@@ -129,7 +129,7 @@ describe("WithdrawalFactory", function () {
                     .connect(owner)
                     .createWithdrawal(
                         await paymentToken.getAddress(),
-                        await withdrawalToken.getAddress(),
+                        await shareToken.getAddress(),
                         ethers.ZeroAddress,
                         owner.address,
                     ),
@@ -142,7 +142,7 @@ describe("WithdrawalFactory", function () {
                 .connect(owner)
                 .createWithdrawal(
                     await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
+                    await shareToken.getAddress(),
                     amlSigner.address,
                     owner.address,
                 );
@@ -153,7 +153,7 @@ describe("WithdrawalFactory", function () {
                     .connect(owner)
                     .createWithdrawal(
                         await paymentToken.getAddress(),
-                        await withdrawalToken.getAddress(),
+                        await shareToken.getAddress(),
                         amlSigner.address,
                         owner.address,
                     ),
@@ -168,7 +168,7 @@ describe("WithdrawalFactory", function () {
                 .connect(owner)
                 .createWithdrawal(
                     await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
+                    await shareToken.getAddress(),
                     amlSigner.address,
                     owner.address,
                 );
@@ -176,7 +176,7 @@ describe("WithdrawalFactory", function () {
 
             const oldWithdrawalAddress = await withdrawalFactory.withdrawals(
                 await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
+                await shareToken.getAddress(),
             );
 
             // Deploy a new implementation
@@ -189,7 +189,7 @@ describe("WithdrawalFactory", function () {
                 .connect(owner)
                 .migrateWithdrawal(
                     await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
+                    await shareToken.getAddress(),
                     amlSigner.address,
                     await newImplementation.getAddress(),
                 );
@@ -198,7 +198,7 @@ describe("WithdrawalFactory", function () {
             // Check that the withdrawal address has changed
             const newWithdrawalAddress = await withdrawalFactory.withdrawals(
                 await paymentToken.getAddress(),
-                await withdrawalToken.getAddress(),
+                await shareToken.getAddress(),
             );
 
             expect(newWithdrawalAddress).to.not.equal(oldWithdrawalAddress);
@@ -208,7 +208,7 @@ describe("WithdrawalFactory", function () {
 
             expect(migratedEvent).to.not.be.undefined;
             expect(migratedEvent.args.paymentToken).to.equal(await paymentToken.getAddress());
-            expect(migratedEvent.args.withdrawalToken).to.equal(await withdrawalToken.getAddress());
+            expect(migratedEvent.args.shareToken).to.equal(await shareToken.getAddress());
         });
 
         it("Should revert if no withdrawal exists to migrate", async function () {
@@ -222,7 +222,7 @@ describe("WithdrawalFactory", function () {
                     .connect(owner)
                     .migrateWithdrawal(
                         await paymentToken.getAddress(),
-                        await withdrawalToken.getAddress(),
+                        await shareToken.getAddress(),
                         amlSigner.address,
                         await testImplementation.getAddress(),
                     ),
@@ -235,7 +235,7 @@ describe("WithdrawalFactory", function () {
                 .connect(owner)
                 .createWithdrawal(
                     await paymentToken.getAddress(),
-                    await withdrawalToken.getAddress(),
+                    await shareToken.getAddress(),
                     amlSigner.address,
                     owner.address,
                 );
@@ -251,7 +251,7 @@ describe("WithdrawalFactory", function () {
                     .connect(user)
                     .migrateWithdrawal(
                         await paymentToken.getAddress(),
-                        await withdrawalToken.getAddress(),
+                        await shareToken.getAddress(),
                         amlSigner.address,
                         await testImplementation.getAddress(),
                     ),

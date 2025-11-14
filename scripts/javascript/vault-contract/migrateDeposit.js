@@ -13,9 +13,9 @@ const DEPOSIT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
 if (!DEPOSIT_TOKEN_ADDRESS) {
     throw new Error("TOKEN_ADDRESS is not set.");
 }
-const SHARE_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
 if (!SHARE_TOKEN_ADDRESS) {
-    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
 
 // 3. DEFINE THE AML SIGNER FOR THE *NEW* v2 CLONE

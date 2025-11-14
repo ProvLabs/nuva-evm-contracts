@@ -9,13 +9,13 @@ if (!FACTORY_ADDRESS) {
 }
 
 // 2. DEFINE THE TOKEN PAIR YOU WANT TO MIGRATE
-const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-if (!WITHDRAWAL_TOKEN_ADDRESS) {
-    throw new Error("TOKEN_ADDRESS is not set.");
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
+if (!SHARE_TOKEN_ADDRESS) {
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
-const PAYMENT_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+const PAYMENT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
 if (!PAYMENT_TOKEN_ADDRESS) {
-    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+    throw new Error("TOKEN_ADDRESS is not set.");
 }
 
 // 3. DEFINE THE AML SIGNER FOR THE *NEW* v2 CLONE
@@ -45,7 +45,7 @@ async function main() {
 
     // 3. --- PRE-MIGRATION CHECK ---
     console.log("Checking for existing (v1) clone...");
-    const oldCloneAddress = await factory.withdrawals(PAYMENT_TOKEN_ADDRESS, WITHDRAWAL_TOKEN_ADDRESS);
+    const oldCloneAddress = await factory.withdrawals(PAYMENT_TOKEN_ADDRESS, SHARE_TOKEN_ADDRESS);
 
     if (oldCloneAddress === ethers.ZeroAddress) {
         throw new Error("No existing withdrawal found for this pair. Nothing to migrate.");
@@ -63,7 +63,7 @@ async function main() {
 
     const tx = await factory
         .connect(owner)
-        .migrateWithdrawal(PAYMENT_TOKEN_ADDRESS, WITHDRAWAL_TOKEN_ADDRESS, NEW_AML_SIGNER_ADDRESS, owner);
+        .migrateWithdrawal(PAYMENT_TOKEN_ADDRESS, SHARE_TOKEN_ADDRESS, NEW_AML_SIGNER_ADDRESS, owner);
 
     // Wait for the transaction to be mined
     const receipt = await tx.wait();
@@ -97,7 +97,7 @@ async function main() {
     }
 
     // Final check: Query the map again to ensure it was updated
-    const mappedAddress = await factory.withdrawals(PAYMENT_TOKEN_ADDRESS, WITHDRAWAL_TOKEN_ADDRESS);
+    const mappedAddress = await factory.withdrawals(PAYMENT_TOKEN_ADDRESS, SHARE_TOKEN_ADDRESS);
 
     if (mappedAddress !== newCloneAddress) {
         throw new Error("CRITICAL ERROR: The 'withdrawals' map was not updated correctly!");

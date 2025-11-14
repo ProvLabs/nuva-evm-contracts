@@ -30,9 +30,9 @@ async function main() {
         throw new Error("TOKEN_ADDRESS is not set.");
     }
 
-    const paymentTokenAddr = process.env.SHARED_TOKEN_ADDRESS;
+    const paymentTokenAddr = process.env.SHARE_TOKEN_ADDRESS;
     if (!paymentTokenAddr) {
-        throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+        throw new Error("SHARE_TOKEN_ADDRESS is not set.");
     }
 
     const amlSignerAddr = process.env.AML_SIGNER_KEY;
@@ -40,12 +40,12 @@ async function main() {
         throw new Error("AML_SIGNER_KEY is not set.");
     }
     // 5. Initialize a new Withdrawal instance through the factory
-    const withdrawalTokenAddress = ethers.getAddress(tokenAddr);
+    const sharedTokenAddress = ethers.getAddress(tokenAddr);
     const paymentTokenAddress = ethers.getAddress(paymentTokenAddr);
     const amlSignerAddress = ethers.getAddress(amlSignerAddr);
 
     console.log("Creating new Withdrawal instance...");
-    const tx = await factory.createWithdrawal(paymentTokenAddress, withdrawalTokenAddress, amlSignerAddress, user);
+    const tx = await factory.createWithdrawal(paymentTokenAddress, sharedTokenAddress, amlSignerAddress, user);
     console.log("\nTransaction hash:", tx.hash);
     const receipt = await tx.wait();
 

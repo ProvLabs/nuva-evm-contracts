@@ -7,9 +7,9 @@ if (!CLONE_ADDRESS) {
     throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
 }
 
-const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-if (!WITHDRAWAL_TOKEN_ADDRESS) {
-    throw new Error("TOKEN_ADDRESS is not set.");
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
+if (!SHARE_TOKEN_ADDRESS) {
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
 
 // NOTE: Change '18' if your token has different decimals
@@ -28,10 +28,10 @@ async function main() {
 
     // 2. Get contract instances
     const withdrawal = await ethers.getContractAt("Withdrawal", CLONE_ADDRESS);
-    const withdrawalToken = await ethers.getContractAt("CustomToken", WITHDRAWAL_TOKEN_ADDRESS);
+    const shareToken = await ethers.getContractAt("CustomToken", SHARE_TOKEN_ADDRESS);
 
     // 3. Check the contract's current balance
-    const initialBalance = await withdrawalToken.balanceOf(CLONE_ADDRESS);
+    const initialBalance = await shareToken.balanceOf(CLONE_ADDRESS);
     console.log(`Contract's initial balance: ${ethers.formatUnits(initialBalance, 6)} tokens.`);
 
     console.log("initialBalance", initialBalance);
@@ -67,7 +67,7 @@ async function main() {
     }
 
     // 4. Final verification
-    const finalBalance = await withdrawalToken.balanceOf(CLONE_ADDRESS);
+    const finalBalance = await shareToken.balanceOf(CLONE_ADDRESS);
     console.log("-----------------------------------------");
     console.log("🎉 Verification Complete 🎉");
     console.log(`Contract's final balance: ${ethers.formatUnits(finalBalance, 6)} tokens.`);

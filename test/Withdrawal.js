@@ -111,7 +111,7 @@ describe("Withdrawal", function () {
 
         await expect(withdrawal.connect(user).withdraw(amount, amlSig, amlDeadline))
             .to.emit(withdrawal, "Withdraw")
-            .withArgs(user.address, amount, paymentToken);
+            .withArgs(user.address, amount, await withdrawal.shareToken(), paymentToken);
 
         expect(await token.balanceOf(withdrawal.target)).to.equal(amount);
         expect(await token.balanceOf(user.address)).to.equal(ethers.parseUnits("900", 18));
@@ -150,7 +150,7 @@ describe("Withdrawal", function () {
 
         await expect(withdrawal.connect(user).withdrawWithPermit(amount, amlSig, amlDeadline, permitDeadline, v, r, s))
             .to.emit(withdrawal, "Withdraw")
-            .withArgs(user.address, amount, paymentToken);
+            .withArgs(user.address, amount, await withdrawal.shareToken(), paymentToken);
 
         expect(await token.balanceOf(withdrawal.target)).to.equal(amount);
     });
@@ -383,7 +383,7 @@ describe("Withdrawal", function () {
             const DEFAULT_ADMIN_ROLE = await withdrawal.DEFAULT_ADMIN_ROLE();
             const BURN_ROLE = await withdrawal.BURN_ROLE();
 
-            expect(await withdrawal.withdrawalToken()).to.equal(token.target);
+            expect(await withdrawal.shareToken()).to.equal(token.target);
             expect(await withdrawal.paymentToken()).to.equal(paymentToken);
             expect(await withdrawal.amlSigner()).to.equal(amlSigner.address);
             expect(await withdrawal.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;

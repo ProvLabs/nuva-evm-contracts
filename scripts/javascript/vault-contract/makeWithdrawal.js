@@ -7,14 +7,14 @@ if (!CLONE_ADDRESS) {
     throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
 }
 
-const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-if (!WITHDRAWAL_TOKEN_ADDRESS) {
-    throw new Error("TOKEN_ADDRESS is not set.");
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
+if (!SHARE_TOKEN_ADDRESS) {
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
 
-const PAYMENT_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+const PAYMENT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
 if (!PAYMENT_TOKEN_ADDRESS) {
-    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+    throw new Error("TOKEN_ADDRESS is not set.");
 }
 
 // NOTE: Change '18' if your token has different decimals
@@ -45,10 +45,10 @@ async function main() {
 
     // 2. Get contract instances
     const withdrawal = await ethers.getContractAt("Withdrawal", CLONE_ADDRESS);
-    const withdrawalToken = await ethers.getContractAt("IERC20", WITHDRAWAL_TOKEN_ADDRESS);
+    const shareToken = await ethers.getContractAt("IERC20", SHARE_TOKEN_ADDRESS);
 
     // 3. Check if the user has enough tokens to withdraw
-    const balance = await withdrawalToken.balanceOf(user.address);
+    const balance = await shareToken.balanceOf(user.address);
     if (balance < AMOUNT_TO_WITHDRAW) {
         console.error("❌ Error: User does not have enough tokens to withdraw.");
         console.error(`  User Balance: ${ethers.formatUnits(balance, 18)}`);
@@ -67,7 +67,7 @@ async function main() {
         ["address", "address", "address", "uint256", "address", "uint256"],
         [
             user.address, // msg.sender
-            WITHDRAWAL_TOKEN_ADDRESS, // address(withdrawalToken)
+            SHARE_TOKEN_ADDRESS, // address(shareToken)
             PAYMENT_TOKEN_ADDRESS, // paymentToken
             AMOUNT_TO_WITHDRAW, // _amount
             CLONE_ADDRESS, // _destinationAddress (the contract itself)
@@ -83,7 +83,7 @@ async function main() {
         `\n2. Approving clone (${withdrawal.target}) to spend ${ethers.formatUnits(AMOUNT_TO_WITHDRAW, 18)} tokens...`,
     );
 
-    const approveTx = await withdrawalToken.connect(user).approve(withdrawal.target, AMOUNT_TO_WITHDRAW);
+    const approveTx = await shareToken.connect(user).approve(withdrawal.target, AMOUNT_TO_WITHDRAW);
     await approveTx.wait();
 
     console.log("   ✅ Approval successful.");
@@ -97,7 +97,7 @@ async function main() {
     console.log("   ✅ Withdrawal successful! Transaction hash:", receipt.hash);
 
     // 4. Final verification
-    const finalContractBalance = await withdrawalToken.balanceOf(CLONE_ADDRESS);
+    const finalContractBalance = await shareToken.balanceOf(CLONE_ADDRESS);
     console.log("-----------------------------------------");
     console.log("🎉 Verification Complete 🎉");
     console.log(`Contract's final token balance: ${ethers.formatUnits(finalContractBalance, 18)} tokens.`);

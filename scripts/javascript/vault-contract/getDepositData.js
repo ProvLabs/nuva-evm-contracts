@@ -17,9 +17,9 @@ if (!DEPOSIT_TOKEN_ADDRESS) {
     throw new Error("TOKEN_ADDRESS is not set.");
 }
 
-const SHARE_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
 if (!SHARE_TOKEN_ADDRESS) {
-    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
 
 const DESTINATION_ADDRESS = "0x69482E00b8Ab0a256E8eF99718CcD8a2C460C3f7"; // Wallet to receive tokens

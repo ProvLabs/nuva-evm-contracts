@@ -12,7 +12,7 @@ async function main() {
     const withdrawal = await ethers.getContractAt("Withdrawal", WITHDRAWAL_CLONE_ADDRESS);
     console.log("Withdrawal contract:", withdrawal.target);
     console.log("paymentToken:", await withdrawal.paymentToken());
-    console.log("withdrawalToken:", await withdrawal.withdrawalToken());
+    console.log("shareToken:", await withdrawal.shareToken());
     console.log("amlSigner:", await withdrawal.amlSigner());
     // console.log("usedSignatures:", await withdrawal.usedSignatures());
 }

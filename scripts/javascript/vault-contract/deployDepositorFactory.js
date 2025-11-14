@@ -25,9 +25,9 @@ async function main() {
         throw new Error("TOKEN_ADDRESS is not set.");
     }
 
-    const shareTokenAddr = process.env.SHARED_TOKEN_ADDRESS;
+    const shareTokenAddr = process.env.SHARE_TOKEN_ADDRESS;
     if (!shareTokenAddr) {
-        throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+        throw new Error("SHARE_TOKEN_ADDRESS is not set.");
     }
 
     const amlSignerAddr = process.env.AML_SIGNER_KEY;

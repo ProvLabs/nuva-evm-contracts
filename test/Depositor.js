@@ -120,7 +120,13 @@ describe("Depositor", function () {
         const balBefore = await token.balanceOf(await destination.getAddress());
         await expect(depositor.connect(user).deposit(amt, await destination.getAddress(), signature, deadline))
             .to.emit(depositor, "Deposit")
-            .withArgs(await user.getAddress(), amt, shareToken, await destination.getAddress());
+            .withArgs(
+                await user.getAddress(),
+                amt,
+                await depositor.depositToken(),
+                shareToken,
+                await destination.getAddress(),
+            );
 
         const balAfter = await token.balanceOf(await destination.getAddress());
         expect(balAfter - balBefore).to.equal(amt);

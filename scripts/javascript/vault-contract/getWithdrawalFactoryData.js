@@ -7,14 +7,14 @@ if (!WITHDRAWAL_FACTORY_ADDRESS) {
     throw new Error("WITHDRAWAL_FACTORY_CONTRACT is not set.");
 }
 
-const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-if (!WITHDRAWAL_TOKEN_ADDRESS) {
-    throw new Error("TOKEN_ADDRESS is not set.");
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
+if (!SHARE_TOKEN_ADDRESS) {
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
 
-const PAYMENT_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+const PAYMENT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
 if (!PAYMENT_TOKEN_ADDRESS) {
-    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+    throw new Error("TOKEN_ADDRESS is not set.");
 }
 
 // --- END: Configuration ---
@@ -39,9 +39,9 @@ async function main() {
     console.log("Withdrawal contract:", withdrawal.target);
     console.log("impl:", await withdrawal.implementation());
 
-    const withdrawalToken = WITHDRAWAL_TOKEN_ADDRESS;
-    const paymentToken = PAYMENT_TOKEN_ADDRESS;
-    console.log("Withdrawal address:", await withdrawal.withdrawals(paymentToken, withdrawalToken));
+    const sharedTokenAddress = SHARE_TOKEN_ADDRESS;
+    const paymentTokenAddress = PAYMENT_TOKEN_ADDRESS;
+    console.log("Withdrawal address:", await withdrawal.withdrawals(paymentTokenAddress, sharedTokenAddress));
 }
 
 main()

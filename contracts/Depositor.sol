@@ -54,12 +54,14 @@ contract Depositor is Initializable {
      * @notice Emitted when a deposit is made.
      * @param user The address of the user making the deposit.
      * @param amount The amount of tokens deposited.
+     * @param depositToken The address of the deposit token.
      * @param shareToken The address of the share token.
      * @param destinationAddress The address where the tokens were sent.
      */
     event Deposit(
-        address indexed user,
+        address user,
         uint256 amount,
+        address indexed depositToken,
         address indexed shareToken,
         address indexed destinationAddress
     );
@@ -180,7 +182,7 @@ contract Depositor is Initializable {
 
         depositToken.safeTransferFrom(msg.sender, _destinationAddress, _amount);
 
-        emit Deposit(msg.sender, _amount, shareToken, _destinationAddress);
+        emit Deposit(msg.sender, _amount, address(depositToken), shareToken, _destinationAddress);
     }
 
     /**

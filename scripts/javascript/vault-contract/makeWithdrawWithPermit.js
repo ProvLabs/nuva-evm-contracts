@@ -11,14 +11,14 @@ if (!WITHDRAWAL_FACTORY_ADDR) {
     throw new Error("WITHDRAWAL_FACTORY_CONTRACT is not set.");
 }
 
-const WITHDRAWAL_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
-if (!WITHDRAWAL_TOKEN_ADDRESS) {
-    throw new Error("TOKEN_ADDRESS is not set.");
+const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
+if (!SHARE_TOKEN_ADDRESS) {
+    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
 
-const PAYMENT_TOKEN_ADDRESS = process.env.SHARED_TOKEN_ADDRESS;
+const PAYMENT_TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
 if (!PAYMENT_TOKEN_ADDRESS) {
-    throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+    throw new Error("TOKEN_ADDRESS is not set.");
 }
 
 // NOTE: Change '18' if your token has different decimals (e.g., 6 for USDC)
@@ -72,11 +72,11 @@ async function main() {
     console.log("   ✅ AML Signers match. Proceeding...");
     // --- END DIAGNOSTIC BLOCK ---
 
-    const withdrawalToken = await ethers.getContractAt("IFullERC20", WITHDRAWAL_TOKEN_ADDRESS);
+    const shareToken = await ethers.getContractAt("IFullERC20", SHARE_TOKEN_ADDRESS);
     const amountToWithdraw = ethers.parseUnits(AMOUNT_TO_WITHDRAW_STRING, TOKEN_DECIMALS);
 
     // 2. Check User Balance
-    const balance = await withdrawalToken.balanceOf(user.address);
+    const balance = await shareToken.balanceOf(user.address);
     if (balance < amountToWithdraw) {
         console.error(`❌ Error: User does not have enough tokens. Needs ${AMOUNT_TO_WITHDRAW_STRING}.`);
         console.error(`  User Balance: ${ethers.formatUnits(balance, TOKEN_DECIMALS)}`);
@@ -94,7 +94,7 @@ async function main() {
     console.log("\nAML Signature Parameters:");
     console.log({
         sender: user.address,
-        token: WITHDRAWAL_TOKEN_ADDRESS,
+        token: SHARE_TOKEN_ADDRESS,
         paymentToken: PAYMENT_TOKEN_ADDRESS,
         amount: amountToWithdraw.toString(),
         destination: CLONE_ADDRESS,
@@ -106,7 +106,7 @@ async function main() {
         ["address", "address", "address", "uint256", "address", "uint256"],
         [
             user.address, // msg.sender
-            WITHDRAWAL_TOKEN_ADDRESS, // address(withdrawalToken)
+            SHARE_TOKEN_ADDRESS, // address(shareToken)
             PAYMENT_TOKEN_ADDRESS, // paymentToken
             amountToWithdraw, // _amount
             CLONE_ADDRESS, // _destinationAddress
@@ -136,10 +136,10 @@ async function main() {
     console.log("\n2. Generating Permit Signature (as user)...");
 
     // Get the token's current nonce for the user
-    const permitNonce = await withdrawalToken.nonces(user.address);
+    const permitNonce = await shareToken.nonces(user.address);
     // This deadline is for the permit signature
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
-    const tokenName = await withdrawalToken.name();
+    const tokenName = await shareToken.name();
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
     const domain = {
@@ -176,28 +176,28 @@ async function main() {
     console.log("\n3. Checking token permissions...");
 
     // 1. Check token balance
-    const userBalance = await withdrawalToken.balanceOf(user.address);
+    const userBalance = await shareToken.balanceOf(user.address);
     console.log(`User token balance: ${ethers.formatUnits(userBalance, TOKEN_DECIMALS)}`);
 
     // 2. Check current allowance
-    const currentAllowance = await withdrawalToken.allowance(user.address, withdrawal.target);
+    const currentAllowance = await shareToken.allowance(user.address, withdrawal.target);
     console.log(`Current allowance for withdrawer: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
 
     // 3. Check token's permit functionality
     console.log("\nChecking token's permit functionality...");
 
     // Get token details
-    const _tokenName = await withdrawalToken.name();
-    const tokenSymbol = await withdrawalToken.symbol();
-    const tokenDecimals = await withdrawalToken.decimals();
-    const tokenNonce = await withdrawalToken.nonces(user.address);
+    const _tokenName = await shareToken.name();
+    const tokenSymbol = await shareToken.symbol();
+    const tokenDecimals = await shareToken.decimals();
+    const tokenNonce = await shareToken.nonces(user.address);
 
     console.log(`Token: ${_tokenName} (${tokenSymbol})`);
     console.log(`Decimals: ${tokenDecimals}, Nonce: ${tokenNonce}`);
 
     // Try to get EIP-2612 domain separator
     try {
-        const domainSeparator = await withdrawalToken.DOMAIN_SEPARATOR();
+        const domainSeparator = await shareToken.DOMAIN_SEPARATOR();
         console.log("✅ Token supports EIP-2612 (DOMAIN_SEPARATOR found)");
         console.log(`Domain Separator: ${domainSeparator}`);
     } catch (e) {
@@ -328,7 +328,7 @@ async function main() {
     }
 
     // 4. Final Verification
-    const finalBalance = await withdrawalToken.balanceOf(CLONE_ADDRESS);
+    const finalBalance = await shareToken.balanceOf(CLONE_ADDRESS);
     console.log("-----------------------------------------");
     console.log("🎉 Verification Complete 🎉");
     console.log(`Destination wallet balance: ${ethers.formatUnits(finalBalance, TOKEN_DECIMALS)} tokens.`);

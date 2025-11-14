@@ -15,9 +15,9 @@ async function main() {
         throw new Error("TOKEN_ADDRESS is not set.");
     }
 
-    const shareTokenAddr = process.env.SHARED_TOKEN_ADDRESS;
+    const shareTokenAddr = process.env.SHARE_TOKEN_ADDRESS;
     if (!shareTokenAddr) {
-        throw new Error("SHARED_TOKEN_ADDRESS is not set.");
+        throw new Error("SHARE_TOKEN_ADDRESS is not set.");
     }
 
     const amlSignerAddr = process.env.AML_SIGNER_KEY;
@@ -26,12 +26,12 @@ async function main() {
     }
     // 3. Initialize the deployed contract
     // Convert all addresses to checksum format
-    const withdrawalTokenAddress = ethers.getAddress(tokenAddr);
+    const sharedTokenAddress = ethers.getAddress(tokenAddr);
     const shareTokenAddress = ethers.getAddress(shareTokenAddr);
     const amlSignerAddress = ethers.getAddress(amlSignerAddr);
 
     console.log("Initializing Withdrawal contract with:", {
-        withdrawalTokenAddress,
+        sharedTokenAddress,
         shareTokenAddress,
         amlSignerAddress,
     });
@@ -43,7 +43,7 @@ async function main() {
     // Initialize with the signer
     const tx = await implementation
         .connect(deployer)
-        .initialize(withdrawalTokenAddress, shareTokenAddress, amlSignerAddress);
+        .initialize(sharedTokenAddress, shareTokenAddress, amlSignerAddress);
     console.log("\nTransaction hash:", tx.hash);
     const receipt = await tx.wait();
 
