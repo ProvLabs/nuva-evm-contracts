@@ -1,20 +1,18 @@
 // scripts/fullDepositWithPermit.js
 const { ethers } = require("hardhat");
 
-const WITHDRAWAL_CONTRACT_ADDRESS = process.env.WITHDRAWAL_CONTRACT;
-if (!WITHDRAWAL_CONTRACT_ADDRESS) {
-    throw new Error(
-      "WITHDRAWAL_CONTRACT is not set."
-    );
+const WITHDRAWAL_CLONE_ADDRESS = process.env.WITHDRAWAL_CLONE_ADDRESS;
+if (!WITHDRAWAL_CLONE_ADDRESS) {
+    throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
 }
 
 // --- Main Script ---
 async function main() {
     // Get the Withdrawal contract instance
-    const withdrawal = await ethers.getContractAt("Withdrawal", WITHDRAWAL_CONTRACT_ADDRESS);
+    const withdrawal = await ethers.getContractAt("Withdrawal", WITHDRAWAL_CLONE_ADDRESS);
     console.log("Withdrawal contract:", withdrawal.target);
+    console.log("paymentToken:", await withdrawal.paymentToken());
     console.log("shareToken:", await withdrawal.shareToken());
-    console.log("withdrawalToken:", await withdrawal.withdrawalToken());
     console.log("amlSigner:", await withdrawal.amlSigner());
     // console.log("usedSignatures:", await withdrawal.usedSignatures());
 }

@@ -25,7 +25,7 @@ contract TokenFactory {
      * @param decimals The number of decimals for the created token.
      * @param owner The owner of the created token.
      */
-    event TokenCreated(address indexed tokenAddress, string name, string symbol, uint8 indexed decimals, address indexed owner);
+    event TokenCreated(address indexed tokenAddress, string name, string symbol, uint8 decimals, address indexed owner);
 
     /**
      * @notice Creates a new custom ERC20 token.
