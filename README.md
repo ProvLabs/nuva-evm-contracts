@@ -60,6 +60,7 @@ npx hardhat test --verbose
 - `npx hardhat clean`: Clean cache and artifacts
 - `npx hardhat node`: Start local Ethereum node
 - `npx hardhat coverage`: Generate test coverage report
+- `npx hardhat verify --network sepolia <contract_address>`: Verify contract on Etherscan
 
 ## Security
 
