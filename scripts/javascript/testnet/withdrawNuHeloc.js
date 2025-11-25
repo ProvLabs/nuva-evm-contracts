@@ -2,12 +2,12 @@ const { GcpKmsSigner } = require("ethers-gcp-kms-signer");
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = "0x732Afa245f10C2c4Ee6d892aF39B68AF0d6b70b2";
+const CLONE_ADDRESS = "0x96a78fcfED84B48Ea5ce8493Fd13c838C5c7fcB7";
 if (!CLONE_ADDRESS) {
     throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
 }
 
-const SHARE_TOKEN_ADDRESS = "0xe937Dddfa0A3C2eC875C81D49BD5849475fdA1DD";
+const SHARE_TOKEN_ADDRESS = "0x19f3EC2705865f457235b51051490675c4F01596";
 if (!SHARE_TOKEN_ADDRESS) {
     throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
@@ -19,7 +19,7 @@ if (!PAYMENT_TOKEN_ADDRESS) {
 
 // NOTE: Change '18' if your token has different decimals (e.g., 6 for USDC)
 const TOKEN_DECIMALS = 18;
-const AMOUNT_TO_WITHDRAW_STRING = "121000"; // The amount in human-readable form
+const AMOUNT_TO_WITHDRAW_STRING = "131000"; // The amount in human-readable form
 // --- END: Configuration ---
 
 // --- Helper: Load AML Signer ---

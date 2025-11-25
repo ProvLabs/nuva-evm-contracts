@@ -25,7 +25,7 @@ if (!DESTINATION_ADDRESS) {
 
 // NOTE: Change '18' if your token has different decimals (e.g., 6 for USDC)
 const TOKEN_DECIMALS = 6;
-const AMOUNT_TO_DEPOSIT_STRING = "0.125"; // The amount in human-readable form
+const AMOUNT_TO_DEPOSIT_STRING = "0.121"; // The amount in human-readable form
 // --- END: Configuration ---
 
 // --- Helper: Load AML Signer ---
