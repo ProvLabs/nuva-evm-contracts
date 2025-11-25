@@ -2,7 +2,7 @@ const { GcpKmsSigner } = require("ethers-gcp-kms-signer");
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = "0xc0C7Dc6c286568F92af56B1550F4BE423c90dAe9";
+const CLONE_ADDRESS = "0x914c06d1a729b26daAb0ef3dC6a73B3EDC3D1587";
 if (!CLONE_ADDRESS) {
     throw new Error("DEPOSITOR_CLONE_ADDRESS is not set.");
 }

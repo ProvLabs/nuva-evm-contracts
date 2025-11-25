@@ -2,7 +2,7 @@ const { GcpKmsSigner } = require("ethers-gcp-kms-signer");
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = "0x2c9071aF7A501EC3d2Dc8d20439e0C7a9CBB87d4";
+const CLONE_ADDRESS = "0x732Afa245f10C2c4Ee6d892aF39B68AF0d6b70b2";
 if (!CLONE_ADDRESS) {
     throw new Error("WITHDRAWAL_CLONE_ADDRESS is not set.");
 }
@@ -72,6 +72,8 @@ async function main() {
     console.log("\nAML Signature Parameters:");
     console.log({
         sender: user.address,
+        shareToken: SHARE_TOKEN_ADDRESS,
+        paymentToken: PAYMENT_TOKEN_ADDRESS,
         amount: amountToWithdraw.toString(),
         contract: CLONE_ADDRESS,
         deadline: amlDeadline,
