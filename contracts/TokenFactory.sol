@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {CustomToken} from "./CustomToken.sol";
 
 /**
@@ -10,7 +11,7 @@ import {CustomToken} from "./CustomToken.sol";
  * @notice Creates and manages custom ERC20 tokens.
  * @author NU Blockchain Technologies
  */
-contract TokenFactory {
+contract TokenFactory is Ownable {
     using SafeERC20 for IERC20;
     /**
      * @notice Array of all created tokens.
@@ -27,17 +28,20 @@ contract TokenFactory {
      */
     event TokenCreated(address indexed tokenAddress, string name, string symbol, uint8 decimals, address indexed owner);
 
+    // --- Constructor ---
+
+    /**
+     * @notice Initializes the contract.
+     */
+    constructor() Ownable(msg.sender) {}
+
     /**
      * @notice Creates a new custom ERC20 token.
      * @param _name The name of the token.
      * @param _symbol The symbol of the token.
      * @param _decimals The number of decimals for the token.
      */
-    function createToken(
-        string calldata _name,
-        string calldata _symbol,
-        uint8 _decimals
-    ) external {
+    function createToken(string calldata _name, string calldata _symbol, uint8 _decimals) external onlyOwner {
         CustomToken token = new CustomToken(_name, _symbol, msg.sender, _decimals);
         allTokens.push(address(token));
         emit TokenCreated(address(token), _name, _symbol, _decimals, msg.sender);

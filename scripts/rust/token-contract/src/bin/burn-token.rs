@@ -36,7 +36,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .wallet(signer)
         .connect_http(Url::parse(&rpc_url)?);
 
-    let calldata: Bytes = burnCall { value: args.amount }.abi_encode().into();
+    let calldata: Bytes = burnCall {
+        amount: args.amount,
+    }
+    .abi_encode()
+    .into();
 
     // Send the burn transaction to the token contract address
     let tx = TransactionRequest::default()

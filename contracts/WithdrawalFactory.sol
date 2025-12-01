@@ -5,11 +5,6 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Withdrawal} from "./Withdrawal.sol";
 
-/*
- * @title WithdrawalFactory
- * @notice Deploys clones of the Withdrawal implementation.
- * @dev Stores clones by [paymentToken][shareToken] pairs.
- */
 // Errors
 error ZeroAddress();
 error WithdrawalAlreadyExists();
@@ -45,11 +40,7 @@ contract WithdrawalFactory is Ownable {
     /// @param paymentToken The address of the payment token
     /// @param shareToken The address of the shared token
     /// @param withdrawalAddress The address of the newly created withdrawal contract
-    event WithdrawalCreated(
-        address paymentToken,
-        address shareToken,
-        address indexed withdrawalAddress
-    );
+    event WithdrawalCreated(address paymentToken, address shareToken, address indexed withdrawalAddress);
 
     /// @notice Emitted when a withdrawal is migrated to a new implementation
     /// @param paymentToken The address of the payment token
@@ -93,7 +84,7 @@ contract WithdrawalFactory is Ownable {
         address _shareTokenAddress,
         address _amlSignerAddress,
         address _burnUser
-    ) external returns (address withdrawalAddress) {
+    ) external onlyOwner returns (address withdrawalAddress) {
         if (_paymentTokenAddress == address(0)) {
             revert ZeroAddress();
         }
@@ -124,11 +115,7 @@ contract WithdrawalFactory is Ownable {
         withdrawals[_paymentTokenAddress][_shareTokenAddress] = withdrawalAddress;
 
         // 4. Emit the event
-        emit WithdrawalCreated(
-            _paymentTokenAddress,
-            _shareTokenAddress,
-            withdrawalAddress
-        );
+        emit WithdrawalCreated(_paymentTokenAddress, _shareTokenAddress, withdrawalAddress);
     }
 
     /**
@@ -138,7 +125,7 @@ contract WithdrawalFactory is Ownable {
      * @param _shareTokenAddress The (variable) shared token (e.g., nuYLDS) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _burnUser The address of the trusted AML signer.
-     * @return newWithdrawalAddress The address of the newly created clone.  
+     * @return newWithdrawalAddress The address of the newly created clone.
      */
     function migrateWithdrawal(
         address _paymentTokenAddress,
@@ -146,9 +133,7 @@ contract WithdrawalFactory is Ownable {
         address _amlSignerAddress,
         address _burnUser
     ) external onlyOwner returns (address newWithdrawalAddress) {
-        address oldWithdrawal = withdrawals[_paymentTokenAddress][
-            _shareTokenAddress
-        ];
+        address oldWithdrawal = withdrawals[_paymentTokenAddress][_shareTokenAddress];
 
         // This check ensures we are only migrating pairs that exist
         if (oldWithdrawal == address(0)) {
@@ -167,16 +152,9 @@ contract WithdrawalFactory is Ownable {
         );
 
         // Overwrite the old address with the new one
-        withdrawals[_paymentTokenAddress][
-            _shareTokenAddress
-        ] = newWithdrawalAddress;
+        withdrawals[_paymentTokenAddress][_shareTokenAddress] = newWithdrawalAddress;
 
-        emit WithdrawalMigrated(
-            _paymentTokenAddress,
-            _shareTokenAddress,
-            oldWithdrawal,
-            newWithdrawalAddress
-        );
+        emit WithdrawalMigrated(_paymentTokenAddress, _shareTokenAddress, oldWithdrawal, newWithdrawalAddress);
     }
 
     /**
@@ -185,9 +163,7 @@ contract WithdrawalFactory is Ownable {
      * @dev All *new* clones will use this new address.
      * @param _newImplementation The address of the new implementation contract.
      */
-    function updateImplementation(
-        address _newImplementation
-    ) external onlyOwner {
+    function updateImplementation(address _newImplementation) external onlyOwner {
         if (_newImplementation == address(0)) {
             revert ZeroAddress();
         }

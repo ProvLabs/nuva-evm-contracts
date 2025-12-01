@@ -45,11 +45,7 @@ contract DepositorFactory is Ownable {
     /// @param shareToken The address of the share token
     /// @param depositToken The address of the deposit token
     /// @param depositorAddress The address of the newly created depositor contract
-    event DepositorCreated(
-        address shareToken,
-        address depositToken,
-        address indexed depositorAddress
-    );
+    event DepositorCreated(address shareToken, address depositToken, address indexed depositorAddress);
 
     /// @notice Emitted when a depositor is migrated to a new implementation
     /// @param shareToken The address of the share token
@@ -91,7 +87,7 @@ contract DepositorFactory is Ownable {
         address _shareTokenAddress,
         address _depositTokenAddress,
         address _amlSignerAddress
-    ) external returns (address depositorAddress) {
+    ) external onlyOwner returns (address depositorAddress) {
         if (_shareTokenAddress == address(0)) {
             revert ZeroAddress();
         }
@@ -111,21 +107,13 @@ contract DepositorFactory is Ownable {
         depositorAddress = Clones.clone(implementation);
 
         // 2. Initialize the new clone with its unique state
-        Depositor(depositorAddress).initialize(
-            _depositTokenAddress,
-            _shareTokenAddress,
-            _amlSignerAddress
-        );
+        Depositor(depositorAddress).initialize(_depositTokenAddress, _shareTokenAddress, _amlSignerAddress);
 
         // 3. Save it to the nested mapping
         depositors[_shareTokenAddress][_depositTokenAddress] = depositorAddress;
 
         // 4. Emit the event
-        emit DepositorCreated(
-            _shareTokenAddress,
-            _depositTokenAddress,
-            depositorAddress
-        );
+        emit DepositorCreated(_shareTokenAddress, _depositTokenAddress, depositorAddress);
     }
 
     /**
@@ -134,16 +122,14 @@ contract DepositorFactory is Ownable {
      * @param _shareTokenAddress The (variable) share token for this new depositor.
      * @param _depositTokenAddress The (variable) input token (e.g., USDC) for this depositor.
      * @param _amlSignerAddress The address of the trusted AML signer.
-     * @return newDepositorAddress The address of the newly created clone.  
+     * @return newDepositorAddress The address of the newly created clone.
      */
     function migrateDepositor(
         address _shareTokenAddress,
         address _depositTokenAddress,
         address _amlSignerAddress
     ) external onlyOwner returns (address newDepositorAddress) {
-        address oldDepositor = depositors[_shareTokenAddress][
-            _depositTokenAddress
-        ];
+        address oldDepositor = depositors[_shareTokenAddress][_depositTokenAddress];
 
         // This check ensures we are only migrating pairs that exist
         if (oldDepositor == address(0)) {
@@ -154,23 +140,12 @@ contract DepositorFactory is Ownable {
         newDepositorAddress = Clones.clone(implementation);
 
         // Initialize the new clone
-        Depositor(newDepositorAddress).initialize(
-            _depositTokenAddress,
-            _shareTokenAddress,
-            _amlSignerAddress
-        );
+        Depositor(newDepositorAddress).initialize(_depositTokenAddress, _shareTokenAddress, _amlSignerAddress);
 
         // Overwrite the old address with the new one
-        depositors[_shareTokenAddress][
-            _depositTokenAddress
-        ] = newDepositorAddress;
+        depositors[_shareTokenAddress][_depositTokenAddress] = newDepositorAddress;
 
-        emit DepositorMigrated(
-            _shareTokenAddress,
-            _depositTokenAddress,
-            oldDepositor,
-            newDepositorAddress
-        );
+        emit DepositorMigrated(_shareTokenAddress, _depositTokenAddress, oldDepositor, newDepositorAddress);
     }
 
     /**
@@ -179,9 +154,7 @@ contract DepositorFactory is Ownable {
      * @dev All *new* clones will use this new address.
      * @param _newImplementation The address of the new implementation contract.
      */
-    function updateImplementation(
-        address _newImplementation
-    ) external onlyOwner {
+    function updateImplementation(address _newImplementation) external onlyOwner {
         if (_newImplementation == address(0)) {
             revert ZeroAddress();
         }

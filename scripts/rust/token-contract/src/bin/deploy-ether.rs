@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // 2️⃣  Compile or load the contract
     // -----------------------------
     // Assuming `artifacts/contracts/TokenFactory.json` exists (from Hardhat build)
-    let abi = include_str!("../../../../../artifacts/contracts/Factory.sol/TokenFactory.json");
+    let abi = include_str!("../../../../../artifacts/contracts/TokenFactory.sol/TokenFactory.json");
     let artifact: serde_json::Value = serde_json::from_str(abi)?;
     let contract_abi = serde_json::to_string(&artifact["abi"])?;
     let bytecode = artifact["bytecode"].as_str().unwrap();
