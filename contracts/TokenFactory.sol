@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {CustomToken} from "./CustomToken.sol";
 
 /**
@@ -9,7 +9,7 @@ import {CustomToken} from "./CustomToken.sol";
  * @notice Creates and manages custom ERC20 tokens.
  * @author NU Blockchain Technologies
  */
-contract TokenFactory is Ownable {
+contract TokenFactory is Ownable2Step {
     /**
      * @notice Array of all created tokens.
      */

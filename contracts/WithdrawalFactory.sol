@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Withdrawal} from "./Withdrawal.sol";
 
 // Errors
@@ -16,7 +16,7 @@ error NoExistingWithdrawalToMigrate();
  * @dev Stores clones by [paymentToken][shareToken] pairs.
  * @author NU Blockchain Technologies
  */
-contract WithdrawalFactory is Ownable {
+contract WithdrawalFactory is Ownable2Step {
     // --- State Variables ---
 
     /**

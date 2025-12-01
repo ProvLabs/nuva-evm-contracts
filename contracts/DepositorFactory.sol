@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Depositor} from "./Depositor.sol";
 
 /*
@@ -21,7 +21,7 @@ error NoExistingDepositorToMigrate();
  * @dev Stores clones by [shareToken][depositToken] pairs.
  * @author NU Blockchain Technologies
  */
-contract DepositorFactory is Ownable {
+contract DepositorFactory is Ownable2Step {
     // --- State Variables ---
 
     /**
