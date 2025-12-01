@@ -43,7 +43,6 @@ contract CustomToken is ERC20, ERC20Permit, AccessControl {
         _customDecimals = _decimals;
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(MINTER_ROLE, _admin);
-        _mint(_admin, 0);
     }
 
     /**
