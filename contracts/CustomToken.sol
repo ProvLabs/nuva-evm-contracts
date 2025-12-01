@@ -14,7 +14,9 @@ contract CustomToken is ERC20, ERC20Permit, AccessControl {
     /**
      * @notice Role for minting tokens.
      */
+    bytes32 public constant MINTER_ADMIN_ROLE = keccak256("MINTER_ADMIN_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
     /**
      * @notice Custom decimals for the token.
      */
@@ -41,7 +43,8 @@ contract CustomToken is ERC20, ERC20Permit, AccessControl {
         uint8 _decimals
     ) ERC20(_name, _symbol) ERC20Permit(_name) {
         _customDecimals = _decimals;
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        _setRoleAdmin(MINTER_ROLE, MINTER_ADMIN_ROLE);
+        _grantRole(MINTER_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, _admin);
     }
 
