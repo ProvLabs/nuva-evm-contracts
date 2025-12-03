@@ -95,6 +95,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         address burnAdminAddress
     ) external initializer {
         __AccessControl_init();
+
         if (_shareTokenAddress == address(0)) revert InvalidAddress("Invalid withdrawal token");
         if (_paymentTokenAddress == address(0)) revert InvalidAddress("Invalid payment token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("Invalid AML signer");

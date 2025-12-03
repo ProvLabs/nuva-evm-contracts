@@ -107,6 +107,8 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         address _amlSignerAddress,
         address _destinationManagerAddress
     ) external initializer {
+        __AccessControl_init();
+
         if (_depositTokenAddress == address(0)) revert InvalidAddress("deposit token");
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
