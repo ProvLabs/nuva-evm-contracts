@@ -44,8 +44,7 @@ contract CustomToken is ERC20, ERC20Permit, AccessControl {
     ) ERC20(_name, _symbol) ERC20Permit(_name) {
         _customDecimals = _decimals;
         _setRoleAdmin(MINTER_ROLE, MINTER_ADMIN_ROLE);
-        _grantRole(MINTER_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, _admin);
+        _grantRole(MINTER_ADMIN_ROLE, _admin);
     }
 
     /**

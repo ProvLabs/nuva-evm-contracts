@@ -33,7 +33,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
 
     // --- Constants ---
 
-    /// @notice Role for burning locked tokens
+    /// @notice Role for burning locked tokens.
     bytes32 public constant BURN_ADMIN_ROLE = keccak256("BURN_ADMIN_ROLE");
     bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
 
@@ -86,31 +86,25 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param _shareTokenAddress The address of the token that can be withdrawn.
      * @param _paymentTokenAddress The address of the payment token for logging purposes.
      * @param _amlSignerAddress The address of the trusted AML signer.
-     * @param burnUser The address of the user who can burn tokens.
+     * @param burnAdminAddress The address of the user who can manage the burn role.
      */
     function initialize(
         address _shareTokenAddress,
         address _paymentTokenAddress,
         address _amlSignerAddress,
-        address burnUser
+        address burnAdminAddress
     ) external initializer {
         __AccessControl_init();
-        if (_shareTokenAddress == address(0)) {
-            revert InvalidAddress("Invalid withdrawal token");
-        }
-        if (_paymentTokenAddress == address(0)) {
-            revert InvalidAddress("Invalid payment token");
-        }
-        if (_amlSignerAddress == address(0)) {
-            revert InvalidAddress("Invalid AML signer");
-        }
+        if (_shareTokenAddress == address(0)) revert InvalidAddress("Invalid withdrawal token");
+        if (_paymentTokenAddress == address(0)) revert InvalidAddress("Invalid payment token");
+        if (_amlSignerAddress == address(0)) revert InvalidAddress("Invalid AML signer");
 
         shareToken = ICustomToken(_shareTokenAddress);
         paymentToken = _paymentTokenAddress;
         amlSigner = _amlSignerAddress;
+
         _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
-        _grantRole(BURN_ADMIN_ROLE, msg.sender);
-        _grantRole(BURN_ROLE, burnUser);
+        _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
 
         emit WithdrawalInitialized(_shareTokenAddress, _paymentTokenAddress, _amlSignerAddress);
     }
@@ -125,9 +119,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param _amlDeadline The expiration timestamp for the AML signature.
      */
     function withdraw(uint256 _amount, bytes calldata _amlSignature, uint256 _amlDeadline) external {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
-        }
+        if (_amount == 0) revert AmountMustBeGreaterThanZero();
 
         bytes32 messageHash = _getMessageHash(_amount, _amlDeadline);
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
@@ -155,9 +147,7 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         bytes32 _r,
         bytes32 _s
     ) external {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
-        }
+        if (_amount == 0) revert AmountMustBeGreaterThanZero();
 
         bytes32 messageHash = _getMessageHash(_amount, _amlDeadline);
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
@@ -202,19 +192,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * - Contract must have sufficient token balance
      */
     function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
-        if (amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
-
-        if (bytes(mintTransactionHash).length == 0) {
-            revert InvalidMintTransactionHash();
-        }
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (bytes(mintTransactionHash).length == 0) revert InvalidMintTransactionHash();
 
         // Ensure the contract has enough tokens to burn
         uint256 contractBalance = shareToken.balanceOf(address(this));
-        if (amount > contractBalance) {
-            revert InsufficientBalance();
-        }
+        if (amount > contractBalance) revert InsufficientBalance();
 
         // Burn the tokens using the CustomToken's burnAuthorized function
         shareToken.burn(amount);
@@ -223,90 +206,53 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     }
 
     /**
-     * @notice Verifies an AML signature for a withdrawal.
-     * @dev Internal function to verify the AML signature.
+     * @notice Internal function to verify the AML signature.
+     * @dev This function is called by the public deposit and depositWithPermit functions.
      * @param messageHash The hash of the message to verify.
      * @param _signature The signature to verify.
      * @param _deadline The expiration timestamp for the signature.
      */
     function _verifyAML(bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
-        verifyAML(messageHash, _signature, _deadline, amlSigner);
-    }
+        if (block.timestamp > _deadline) revert AmlSignatureExpired();
+        if (usedSignatures[messageHash]) revert AmlSignatureAlreadyUsed();
 
-    /**
-     * @notice Generates a message hash for AML verification by hashing the withdrawal details.
-     * @dev Internal function to build the AML message hash.
-     * @param _amount The amount of tokens for the withdrawal.
-     * @param _deadline The expiration timestamp for the message.
-     * @return The hashed message used for AML signature verification.
-     */
-    function _getMessageHash(uint256 _amount, uint256 _deadline) private view returns (bytes32) {
-        return getMessageHash(msg.sender, _amount, address(this), _deadline);
-    }
-
-    /**
-     * @notice Verifies an AML signature
-     * @dev This function checks if the signature is valid, not expired, and not reused
-     * @param messageHash The hash of the message that was signed
-     * @param _signature The signature to verify
-     * @param _deadline The timestamp after which the signature is considered expired
-     * @param expectedSigner The address that is expected to have signed the message
-     * @custom:reverts AmlSignatureExpired If the signature has expired
-     * @custom:reverts AmlSignatureAlreadyUsed If the signature has already been used
-     * @custom:reverts InvalidAmlSignature If the signature is invalid
-     * @custom:reverts InvalidAmlSigner If the signer is not the expected address
-     */
-    function verifyAML(
-        bytes32 messageHash,
-        bytes calldata _signature,
-        uint256 _deadline,
-        address expectedSigner
-    ) private {
-        // Check if the signature has expired
-        if (block.timestamp > _deadline) {
-            revert AmlSignatureExpired();
-        }
-
-        // Replay Prevention
-        if (usedSignatures[messageHash]) {
-            revert AmlSignatureAlreadyUsed();
-        }
-
-        // Recover the Signer
-        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(), messageHash);
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
-        // Validate the Signer
-        if (recoveredSigner == address(0)) {
-            revert InvalidAmlSignature();
-        }
-        if (recoveredSigner != expectedSigner) {
-            revert InvalidAmlSigner();
-        }
+        if (recoveredSigner == address(0)) revert InvalidAmlSignature();
+        if (recoveredSigner != amlSigner) revert InvalidAmlSigner();
 
-        // Mark Signature as Used
         usedSignatures[messageHash] = true;
     }
 
     /**
-     * @notice Builds the message hash for AML verification
-     * @dev This function creates a hash of all relevant parameters to be signed
-     * @param sender The address of the transaction sender
-     * @param _amount The amount of tokens being transferred
-     * @param _destinationAddress The destination address for the transfer
-     * @param _deadline The deadline for the signature to be valid until
-     * @return The keccak256 hash of the packed parameters
+     * @notice Returns the domain separator for the current chain.
      */
-    function getMessageHash(
-        address sender,
-        uint256 _amount,
-        address _destinationAddress,
-        uint256 _deadline
-    ) private view returns (bytes32) {
-        // This hash MUST match what the frontend AML signer signs
+    function _getDomainSeparator() private view returns (bytes32) {
         return
             keccak256(
-                abi.encodePacked(sender, address(shareToken), paymentToken, _amount, _destinationAddress, _deadline)
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256("Withdrawal"),
+                    keccak256("1"),
+                    block.chainid,
+                    address(this)
+                )
+            );
+    }
+
+    /**
+     * @notice Calculates the hash of the struct using abi.encode (standard EIP-712).
+     */
+    function _getMessageHash(uint256 _amount, uint256 _deadline) private view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("Withdraw(address sender,uint256 amount,uint256 deadline)"),
+                    msg.sender,
+                    _amount,
+                    _deadline
+                )
             );
     }
 }

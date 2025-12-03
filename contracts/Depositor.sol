@@ -2,14 +2,12 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IERC20Permit} from"@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {CustomToken} from "./CustomToken.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
-// TODO
-// access control list for multi admin functionality? read open zeppelin docs
 
 /*
  * @title Depositor
@@ -31,24 +29,47 @@ error InvalidAmlSigner(); // dev: The AML signer is invalid
  * It's designed to be cloned by a factory contract for multiple instances.
  * @author NU Blockchain Technologies
  */
-contract Depositor is Initializable {
+contract Depositor is Initializable, AccessControlUpgradeable {
     using SafeERC20 for CustomToken;
+
+    // --- Constants ---
+
+    /// @notice Role for managing the destination address allow list.
+    bytes32 public constant DESTINATION_MANAGER_ADMIN_ROLE = keccak256("DESTINATION_MANAGER_ADMIN_ROLE");
+    bytes32 public constant DESTINATION_MANAGER_ROLE = keccak256("DESTINATION_MANAGER_ROLE");
 
     // --- State Variables ---
 
     /// @notice The token that can be deposited into this contract.
     CustomToken public depositToken;
-    
+
     /// @notice The address of the share token, used for event emissions.
     address public shareToken;
-    
+
     /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
     address public amlSigner;
-    
+
+    /// @notice Array of all allowed destination addresses.
+    address[] public destinationAddresses;
+
     /// @notice Mapping to track used AML signatures to prevent replay attacks.
     mapping(bytes32 => bool) public usedSignatures;
 
     // --- Events ---
+
+    /**
+     * @notice Emitted when a depositor is initialized.
+     * @param depositTokenAddress The address of the deposit token.
+     * @param shareTokenAddress The address of the withdrawal token.
+     * @param amlSignerAddress The address of the AML signer.
+     * @param destinationManagerAddress The address of the destination address manager.
+     */
+    event DepositInitialized(
+        address depositTokenAddress,
+        address shareTokenAddress,
+        address amlSignerAddress,
+        address destinationManagerAddress
+    );
 
     /**
      * @notice Emitted when a deposit is made.
@@ -66,6 +87,11 @@ contract Depositor is Initializable {
         address destinationAddress
     );
 
+    /// @notice Emitted when destination addresses are altered.
+    event DestinationAddressAdded(address destination);
+    event DestinationAddressRemoved(address destination);
+    event DestinationAddressSkipped(address destination);
+
     // --- Initializer ---
 
     /**
@@ -78,21 +104,27 @@ contract Depositor is Initializable {
     function initialize(
         address _depositTokenAddress,
         address _shareTokenAddress,
-        address _amlSignerAddress
+        address _amlSignerAddress,
+        address _destinationManagerAddress
     ) external initializer {
-        if (_depositTokenAddress == address(0)) {
-            revert InvalidAddress("deposit token");
-        }
-        if (_shareTokenAddress == address(0)) {
-            revert InvalidAddress("share token");
-        }
-        if (_amlSignerAddress == address(0)) {
-            revert InvalidAddress("aml signer");
-        }
+        if (_depositTokenAddress == address(0)) revert InvalidAddress("deposit token");
+        if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
+        if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
+        if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
 
         depositToken = CustomToken(_depositTokenAddress);
         shareToken = _shareTokenAddress;
         amlSigner = _amlSignerAddress;
+
+        _setRoleAdmin(DESTINATION_MANAGER_ROLE, DESTINATION_MANAGER_ADMIN_ROLE);
+        _grantRole(DESTINATION_MANAGER_ADMIN_ROLE, _destinationManagerAddress);
+
+        emit DepositInitialized(
+            _depositTokenAddress,
+            _shareTokenAddress,
+            _amlSignerAddress,
+            _destinationManagerAddress
+        );
     }
 
     // --- Public Functions ---
@@ -111,11 +143,7 @@ contract Depositor is Initializable {
         bytes calldata _amlSignature,
         uint256 _amlDeadline
     ) external {
-        bytes32 messageHash = _getMessageHash(
-            _amount,
-            _destinationAddress,
-            _amlDeadline
-        );
+        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
         _doDeposit(_amount, _destinationAddress);
@@ -143,11 +171,7 @@ contract Depositor is Initializable {
         bytes32 _r,
         bytes32 _s
     ) external {
-        bytes32 messageHash = _getMessageHash(
-            _amount,
-            _destinationAddress,
-            _amlDeadline
-        );
+        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
@@ -164,6 +188,66 @@ contract Depositor is Initializable {
         _doDeposit(_amount, _destinationAddress);
     }
 
+    /**
+     * @dev Helper function to get the full list of addresses.
+     */
+    function getDestinationAddresses() public view returns (address[] memory) {
+        return destinationAddresses;
+    }
+
+    /**
+     * @dev Checks if an address exists in the destination array.
+     * @param _destination The address to check.
+     */
+    function isDestination(address _destination) public view returns (bool) {
+        for (uint i = 0; i < destinationAddresses.length; i++) {
+            if (destinationAddresses[i] == _destination) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @dev Adds a destination address to the array only if it doesn't already exist.
+     * @param _destination The address to attempt to add.
+     */
+    function addDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
+        if (_destination == address(0)) revert InvalidAddress("destination address");
+
+        // Check if the address already exists by iterating (efficient for small arrays < 5)
+        for (uint i = 0; i < destinationAddresses.length; i++) {
+            if (destinationAddresses[i] == _destination) {
+                emit DestinationAddressSkipped(_destination);
+                return;
+            }
+        }
+
+        destinationAddresses.push(_destination);
+        emit DestinationAddressAdded(_destination);
+    }
+
+    /**
+     * @dev Removes a destination address from the array.
+     * Note: This changes the order of the array (swap and pop) for gas efficiency.
+     * @param _destination The address to remove.
+     */
+    function removeDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
+        for (uint i = 0; i < destinationAddresses.length; i++) {
+            if (destinationAddresses[i] == _destination) {
+                // Move the last element into the place to delete
+                destinationAddresses[i] = destinationAddresses[destinationAddresses.length - 1];
+                // Remove the last element
+                destinationAddresses.pop();
+
+                emit DestinationAddressRemoved(_destination);
+                return;
+            }
+        }
+
+        emit DestinationAddressSkipped(_destination);
+    }
+
     // --- Private Helper Functions ---
 
     /**
@@ -173,12 +257,9 @@ contract Depositor is Initializable {
      * @param _destinationAddress The address where tokens will be sent.
      */
     function _doDeposit(uint256 _amount, address _destinationAddress) private {
-        if (_amount == 0) {
-            revert InvalidAmount();
-        }
-        if (_destinationAddress == address(0)) {
-            revert InvalidAddress("destination");
-        }
+        if (_amount == 0) revert InvalidAmount();
+        if (_destinationAddress == address(0)) revert InvalidAddress("destination");
+        if (!isDestination(_destinationAddress)) revert InvalidAddress("destination");
 
         depositToken.safeTransferFrom(msg.sender, _destinationAddress, _amount);
 
@@ -192,101 +273,48 @@ contract Depositor is Initializable {
      * @param _signature The signature to verify.
      * @param _deadline The expiration timestamp for the signature.
      */
-    function _verifyAML(
-        bytes32 messageHash,
-        bytes calldata _signature,
-        uint256 _deadline
-    ) private {
-        verifyAML(messageHash, _signature, _deadline, amlSigner);
+    function _verifyAML(bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
+        if (block.timestamp > _deadline) revert AmlSignatureExpired();
+        if (usedSignatures[messageHash]) revert AmlSignatureAlreadyUsed();
+
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(), messageHash);
+        address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
+
+        if (recoveredSigner == address(0)) revert InvalidAmlSignature();
+        if (recoveredSigner != amlSigner) revert InvalidAmlSigner();
+
+        usedSignatures[messageHash] = true;
     }
 
     /**
-     * @notice Internal function to build the AML message hash.
-     * @dev This function is called by the public deposit and depositWithPermit functions.
-     * @param _amount The amount of tokens for the deposit.
-     * @param _destinationAddress The address where tokens will be sent.
-     * @param _deadline The expiration timestamp for the message.
-     * @return The hashed message used for AML signature verification.
+     * @notice Returns the domain separator for the current chain.
+     */
+    function _getDomainSeparator() private view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256("Depositor"),
+                    keccak256("1"),
+                    block.chainid,
+                    address(this)
+                )
+            );
+    }
+
+    /**
+     * @notice Calculates the hash of the struct using abi.encode (standard EIP-712).
      */
     function _getMessageHash(
         uint256 _amount,
         address _destinationAddress,
         uint256 _deadline
     ) private view returns (bytes32) {
-        return getMessageHash(
-            msg.sender,
-            _amount,
-            _destinationAddress,
-            _deadline
-        );
-    }
-
-    /**
-     * @notice Verifies an AML signature
-     * @dev This function checks if the signature is valid, not expired, and not reused
-     * @param messageHash The hash of the message that was signed
-     * @param _signature The signature to verify
-     * @param _deadline The timestamp after which the signature is considered expired
-     * @param expectedSigner The address that is expected to have signed the message
-     * @custom:reverts AmlSignatureExpired If the signature has expired
-     * @custom:reverts AmlSignatureAlreadyUsed If the signature has already been used
-     * @custom:reverts InvalidAmlSignature If the signature is invalid
-     * @custom:reverts InvalidAmlSigner If the signer is not the expected address
-     */
-    function verifyAML(
-        bytes32 messageHash,
-        bytes calldata _signature,
-        uint256 _deadline,
-        address expectedSigner
-    ) private {
-        // Check if the signature has expired
-        if (block.timestamp > _deadline) {
-            revert AmlSignatureExpired();
-        }
-
-        // Replay Prevention
-        if (usedSignatures[messageHash]) {
-            revert AmlSignatureAlreadyUsed();
-        }
-
-        // Recover the Signer
-        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
-        address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
-
-        // Validate the Signer
-        if (recoveredSigner == address(0)) {
-            revert InvalidAmlSignature();
-        }  
-        if (recoveredSigner != expectedSigner) {
-            revert InvalidAmlSigner();
-        }
-
-        // Mark Signature as Used
-        usedSignatures[messageHash] = true;
-    }
-
-    /**
-     * @notice Builds the message hash for AML verification
-     * @dev This function creates a hash of all relevant parameters to be signed
-     * @param sender The address of the transaction sender
-     * @param _amount The amount of tokens being transferred
-     * @param _destinationAddress The destination address for the transfer
-     * @param _deadline The deadline for the signature to be valid until
-     * @return The keccak256 hash of the packed parameters
-     */
-    function getMessageHash(
-        address sender,
-        uint256 _amount,
-        address _destinationAddress,
-        uint256 _deadline
-    ) private view returns (bytes32) {
-        // This hash MUST match what the frontend AML signer signs
         return
             keccak256(
-                abi.encodePacked(
-                    sender,
-                    address(depositToken),
-                    shareToken,
+                abi.encode(
+                    keccak256("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)"),
+                    msg.sender,
                     _amount,
                     _destinationAddress,
                     _deadline

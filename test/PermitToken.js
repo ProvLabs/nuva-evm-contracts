@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 
 describe("CustomToken ERC20Permit", function () {
     async function deploy() {
-        const [deployer, owner, spender] = await ethers.getSigners();
+        const [owner, minter, spender] = await ethers.getSigners();
 
         const Factory = await ethers.getContractFactory("TokenFactory");
         const factory = await Factory.deploy();
@@ -22,9 +22,14 @@ describe("CustomToken ERC20Permit", function () {
 
         // fund owner with some tokens
         const scale = 10n ** BigInt(decimals);
-        await token.connect(deployer).mint(await owner.getAddress(), 1_000_000n * scale);
+        const MINTER_ROLE = await token.MINTER_ROLE();
+        await expect(token.connect(owner).grantRole(MINTER_ROLE, await minter.getAddress())).to.emit(
+            token,
+            "RoleGranted",
+        );
+        await token.connect(minter).mint(await owner.getAddress(), 1_000_000n * scale);
 
-        return { deployer, owner, spender, token, name, symbol, decimals };
+        return { owner, minter, spender, token, name, symbol, decimals };
     }
 
     async function buildPermit(owner, token, spender, value, deadline) {

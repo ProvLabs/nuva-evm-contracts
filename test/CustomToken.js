@@ -22,6 +22,11 @@ describe("CustomToken", function () {
         const token = await ethers.getContractAt("CustomToken", tokenAddr);
 
         const scale = BigInt(10 ** decimals);
+        const MINTER_ROLE = await token.MINTER_ROLE();
+        await expect(token.connect(deployer).grantRole(MINTER_ROLE, await deployer.getAddress())).to.emit(
+            token,
+            "RoleGranted",
+        );
         await token.connect(deployer).mint(await deployer.getAddress(), initialSupply * scale);
 
         return { deployer, user, token, name, symbol, initialSupply: BigInt(initialSupply), decimals };

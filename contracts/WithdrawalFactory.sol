@@ -63,9 +63,8 @@ contract WithdrawalFactory is Ownable2Step {
      * Withdrawal logic contract.
      */
     constructor(address _implementation) Ownable(msg.sender) {
-        if (_implementation == address(0)) {
-            revert ZeroAddress();
-        }
+        if (_implementation == address(0)) revert ZeroAddress();
+
         implementation = _implementation;
     }
 
@@ -76,29 +75,19 @@ contract WithdrawalFactory is Ownable2Step {
      * @param _paymentTokenAddress The (variable) payment token for this new withdrawal.
      * @param _shareTokenAddress The (variable) input token (e.g., USDC) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
-     * @param _burnUser The address of the trusted AML signer.
      * @return withdrawalAddress The address of the newly created clone.
      */
     function createWithdrawal(
         address _paymentTokenAddress,
         address _shareTokenAddress,
-        address _amlSignerAddress,
-        address _burnUser
+        address _amlSignerAddress
     ) external onlyOwner returns (address withdrawalAddress) {
-        if (_paymentTokenAddress == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_shareTokenAddress == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_amlSignerAddress == address(0)) {
-            revert ZeroAddress();
-        }
+        if (_paymentTokenAddress == address(0)) revert ZeroAddress();
+        if (_shareTokenAddress == address(0)) revert ZeroAddress();
+        if (_amlSignerAddress == address(0)) revert ZeroAddress();
 
         // Check for existence using the nested mapping
-        if (withdrawals[_paymentTokenAddress][_shareTokenAddress] != address(0)) {
-            revert WithdrawalAlreadyExists();
-        }
+        if (withdrawals[_paymentTokenAddress][_shareTokenAddress] != address(0)) revert WithdrawalAlreadyExists();
 
         // 1. Create the cheap EIP-1167 clone
         withdrawalAddress = Clones.clone(implementation);
@@ -108,7 +97,7 @@ contract WithdrawalFactory is Ownable2Step {
             _shareTokenAddress,
             _paymentTokenAddress,
             _amlSignerAddress,
-            _burnUser
+            msg.sender
         );
 
         // 3. Save it to the nested mapping
@@ -124,21 +113,17 @@ contract WithdrawalFactory is Ownable2Step {
      * @param _paymentTokenAddress The (variable) payment token for this new withdrawal.
      * @param _shareTokenAddress The (variable) shared token (e.g., nuYLDS) for this withdrawal.
      * @param _amlSignerAddress The address of the trusted AML signer.
-     * @param _burnUser The address of the trusted AML signer.
      * @return newWithdrawalAddress The address of the newly created clone.
      */
     function migrateWithdrawal(
         address _paymentTokenAddress,
         address _shareTokenAddress,
-        address _amlSignerAddress,
-        address _burnUser
+        address _amlSignerAddress
     ) external onlyOwner returns (address newWithdrawalAddress) {
         address oldWithdrawal = withdrawals[_paymentTokenAddress][_shareTokenAddress];
 
         // This check ensures we are only migrating pairs that exist
-        if (oldWithdrawal == address(0)) {
-            revert NoExistingWithdrawalToMigrate();
-        }
+        if (oldWithdrawal == address(0)) revert NoExistingWithdrawalToMigrate();
 
         // Create a new clone pointing to the *current* implementation
         newWithdrawalAddress = Clones.clone(implementation);
@@ -148,7 +133,7 @@ contract WithdrawalFactory is Ownable2Step {
             _shareTokenAddress,
             _paymentTokenAddress,
             _amlSignerAddress,
-            _burnUser
+            msg.sender
         );
 
         // Overwrite the old address with the new one
@@ -164,9 +149,8 @@ contract WithdrawalFactory is Ownable2Step {
      * @param _newImplementation The address of the new implementation contract.
      */
     function updateImplementation(address _newImplementation) external onlyOwner {
-        if (_newImplementation == address(0)) {
-            revert ZeroAddress();
-        }
+        if (_newImplementation == address(0)) revert ZeroAddress();
+
         implementation = _newImplementation;
         emit ImplementationUpdated(_newImplementation);
     }

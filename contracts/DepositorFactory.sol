@@ -107,7 +107,7 @@ contract DepositorFactory is Ownable2Step {
         depositorAddress = Clones.clone(implementation);
 
         // 2. Initialize the new clone with its unique state
-        Depositor(depositorAddress).initialize(_depositTokenAddress, _shareTokenAddress, _amlSignerAddress);
+        Depositor(depositorAddress).initialize(_depositTokenAddress, _shareTokenAddress, _amlSignerAddress, msg.sender);
 
         // 3. Save it to the nested mapping
         depositors[_shareTokenAddress][_depositTokenAddress] = depositorAddress;
@@ -129,6 +129,16 @@ contract DepositorFactory is Ownable2Step {
         address _depositTokenAddress,
         address _amlSignerAddress
     ) external onlyOwner returns (address newDepositorAddress) {
+        if (_shareTokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_depositTokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_amlSignerAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
         address oldDepositor = depositors[_shareTokenAddress][_depositTokenAddress];
 
         // This check ensures we are only migrating pairs that exist
@@ -140,7 +150,12 @@ contract DepositorFactory is Ownable2Step {
         newDepositorAddress = Clones.clone(implementation);
 
         // Initialize the new clone
-        Depositor(newDepositorAddress).initialize(_depositTokenAddress, _shareTokenAddress, _amlSignerAddress);
+        Depositor(newDepositorAddress).initialize(
+            _depositTokenAddress,
+            _shareTokenAddress,
+            _amlSignerAddress,
+            msg.sender
+        );
 
         // Overwrite the old address with the new one
         depositors[_shareTokenAddress][_depositTokenAddress] = newDepositorAddress;

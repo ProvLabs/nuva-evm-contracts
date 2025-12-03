@@ -22,19 +22,28 @@ describe("CustomToken AccessControl", function () {
         const token = await ethers.getContractAt("CustomToken", tokenAddr);
 
         // Mint initial balance to admin since the contract does not mint on deploy
+        const MINTER_ROLE = await token.MINTER_ROLE();
+        await expect(token.connect(admin).grantRole(MINTER_ROLE, await admin.getAddress())).to.emit(
+            token,
+            "RoleGranted",
+        );
         const scale = BigInt(10 ** decimals);
         await token.connect(admin).mint(await admin.getAddress(), initialSupply * scale);
+        await expect(token.connect(admin).revokeRole(MINTER_ROLE, await admin.getAddress())).to.emit(
+            token,
+            "RoleRevoked",
+        );
 
         return { admin, alice, bob, factory, token, name, symbol, initialSupply: BigInt(initialSupply), decimals };
     }
 
     it("assigns DEFAULT_ADMIN, MINTER to creator", async function () {
         const { admin, token } = await deploy();
-        const ADMIN_ROLE = await token.DEFAULT_ADMIN_ROLE();
+        const MINTER_ADMIN_ROLE = await token.MINTER_ADMIN_ROLE();
         const MINTER_ROLE = await token.MINTER_ROLE();
 
-        expect(await token.hasRole(ADMIN_ROLE, await admin.getAddress())).to.equal(true);
-        expect(await token.hasRole(MINTER_ROLE, await admin.getAddress())).to.equal(true);
+        expect(await token.hasRole(MINTER_ADMIN_ROLE, await admin.getAddress())).to.equal(true);
+        expect(await token.hasRole(MINTER_ROLE, await admin.getAddress())).to.equal(false);
     });
 
     it("mint requires MINTER_ROLE and is transferrable via grant/revoke", async function () {
@@ -71,6 +80,11 @@ describe("CustomToken AccessControl", function () {
 
         // Mint some tokens to alice first
         const mintAmount = 1000n * 10n ** 18n;
+        const MINTER_ROLE = await token.MINTER_ROLE();
+        await expect(token.connect(admin).grantRole(MINTER_ROLE, await admin.getAddress())).to.emit(
+            token,
+            "RoleGranted",
+        );
         await token.connect(admin).mint(await alice.getAddress(), mintAmount);
 
         // Verify alice can burn their own tokens

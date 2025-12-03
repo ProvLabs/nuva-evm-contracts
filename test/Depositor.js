@@ -7,24 +7,34 @@ async function latestTimestamp() {
     return BigInt(block.timestamp);
 }
 
-// Helper function to get AML signature
-async function getAMLSignature({ amlSigner, user, token, shareToken, amount, destination, deadline }) {
-    const hash = ethers.solidityPackedKeccak256(
-        ["address", "address", "address", "uint256", "address", "uint256"],
-        [user.address, token.target, shareToken, amount, destination, deadline],
-    );
-    const sig = await amlSigner.signMessage(ethers.getBytes(hash));
-    return sig;
-}
+// Helper function to get AML signature for Withdrawal contract
+async function getAMLSignature({ contract, amlSigner, user, amount, deadline, destinationAddress }) {
+    const chainId = (await user.provider.getNetwork()).chainId;
+    const domain = {
+        name: "Depositor",
+        version: "1",
+        chainId,
+        verifyingContract: await contract.getAddress(),
+    };
 
-async function buildAmlSignature({ amlSigner, user, depositToken, shareToken, amount, destination, deadline }) {
-    const msgHash = ethers.solidityPackedKeccak256(
-        ["address", "address", "address", "uint256", "address", "uint256"],
-        [await user.getAddress(), await depositToken.getAddress(), shareToken, amount, destination, deadline],
-    );
-    // signMessage wraps with EIP-191 prefix, matching toEthSignedMessageHash in contract
-    const signature = await amlSigner.signMessage(ethers.getBytes(msgHash));
-    return { messageHash: msgHash, signature };
+    const types = {
+        Deposit: [
+            { name: "sender", type: "address" },
+            { name: "amount", type: "uint256" },
+            { name: "destinationAddress", type: "address" },
+            { name: "deadline", type: "uint256" },
+        ],
+    };
+
+    const message = {
+        sender: user.address,
+        amount,
+        destinationAddress,
+        deadline,
+    };
+
+    const sig = await amlSigner.signTypedData(domain, types, message);
+    return sig;
 }
 
 async function buildPermit(owner, token, spender, value, deadline) {
@@ -54,7 +64,7 @@ async function buildPermit(owner, token, spender, value, deadline) {
 
 describe("Depositor", function () {
     async function deployFixture() {
-        const [deployer, user, amlSigner, destination] = await ethers.getSigners();
+        const [deployer, user, amlSigner, destinationManager, destination] = await ethers.getSigners();
 
         // Deploy CustomToken via factory or directly via TokenFactory
         const TokenFactory = await ethers.getContractFactory("TokenFactory");
@@ -71,6 +81,11 @@ describe("Depositor", function () {
 
         // Mint tokens to user for deposits
         const scale = 10n ** BigInt(decimals);
+        const MINTER_ROLE = await token.MINTER_ROLE();
+        await expect(token.connect(deployer).grantRole(MINTER_ROLE, await deployer.getAddress())).to.emit(
+            token,
+            "RoleGranted",
+        );
         await token.connect(deployer).mint(await user.getAddress(), 1_000_000n * scale);
 
         // Deploy Depositor implementation with linked library
@@ -89,8 +104,17 @@ describe("Depositor", function () {
         ).wait();
         const depositorAddr = await depositorFactory.depositors(shareToken, await token.getAddress());
         const depositor = await ethers.getContractAt("Depositor", depositorAddr);
+        const DESTINATION_MANAGER_ROLE = await depositor.DESTINATION_MANAGER_ROLE();
+        await expect(depositor.connect(deployer).grantRole(DESTINATION_MANAGER_ROLE, await destinationManager.getAddress())).to.emit(
+            depositor,
+            "RoleGranted",
+        );
+        await expect(depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressAdded",
+        );
 
-        return { deployer, user, amlSigner, destination, token, decimals, depositor, shareToken };
+        return { deployer, user, amlSigner, destination, token, decimals, depositor, shareToken, destinationManager };
     }
 
     it("initializes correctly via factory", async function () {
@@ -107,13 +131,12 @@ describe("Depositor", function () {
         await token.connect(user).approve(await depositor.getAddress(), amt);
 
         const deadline = (await latestTimestamp()) + 3600n;
-        const { signature } = await buildAmlSignature({
+        const signature = await getAMLSignature({
+            contract: depositor,
             amlSigner,
             user,
-            depositToken: token,
-            shareToken,
             amount: amt,
-            destination: await destination.getAddress(),
+            destinationAddress: await destination.getAddress(),
             deadline,
         });
 
@@ -141,12 +164,11 @@ describe("Depositor", function () {
 
         // expired
         const sigExpired = await getAMLSignature({
+            contract: depositor,
             amlSigner,
             user,
-            token,
-            shareToken: await depositor.shareToken(),
             amount: amt,
-            destination: await destination.getAddress(),
+            destinationAddress: await destination.getAddress(),
             deadline: nowTs - 1n,
         });
 
@@ -158,13 +180,12 @@ describe("Depositor", function () {
         // Test wrong signer
         const imposter = (await ethers.getSigners())[3];
         const deadline = nowTs + 3600n;
-        const { signature: sigWrong } = await buildAmlSignature({
+        const sigWrong = await getAMLSignature({
+            contract: depositor,
             amlSigner: imposter,
             user,
-            depositToken: token,
-            shareToken: await depositor.shareToken(),
             amount: amt,
-            destination: await destination.getAddress(),
+            destinationAddress: await destination.getAddress(),
             deadline,
         });
         await expect(
@@ -172,13 +193,12 @@ describe("Depositor", function () {
         ).to.be.revertedWithCustomError(depositor, "InvalidAmlSigner");
 
         // Test replay protection
-        const { signature } = await buildAmlSignature({
+        const signature = await getAMLSignature({
+            contract: depositor,
             amlSigner,
             user,
-            depositToken: token,
-            shareToken,
             amount: amt,
-            destination: await destination.getAddress(),
+            destinationAddress: await destination.getAddress(),
             deadline,
         });
 
@@ -194,27 +214,72 @@ describe("Depositor", function () {
         ).to.be.revertedWithCustomError(depositor, "AmlSignatureAlreadyUsed");
     });
 
+    it("validates destination manager can manage destination addresses", async function () {
+        const { deployer, user, destination, depositor, destinationManager } = await deployFixture();
+
+        await expect(depositor.connect(destinationManager).removeDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressRemoved",
+        );
+        await expect(depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressAdded",
+        );
+        await expect(depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressSkipped",
+        );
+
+        // user cannot manage
+        await expect(depositor.connect(user).removeDestinationAddress(await destination.getAddress()))
+            .to.be.revertedWithCustomError(depositor, "AccessControlUnauthorizedAccount");
+        await expect(depositor.connect(user).addDestinationAddress(await destination.getAddress()))
+            .to.be.revertedWithCustomError(depositor, "AccessControlUnauthorizedAccount");
+
+        // user can manage after role addition
+        const DESTINATION_MANAGER_ROLE = await depositor.DESTINATION_MANAGER_ROLE();
+        await expect(depositor.connect(deployer).grantRole(DESTINATION_MANAGER_ROLE, await user.getAddress())).to.emit(
+            depositor,
+            "RoleGranted",
+        );
+        await expect(depositor.connect(deployer).revokeRole(DESTINATION_MANAGER_ROLE, await destinationManager.getAddress())).to.emit(
+            depositor,
+            "RoleRevoked",
+        );
+        await expect(depositor.connect(user).removeDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressRemoved",
+        );
+        await expect(depositor.connect(user).addDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressAdded",
+        );
+        await expect(depositor.connect(user).addDestinationAddress(await destination.getAddress())).to.emit(
+            depositor,
+            "DestinationAddressSkipped",
+        );
+    })
+
     it("validates amount and destination", async function () {
-        const { user, destination, token, depositor, amlSigner, shareToken } = await deployFixture();
+        const { user, destination, token, depositor, amlSigner, destinationManager } = await deployFixture();
 
         // approve some so we hit internal checks
         await token.connect(user).approve(await depositor.getAddress(), 100n);
         const deadline = (await latestTimestamp()) + 3600n;
 
         const build = async (amount, dest) =>
-            buildAmlSignature({
+            getAMLSignature({
+                contract: depositor,
                 amlSigner,
                 user,
-                depositToken: token,
-                shareToken,
                 amount,
-                destination: dest,
+                destinationAddress: dest,
                 deadline,
             });
 
         // Test zero amount
         {
-            const { signature } = await build(0n, await destination.getAddress());
+            const signature = await build(0n, await destination.getAddress());
             // This is a contract-level error, not from AMLUtils
             await expect(
                 depositor.connect(user).deposit(0n, await destination.getAddress(), signature, deadline),
@@ -223,29 +288,51 @@ describe("Depositor", function () {
 
         // Test zero destination
         {
-            const { signature } = await build(1n, ethers.ZeroAddress);
+            const signature = await build(1n, ethers.ZeroAddress);
             // This is a contract-level error, not from AMLUtils
             await expect(depositor.connect(user).deposit(1n, ethers.ZeroAddress, signature, deadline))
+                .to.be.revertedWithCustomError(depositor, "InvalidAddress")
+                .withArgs("destination");
+        }
+
+        // Test destination not in allow list
+        {
+            const signature = await build(1n, await user.getAddress());
+            // This is a contract-level error, not from AMLUtils
+            await expect(depositor.connect(user).deposit(1n, await user.getAddress(), signature, deadline))
+                .to.be.revertedWithCustomError(depositor, "InvalidAddress")
+                .withArgs("destination");
+        }
+
+        // Test destination removed from allow list
+        {
+            await expect(depositor.connect(destinationManager).removeDestinationAddress(await destination.getAddress())).to.emit(
+                depositor,
+                "DestinationAddressRemoved",
+            );
+            const signature = await build(1n, await destination.getAddress());
+            // This is a contract-level error, not from AMLUtils
+            await expect(
+                depositor.connect(user).deposit(1n, await destination.getAddress(), signature, deadline))
                 .to.be.revertedWithCustomError(depositor, "InvalidAddress")
                 .withArgs("destination");
         }
     });
 
     it("depositWithPermit performs permit then transfers in one tx", async function () {
-        const { user, destination, token, decimals, depositor, amlSigner, shareToken } = await deployFixture();
+        const { user, destination, token, decimals, depositor, amlSigner } = await deployFixture();
 
         const amt = 777n * 10n ** BigInt(decimals);
         const nowTs = await latestTimestamp();
         const permitDeadline = nowTs + 3600n;
 
         // Build AML signature
-        const { signature } = await buildAmlSignature({
+        const signature = await getAMLSignature({
+            contract: depositor,
             amlSigner,
             user,
-            depositToken: token,
-            shareToken: await depositor.shareToken(),
             amount: amt,
-            destination: await destination.getAddress(),
+            destinationAddress: await destination.getAddress(),
             deadline: nowTs + 3600n,
         });
 
