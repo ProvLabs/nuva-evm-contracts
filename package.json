@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@cuonghx.gu-tech/ethers-gcp-kms-signer": "^0.9.1",
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.0",
     "@nomicfoundation/hardhat-ignition": "^0.15.13",
@@ -29,7 +30,6 @@
     "chai": "^4.2.0",
     "dotenv": "^17.2.3",
     "ethers": "^6.14.0",
-    "ethers-gcp-kms-signer": "^1.1.6",
     "hardhat": "2.26.3",
     "hardhat-gas-reporter": "^2.3.0",
     "prettier": "^3.6.2",

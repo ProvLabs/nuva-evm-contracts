@@ -1,8 +1,8 @@
-const { GcpKmsSigner } = require("ethers-gcp-kms-signer");
+const { GcpKmsSigner } = require("@cuonghx.gu-tech/ethers-gcp-kms-signer");
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CLONE_ADDRESS = "0x49eE2921b7D5F26484bfb32C1F889e9Eb8fc6302";
+const CLONE_ADDRESS = "0x0D27b419Cce1c29b9d430345298410df05Cd8751";
 if (!CLONE_ADDRESS) {
     throw new Error("DEPOSITOR_CLONE_ADDRESS is not set.");
 }
@@ -12,7 +12,7 @@ if (!DEPOSIT_TOKEN_ADDRESS) {
     throw new Error("TOKEN_ADDRESS is not set.");
 }
 
-const SHARE_TOKEN_ADDRESS = "0xe937Dddfa0A3C2eC875C81D49BD5849475fdA1DD";
+const SHARE_TOKEN_ADDRESS = "0x0A1c879E67d4a74c23E7A2D415D59F2570eEF4Ec";
 if (!SHARE_TOKEN_ADDRESS) {
     throw new Error("SHARE_TOKEN_ADDRESS is not set.");
 }
@@ -25,20 +25,56 @@ if (!DESTINATION_ADDRESS) {
 
 // NOTE: Change '18' if your token has different decimals (e.g., 6 for USDC)
 const TOKEN_DECIMALS = 6;
-const AMOUNT_TO_DEPOSIT_STRING = "0.121"; // The amount in human-readable form
+const AMOUNT_TO_DEPOSIT_STRING = "0.222"; // The amount in human-readable form
 // --- END: Configuration ---
 
-// --- Helper: Load AML Signer ---
-function getAmlSigner() {
-    const kmsCredentials = {
-        projectId: "provlabs-test", // your project id in gcp
-        locationId: "us-central1", // the location where your key ring was created
-        keyRingId: "nuva-key-ring", // the id of the key ring
-        keyId: "nuva-app-ethereum-signing", // the name/id of your key in the key ring
-        keyVersion: "1", // the version of the key
+const kmsConfig = {
+    projectId: "provlabs-test",
+    locationId: "us-central1",
+    keyRingId: "nuva-key-ring",
+    keyId: "nuva-app-ethereum-signing",
+    versionId: "1",
+};
+
+const amlSigner = new GcpKmsSigner(kmsConfig);
+
+// 2. Manual EIP-712 Signing using Google KMS
+async function getAMLSignature({ contract, user, amount, deadline }) {
+    const chainId = (await ethers.provider.getNetwork()).chainId;
+
+    // 1. Define Domain (EIP-712)
+    const domain = {
+        name: "Depositor",
+        version: "1",
+        chainId: chainId,
+        verifyingContract: await contract.getAddress(),
     };
-    let signer = new GcpKmsSigner(kmsCredentials);
-    return signer.connect(ethers.provider);
+
+    // 2. Define Types
+    const types = {
+        Deposit: [
+            { name: "sender", type: "address" },
+            { name: "amount", type: "uint256" },
+            { name: "destinationAddress", type: "address" },
+            { name: "deadline", type: "uint256" },
+        ],
+    };
+
+    // 3. Define Value
+    const value = {
+        sender: user,
+        amount: amount, // ensure this is BigInt
+        destinationAddress: DESTINATION_ADDRESS,
+        deadline: deadline, // ensure this is BigInt
+    };
+
+    console.log("Signing EIP-712 with KMS Library...");
+
+    // 4. Sign using the library
+    // The library handles the hashing, the KMS call, AND the DER decoding automatically.
+    const signature = await amlSigner.signTypedData(domain, types, value);
+
+    return signature;
 }
 
 // --- Main Script ---
@@ -50,7 +86,6 @@ async function main() {
     }
 
     const user = new ethers.Wallet(privateKey, ethers.provider);
-    const amlSigner = getAmlSigner();
 
     console.log(`User (depositor): ${user.address}`);
     console.log(`AML Signer (server): ${await amlSigner.getAddress()}`);
@@ -75,35 +110,13 @@ async function main() {
     // This deadline is for the AML signature itself
     const amlDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
-    // Log the parameters that will be used for the AML signature
-    console.log("\nAML Signature Parameters:");
-    console.log({
-        sender: user.address,
-        depositToken: DEPOSIT_TOKEN_ADDRESS,
-        shareToken: SHARE_TOKEN_ADDRESS,
-        amount: amountToDeposit.toString(),
-        destination: DESTINATION_ADDRESS,
+    // Sign the hash directly (the contract will prepend the prefix)
+    const amlSignature = await getAMLSignature({
+        contract: depositor,
+        user: user.address,
+        amount: amountToDeposit,
         deadline: amlDeadline,
     });
-
-    // This must match exactly how the contract builds the message hash
-    const packedData = ethers.solidityPacked(
-        ["address", "address", "address", "uint256", "address", "uint256"],
-        [
-            user.address, // msg.sender
-            DEPOSIT_TOKEN_ADDRESS, // address(depositToken)
-            SHARE_TOKEN_ADDRESS, // shareToken
-            amountToDeposit, // _amount
-            DESTINATION_ADDRESS, // _destinationAddress
-            amlDeadline, // _deadline
-        ],
-    );
-
-    const amlMessageHash = ethers.keccak256(packedData);
-    console.log("AML Message Hash:", amlMessageHash);
-
-    // Sign the hash directly (the contract will prepend the prefix)
-    const amlSignature = await amlSigner.signMessage(ethers.getBytes(amlMessageHash));
     console.log("AML Signature:", amlSignature);
     console.log("   ✅ AML Signature created.");
 
@@ -114,6 +127,7 @@ async function main() {
     const permitNonce = await depositToken.nonces(user.address);
     // This deadline is for the permit signature
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
+
     const tokenName = await depositToken.name();
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
