@@ -1,31 +1,53 @@
 const { GcpKmsSigner } = require("@cuonghx.gu-tech/ethers-gcp-kms-signer");
 const { ethers } = require("hardhat");
 
-// --- START: Configuration ---
-const CLONE_ADDRESS = "0x0D27b419Cce1c29b9d430345298410df05Cd8751";
+// --- START: Configuration & Argument Parsing ---
+
+// 1. Internal Mapping of Targets to Addresses
+const CLONE_MAPPING = {
+    "nvylds": "0x0D27b419Cce1c29b9d430345298410df05Cd8751",
+    "nvheloc": "0xF6eCEb71dE111345d0D3Ca76D322209B41eB0e3F"
+};
+
+// Helper to grab arguments from CLI flags OR Environment Variables
+function getArg(flag, envVar) {
+    // Priority 1: Check Command Line Flag
+    const index = process.argv.indexOf(flag);
+    if (index > -1 && index + 1 < process.argv.length) {
+        return process.argv[index + 1];
+    }
+    // Priority 2: Check Environment Variable
+    if (process.env[envVar]) {
+        return process.env[envVar];
+    }
+    return null;
+}
+
+// 2. Retrieve Arguments (Flag name, Env Var name)
+const TARGET_KEY = getArg("--target", "TARGET");
+const AMOUNT_TO_DEPOSIT_STRING = getArg("--amount", "AMOUNT");
+
+// 3. Validate Arguments
+if (!TARGET_KEY || !AMOUNT_TO_DEPOSIT_STRING) {
+    console.error("\n❌ Error: Missing required command line arguments.");
+    console.error("Usage: npx hardhat run script.js -- --target <NAME> --amount <AMOUNT>");
+    console.error(`Valid targets: ${Object.keys(CLONE_MAPPING).join(", ")}`);
+    console.error("Example: npx hardhat run script.js -- --target nvylds --amount 0.222\n");
+    process.exit(1);
+}
+
+// 4. Resolve Address from Map
+const CLONE_ADDRESS = CLONE_MAPPING[TARGET_KEY];
+
 if (!CLONE_ADDRESS) {
-    throw new Error("DEPOSITOR_CLONE_ADDRESS is not set.");
+    console.error(`\n❌ Error: Unknown target '${TARGET_KEY}'.`);
+    console.error(`Please use one of the following: ${Object.keys(CLONE_MAPPING).join(", ")}\n`);
+    process.exit(1);
 }
 
 const DEPOSIT_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
-if (!DEPOSIT_TOKEN_ADDRESS) {
-    throw new Error("TOKEN_ADDRESS is not set.");
-}
-
-const SHARE_TOKEN_ADDRESS = "0x0A1c879E67d4a74c23E7A2D415D59F2570eEF4Ec";
-if (!SHARE_TOKEN_ADDRESS) {
-    throw new Error("SHARE_TOKEN_ADDRESS is not set.");
-}
-
-// Wallet to receive tokens
 const DESTINATION_ADDRESS = "0xd46a1942fa6a5ce2ef53178d25ca7d08d0972a5c";
-if (!DESTINATION_ADDRESS) {
-    throw new Error("PUBLIC_KEY_1 is not set.");
-}
-
-// NOTE: Change '18' if your token has different decimals (e.g., 6 for USDC)
 const TOKEN_DECIMALS = 6;
-const AMOUNT_TO_DEPOSIT_STRING = "0.222"; // The amount in human-readable form
 // --- END: Configuration ---
 
 const kmsConfig = {
@@ -42,7 +64,6 @@ const amlSigner = new GcpKmsSigner(kmsConfig);
 async function getAMLSignature({ contract, user, amount, deadline }) {
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
-    // 1. Define Domain (EIP-712)
     const domain = {
         name: "Depositor",
         version: "1",
@@ -50,7 +71,6 @@ async function getAMLSignature({ contract, user, amount, deadline }) {
         verifyingContract: await contract.getAddress(),
     };
 
-    // 2. Define Types
     const types = {
         Deposit: [
             { name: "sender", type: "address" },
@@ -60,25 +80,28 @@ async function getAMLSignature({ contract, user, amount, deadline }) {
         ],
     };
 
-    // 3. Define Value
     const value = {
         sender: user,
-        amount: amount, // ensure this is BigInt
+        amount: amount,
         destinationAddress: DESTINATION_ADDRESS,
-        deadline: deadline, // ensure this is BigInt
+        deadline: deadline,
     };
 
     console.log("Signing EIP-712 with KMS Library...");
-
-    // 4. Sign using the library
-    // The library handles the hashing, the KMS call, AND the DER decoding automatically.
     const signature = await amlSigner.signTypedData(domain, types, value);
-
     return signature;
 }
 
 // --- Main Script ---
 async function main() {
+    // 0. Configuration Log
+    console.log("-----------------------------------------");
+    console.log("🚀 Starting Deposit Script");
+    console.log(`Target Name:    ${TARGET_KEY}`);
+    console.log(`Target Address: ${CLONE_ADDRESS}`);
+    console.log(`Deposit Amount: ${AMOUNT_TO_DEPOSIT_STRING}`);
+    console.log("-----------------------------------------\n");
+
     // 1. Setup Signers and Contracts
     const privateKey = process.env.PRIVATE_KEY;
     if (!privateKey) {
@@ -100,17 +123,15 @@ async function main() {
     if (balance < amountToDeposit) {
         console.error(`❌ Error: User does not have enough tokens. Needs ${AMOUNT_TO_DEPOSIT_STRING}.`);
         console.error(`  User Balance: ${ethers.formatUnits(balance, TOKEN_DECIMALS)}`);
-        return;
+        process.exit(1);
     }
     console.log(`User balance is: ${ethers.formatUnits(balance, TOKEN_DECIMALS)} tokens.`);
 
     // --- STEP 1: Generate AML Signature (Server-side) ---
     console.log("\n1. Generating AML Signature (as server)...");
 
-    // This deadline is for the AML signature itself
     const amlDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
-    // Sign the hash directly (the contract will prepend the prefix)
     const amlSignature = await getAMLSignature({
         contract: depositor,
         user: user.address,
@@ -123,9 +144,7 @@ async function main() {
     // --- STEP 2: Generate EIP-2612 Permit Signature (User-side) ---
     console.log("\n2. Generating Permit Signature (as user)...");
 
-    // Get the token's current nonce for the user
     const permitNonce = await depositToken.nonces(user.address);
-    // This deadline is for the permit signature
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
     const tokenName = await depositToken.name();
@@ -156,65 +175,27 @@ async function main() {
         deadline: permitDeadline,
     };
 
-    // Sign the typed data
     const permitSignature = await user.signTypedData(domain, types, value);
     const { v, r, s } = ethers.Signature.from(permitSignature);
     console.log("   ✅ Permit Signature created.");
 
     // --- STEP 3: Debug Token Permissions ---
     console.log("\n3. Checking token permissions...");
-
-    // 1. Check token balance
     const userBalance = await depositToken.balanceOf(user.address);
     console.log(`User token balance: ${ethers.formatUnits(userBalance, TOKEN_DECIMALS)}`);
 
-    // 2. Check current allowance
     const currentAllowance = await depositToken.allowance(user.address, depositor.target);
     console.log(`Current allowance for depositor: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
-
-    // 3. Check token's permit functionality
-    console.log("\nChecking token's permit functionality...");
-
-    // Get token details
-    const _tokenName = await depositToken.name();
-    const tokenSymbol = await depositToken.symbol();
-    const tokenDecimals = await depositToken.decimals();
-    const tokenNonce = await depositToken.nonces(user.address);
-
-    console.log(`Token: ${_tokenName} (${tokenSymbol})`);
-    console.log(`Decimals: ${tokenDecimals}, Nonce: ${tokenNonce}`);
-
-    // Try to get EIP-2612 domain separator
-    try {
-        const domainSeparator = await depositToken.DOMAIN_SEPARATOR();
-        console.log("✅ Token supports EIP-2612 (DOMAIN_SEPARATOR found)");
-        console.log(`Domain Separator: ${domainSeparator}`);
-    } catch (e) {
-        console.log("❌ Token may not fully support EIP-2612 (DOMAIN_SEPARATOR not found)");
-    }
-
-    // // 5. Verify the approval was successful
-    // const newAllowance = await depositToken.allowance(user.address, depositor.target);
-    // console.log(`New allowance: ${ethers.formatUnits(newAllowance, TOKEN_DECIMALS)}`);
-
-    // if (newAllowance < amountToDeposit) {
-    //     throw new Error("Failed to set sufficient allowance");
-    // }
 
     // --- STEP 4: Call the Contract ---
     console.log("\n4. Attempting deposit...");
 
     try {
-        // Get the current block timestamp to ensure AML deadline is valid
         const currentBlock = await ethers.provider.getBlock("latest");
-        console.log("Current block timestamp:", currentBlock.timestamp);
-        console.log("AML deadline:", amlDeadline);
-
         if (currentBlock.timestamp > amlDeadline) {
             throw new Error("AML deadline has already passed");
         }
 
-        // Estimate gas for the standard deposit function
         console.log("\nEstimating gas for deposit...");
         const estimatedGas = await depositor
             .connect(user)
@@ -226,30 +207,13 @@ async function main() {
                 permitDeadline,
                 v,
                 r,
-                s,
+                s
             );
 
-        // Convert to BigInt and add 20% buffer
         const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-        console.log(
-            `✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
-        );
+        console.log(`✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`);
 
-        // Get current gas price
         const feeData = await ethers.provider.getFeeData();
-        if (!feeData.gasPrice) {
-            throw new Error("Failed to get gas price");
-        }
-
-        console.log("\nSending deposit transaction...");
-        console.log({
-            amount: amountToDeposit.toString(),
-            destination: DESTINATION_ADDRESS,
-            amlSignature: amlSignature,
-            amlDeadline: amlDeadline,
-            gasLimit: gasLimit.toString(),
-            gasPrice: feeData.gasPrice.toString(),
-        });
 
         const tx = await depositor
             .connect(user)
@@ -265,7 +229,7 @@ async function main() {
                 {
                     gasLimit: gasLimit,
                     gasPrice: feeData.gasPrice,
-                },
+                }
             );
 
         console.log("Transaction sent. Waiting for confirmation...");
@@ -276,56 +240,12 @@ async function main() {
         console.error("Error name:", error.name);
         console.error("Error message:", error.message);
 
-        // Log error code if available
-        if (error.code) {
-            console.error("Error code:", error.code);
-        }
-
-        // Log error data if available
         if (error.data) {
             console.error("Error data:", error.data);
-
-            // Try to decode the revert reason from the error data
-            if (error.data.data) {
-                const revertData = error.data.data;
-                console.error("Revert data (hex):", revertData);
-
-                // The first 4 bytes are the function selector, the rest is the error data
-                if (revertData.length > 10) {
-                    // 0x + 4 bytes (8 chars) + at least 2 chars of data
-                    const errorSignature = revertData.substring(0, 10); // 0x + 4 bytes
-                    console.error("Error signature:", errorSignature);
-
-                    // Known error signatures
-                    const errorSignatures = {
-                        "0x08c379a0": "Error(string)",
-                        "0x4e487b71": "Panic(uint256)",
-                        "0xd1cc7385": "InsufficientAllowance()",
-                        // Add more error signatures as needed
-                    };
-
-                    const errorName = errorSignatures[errorSignature] || "Unknown error";
-                    console.error("Decoded error:", errorName);
-
-                    // If it's a known error, provide more context
-                    if (errorSignature === "0xd1cc7385") {
-                        console.error("\n⚠️  InsufficientAllowance error detected!");
-                        console.error(
-                            "This usually means the permit signature verification failed or the allowance wasn't set correctly.",
-                        );
-                        console.error("Please check:");
-                        console.error("1. The token contract's permit function implementation");
-                        console.error("2. The deadline for the permit (might be expired)");
-                        console.error("3. The signature values (v, r, s) for the permit");
-                    }
-                }
+            if (error.data.data && error.data.data.includes("d1cc7385")) {
+                console.error("\n⚠️  InsufficientAllowance error detected!");
             }
         }
-
-        // Log the full error object for debugging
-        console.error("\nFull error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-
-        // Re-throw the error to exit the script
         throw error;
     }
 
