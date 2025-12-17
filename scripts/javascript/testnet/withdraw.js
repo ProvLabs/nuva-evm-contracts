@@ -15,6 +15,11 @@ const TARGET_CONFIG = {
         clone: "0x8b795b7EAf431D132a4444C73cfc8deBB896e256",
         token: "0xB9725490CD6fee733162B195523F8f764CF0b6Df",
         decimals: 12
+    },
+    "snuva": {
+        clone: "0xD8Ee690e664de0c7Cd9932eA706786dE7329EDf3",
+        token: "0x681d331C38412E3502ab52EdFe1eF05Fb53810C4",
+        decimals: 12
     }
 };
 

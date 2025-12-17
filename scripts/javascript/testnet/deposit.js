@@ -6,7 +6,8 @@ const { ethers } = require("hardhat");
 // 1. Internal Mapping of Targets to Addresses
 const CLONE_MAPPING = {
     "nvylds": "0x0D27b419Cce1c29b9d430345298410df05Cd8751",
-    "nvheloc": "0xF6eCEb71dE111345d0D3Ca76D322209B41eB0e3F"
+    "nvheloc": "0xF6eCEb71dE111345d0D3Ca76D322209B41eB0e3F",
+    "snuva": "0x0b3EDc2fD5D6c025E04f9103AF9Fb095b7EaE623"
 };
 
 // Helper to grab arguments from CLI flags OR Environment Variables
@@ -46,7 +47,7 @@ if (!CLONE_ADDRESS) {
 }
 
 const DEPOSIT_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
-const DESTINATION_ADDRESS = "0xd46a1942fa6a5ce2ef53178d25ca7d08d0972a5c";
+const DESTINATION_ADDRESS = "0xD6084C316d8c43f9695517B0961a9bDb6A1E2294";
 const TOKEN_DECIMALS = 6;
 // --- END: Configuration ---
 
