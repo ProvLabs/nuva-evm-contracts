@@ -5,7 +5,7 @@ require("@nomicfoundation/hardhat-toolbox");
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks: {
-    sepolia: {
+    eth: {
       url: process.env.RPC_URL || "http://localhost:8545",
       accounts: [
         process.env.PRIVATE_KEY,
@@ -23,6 +23,12 @@ module.exports = {
       url: process.env.MAINNET_RPC_URL,
       accounts: [process.env.MAINNET_PRIVATE_KEY],
       chainId: 1,
+    base: {
+      url: process.env.RPC_URL_BASE || "http://localhost:8545",
+      accounts: [
+        process.env.PRIVATE_KEY,
+      ],
+      chainId: 84532,
     },
   },
   etherscan: {

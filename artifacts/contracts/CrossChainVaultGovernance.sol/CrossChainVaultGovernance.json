@@ -1,0 +1,225 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "CrossChainVaultGovernance",
+  "sourceName": "contracts/CrossChainVaultGovernance.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "CallerNotTheOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "EmitterAddressCannotBeZero",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "EmitterChainIdCannotBeZeroOrThisChain",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PrecisionMustBeGreaterThanZero",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "RelayerFeePercentageMustBeLessThanPrecision",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "_state",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "wormhole",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "tokenBridge",
+          "type": "address"
+        },
+        {
+          "internalType": "uint16",
+          "name": "chainId",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint8",
+          "name": "wormholeFinality",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32",
+          "name": "feePrecision",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "relayerFeePercentage",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "chainId",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feePrecision",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint16",
+          "name": "emitterChainId",
+          "type": "uint16"
+        }
+      ],
+      "name": "getRegisteredEmitter",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint16",
+          "name": "emitterChainId",
+          "type": "uint16"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "emitterAddress",
+          "type": "bytes32"
+        }
+      ],
+      "name": "registerEmitter",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "relayerFeePercentage",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "tokenBridge",
+      "outputs": [
+        {
+          "internalType": "contract ITokenBridge",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "relayerFeePercentage",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "relayerFeePrecision",
+          "type": "uint32"
+        }
+      ],
+      "name": "updateRelayerFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "wormhole",
+      "outputs": [
+        {
+          "internalType": "contract IWormhole",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "wormholeFinality",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346015576103c8908161001b8239f35b600080fdfe608080604052600436101561001357600080fd5b60003560e01c9081630520557b146103895750806324816abb1461035457806335ff1e281461032d57806384acd1bb1461030457806385e66df4146102dd5780638da5cb5b146102b4578063960b48c3146102065780639a8a0592146101e1578063a1cb31b714610167578063bca4b0fa146100c65763c6328a461461009857600080fd5b346100c15760003660031901126100c1576002546040516001600160a01b039091168152602090f35b600080fd5b346100c15760403660031901126100c1576100df6103aa565b60005460243591906001600160a01b031633036101565761ffff1680151580610143575b15610132578115610121576000526003602052604060002055600080f35b6324f599dd60e21b60005260046000fd5b63019f4be560e11b60005260046000fd5b5061ffff60025460a01c16811415610103565b6301d65ae560e01b60005260046000fd5b346100c15760003660031901126100c15760e060018060a01b036000541663ffffffff60018060a01b036001541660025490604051938452602084015260018060a01b038116604084015261ffff8160a01c16606084015260ff8160b01c166080840152818160b81c1660a084015260d81c1660c0820152f35b346100c15760003660031901126100c157602061ffff60025460a01c16604051908152f35b346100c15760403660031901126100c15760043563ffffffff81168082036100c1576024359063ffffffff8216908183036100c1576000546001600160a01b031633036101565781156102a3571015610292576002805467ffffffffffffffff60b81b191660d89390931b63ffffffff60d81b169290921760b89190911b63ffffffff60b81b16179055005b6304d3cffd60e31b60005260046000fd5b630f9117b760e31b60005260046000fd5b346100c15760003660031901126100c1576000546040516001600160a01b039091168152602090f35b346100c15760003660031901126100c157602063ffffffff60025460d81c16604051908152f35b346100c15760003660031901126100c1576001546040516001600160a01b039091168152602090f35b346100c15760003660031901126100c157602063ffffffff60025460b81c16604051908152f35b346100c15760203660031901126100c15761ffff6103706103aa565b1660005260036020526020604060002054604051908152f35b346100c15760003660031901126100c15760209060ff60025460b01c168152f35b6004359061ffff821682036100c15756fea164736f6c634300081c000a",
+  "deployedBytecode": "0x608080604052600436101561001357600080fd5b60003560e01c9081630520557b146103895750806324816abb1461035457806335ff1e281461032d57806384acd1bb1461030457806385e66df4146102dd5780638da5cb5b146102b4578063960b48c3146102065780639a8a0592146101e1578063a1cb31b714610167578063bca4b0fa146100c65763c6328a461461009857600080fd5b346100c15760003660031901126100c1576002546040516001600160a01b039091168152602090f35b600080fd5b346100c15760403660031901126100c1576100df6103aa565b60005460243591906001600160a01b031633036101565761ffff1680151580610143575b15610132578115610121576000526003602052604060002055600080f35b6324f599dd60e21b60005260046000fd5b63019f4be560e11b60005260046000fd5b5061ffff60025460a01c16811415610103565b6301d65ae560e01b60005260046000fd5b346100c15760003660031901126100c15760e060018060a01b036000541663ffffffff60018060a01b036001541660025490604051938452602084015260018060a01b038116604084015261ffff8160a01c16606084015260ff8160b01c166080840152818160b81c1660a084015260d81c1660c0820152f35b346100c15760003660031901126100c157602061ffff60025460a01c16604051908152f35b346100c15760403660031901126100c15760043563ffffffff81168082036100c1576024359063ffffffff8216908183036100c1576000546001600160a01b031633036101565781156102a3571015610292576002805467ffffffffffffffff60b81b191660d89390931b63ffffffff60d81b169290921760b89190911b63ffffffff60b81b16179055005b6304d3cffd60e31b60005260046000fd5b630f9117b760e31b60005260046000fd5b346100c15760003660031901126100c1576000546040516001600160a01b039091168152602090f35b346100c15760003660031901126100c157602063ffffffff60025460d81c16604051908152f35b346100c15760003660031901126100c1576001546040516001600160a01b039091168152602090f35b346100c15760003660031901126100c157602063ffffffff60025460b81c16604051908152f35b346100c15760203660031901126100c15761ffff6103706103aa565b1660005260036020526020604060002054604051908152f35b346100c15760003660031901126100c15760209060ff60025460b01c168152f35b6004359061ffff821682036100c15756fea164736f6c634300081c000a",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

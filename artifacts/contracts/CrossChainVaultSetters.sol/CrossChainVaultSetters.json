@@ -1,0 +1,54 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "CrossChainVaultSetters",
+  "sourceName": "contracts/CrossChainVaultSetters.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "_state",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "wormhole",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "tokenBridge",
+          "type": "address"
+        },
+        {
+          "internalType": "uint16",
+          "name": "chainId",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint8",
+          "name": "wormholeFinality",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32",
+          "name": "feePrecision",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "relayerFeePercentage",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523460135760ad908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c63a1cb31b714602657600080fd5b34609b576000366003190112609b5760e09063ffffffff60018060a01b036000541660018060a01b0360015416600254918452602084015260018060a01b038116604084015261ffff8160a01c16606084015260ff8160b01c166080840152818160b81c1660a084015260d81c1660c0820152f35b600080fdfea164736f6c634300081c000a",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b60003560e01c63a1cb31b714602657600080fd5b34609b576000366003190112609b5760e09063ffffffff60018060a01b036000541660018060a01b0360015416600254918452602084015260018060a01b038116604084015261ffff8160a01c16606084015260ff8160b01c166080840152818160b81c1660a084015260d81c1660c0820152f35b600080fdfea164736f6c634300081c000a",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

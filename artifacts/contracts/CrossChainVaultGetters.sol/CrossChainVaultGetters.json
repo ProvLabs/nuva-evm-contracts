@@ -1,0 +1,164 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "CrossChainVaultGetters",
+  "sourceName": "contracts/CrossChainVaultGetters.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "_state",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "wormhole",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "tokenBridge",
+          "type": "address"
+        },
+        {
+          "internalType": "uint16",
+          "name": "chainId",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint8",
+          "name": "wormholeFinality",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32",
+          "name": "feePrecision",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "relayerFeePercentage",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "chainId",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feePrecision",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint16",
+          "name": "emitterChainId",
+          "type": "uint16"
+        }
+      ],
+      "name": "getRegisteredEmitter",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "relayerFeePercentage",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "tokenBridge",
+      "outputs": [
+        {
+          "internalType": "contract ITokenBridge",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "wormhole",
+      "outputs": [
+        {
+          "internalType": "contract IWormhole",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "wormholeFinality",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60808060405234601557610255908161001b8239f35b600080fdfe608080604052600436101561001357600080fd5b60003560e01c9081630520557b146102275750806324816abb146101ef57806335ff1e28146101c857806384acd1bb1461019f57806385e66df4146101785780638da5cb5b1461014f5780639a8a05921461012a578063a1cb31b7146100b05763c6328a461461008257600080fd5b346100ab5760003660031901126100ab576002546040516001600160a01b039091168152602090f35b600080fd5b346100ab5760003660031901126100ab5760e060018060a01b036000541663ffffffff60018060a01b036001541660025490604051938452602084015260018060a01b038116604084015261ffff8160a01c16606084015260ff8160b01c166080840152818160b81c1660a084015260d81c1660c0820152f35b346100ab5760003660031901126100ab57602061ffff60025460a01c16604051908152f35b346100ab5760003660031901126100ab576000546040516001600160a01b039091168152602090f35b346100ab5760003660031901126100ab57602063ffffffff60025460d81c16604051908152f35b346100ab5760003660031901126100ab576001546040516001600160a01b039091168152602090f35b346100ab5760003660031901126100ab57602063ffffffff60025460b81c16604051908152f35b346100ab5760203660031901126100ab5760043561ffff81168091036100ab5760005260036020526020604060002054604051908152f35b346100ab5760003660031901126100ab5760209060ff60025460b01c168152f3fea164736f6c634300081c000a",
+  "deployedBytecode": "0x608080604052600436101561001357600080fd5b60003560e01c9081630520557b146102275750806324816abb146101ef57806335ff1e28146101c857806384acd1bb1461019f57806385e66df4146101785780638da5cb5b1461014f5780639a8a05921461012a578063a1cb31b7146100b05763c6328a461461008257600080fd5b346100ab5760003660031901126100ab576002546040516001600160a01b039091168152602090f35b600080fd5b346100ab5760003660031901126100ab5760e060018060a01b036000541663ffffffff60018060a01b036001541660025490604051938452602084015260018060a01b038116604084015261ffff8160a01c16606084015260ff8160b01c166080840152818160b81c1660a084015260d81c1660c0820152f35b346100ab5760003660031901126100ab57602061ffff60025460a01c16604051908152f35b346100ab5760003660031901126100ab576000546040516001600160a01b039091168152602090f35b346100ab5760003660031901126100ab57602063ffffffff60025460d81c16604051908152f35b346100ab5760003660031901126100ab576001546040516001600160a01b039091168152602090f35b346100ab5760003660031901126100ab57602063ffffffff60025460b81c16604051908152f35b346100ab5760203660031901126100ab5760043561ffff81168091036100ab5760005260036020526020604060002054604051908152f35b346100ab5760003660031901126100ab5760209060ff60025460b01c168152f3fea164736f6c634300081c000a",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
