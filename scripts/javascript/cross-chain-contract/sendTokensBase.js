@@ -16,7 +16,7 @@ async function main() {
     const token = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
     const erc20ABI = [
         "function approve(address spender, uint256 amount) public returns (bool)",
-        "function allowance(address owner, address spender) public view returns (uint256)"
+        "function allowance(address owner, address spender) public view returns (uint256)",
     ];
     const tokenContract = new hre.ethers.Contract(token, erc20ABI, (await hre.ethers.getSigners())[0]);
 
@@ -31,7 +31,7 @@ async function main() {
         console.log("Approval confirmed!");
     } else {
         console.log("Sufficient allowance already exists.");
-    }   
+    }
 
     const wormholeAddress = await vault.wormhole();
     const wormhole = await hre.ethers.getContractAt("IWormhole", wormholeAddress);
@@ -40,7 +40,7 @@ async function main() {
 
     const targetChain = 10002;
     const batchId = 1;
-    
+
     const rawAddress = process.env.PUBLIC_KEY;
     if (!rawAddress) {
         throw new Error("PUBLIC_KEY is not set.");
@@ -48,16 +48,9 @@ async function main() {
     const targetRecipient = zeroPadValue(getAddress(rawAddress), 32);
 
     try {
-        const tx = 
-        await vault.sendTokensWithPayload(
-            token, 
-            amount,
-            targetChain,
-            batchId,
-            targetRecipient,
-            { 
+        const tx = await vault.sendTokensWithPayload(token, amount, targetChain, batchId, targetRecipient, {
             value: fee,
-            gasLimit: 500000
+            gasLimit: 500000,
         });
         const receipt = await tx.wait();
 
