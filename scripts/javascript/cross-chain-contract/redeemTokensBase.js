@@ -9,7 +9,7 @@ async function main() {
     const wh = await wormhole("Testnet", [evm.default || evm]);
 
     // Source chain transaction ID
-    const txid = "0x600d3aced4078e6111a766a695bd64e7fe33aacaf3d13a400901687e14e0ec25";
+    const txid = "0xf8817fce693098bb0a4c1d545d5bf5f7276598b1d60cbd4d789f521458a7cb0b";
 
     // Fetch the VAA and decode it
     const vaa = await wh.getVaa(txid, "Uint8Array", 60000);

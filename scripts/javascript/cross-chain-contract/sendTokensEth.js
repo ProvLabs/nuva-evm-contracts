@@ -11,7 +11,7 @@ async function main() {
     const vault = await hre.ethers.getContractAt("CrossChainVault", vaultCrossChain);
 
     const decimals = 6;
-    const amount = hre.ethers.parseUnits("0.01", decimals);
+    const amount = hre.ethers.parseUnits("1", decimals);
     // Eth USDC Token Address
     const token = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238";
     const erc20ABI = [

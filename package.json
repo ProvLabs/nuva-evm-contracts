@@ -42,6 +42,7 @@
     "typescript": ">=4.5.0"
   },
   "dependencies": {
+    "@certusone/wormhole-sdk": "^0.10.18",
     "@nomicfoundation/solidity-analyzer-darwin-arm64": "^0.1.2",
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",

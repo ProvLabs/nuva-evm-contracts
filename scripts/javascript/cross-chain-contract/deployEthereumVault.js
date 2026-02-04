@@ -7,8 +7,8 @@ async function main() {
     const tokenBridge = "0xDB5492265f6038831E89f495670FF909aDe94bd9";
     const chainId = 10002;
     const wormholeFinality = 1;
-    const feePrecision = 6;
-    const relayerFeePercentage = 1000000;
+    const feePrecision = 1000000;
+    const relayerFeePercentage = 10000;
 
     console.log("Deploying Vault (implementation)...");
     const vault = await deployVault.deploy(

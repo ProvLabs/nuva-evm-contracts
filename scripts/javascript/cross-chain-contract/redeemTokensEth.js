@@ -9,7 +9,7 @@ async function main() {
     const wh = await wormhole("Testnet", [evm.default || evm]);
 
     // Source chain transaction ID
-    const txid = "0xd47e6c036c05a17a7ad4fde3857480fe349ca19797a9004e7c7e2cf9c57c9283";
+    const txid = "0x518494ca99260fc00d88de6a0d9adf14068a5864430973a15be8e94582084017";
 
     // Fetch the VAA and decode it
     const vaa = await wh.getVaa(txid, "Uint8Array", 60000);
@@ -27,13 +27,33 @@ async function main() {
 
     console.log("Submitting VAA to contract...");
     try {
-        const tx = await vault.redeemTransferWithPayload(vaaBytes);
+        // Estimate gas for the standard redeem function
+        console.log("\nEstimating gas for redeem...");
+        const estimatedGas = await vault.redeemTransferWithPayload.estimateGas(vaaBytes);
+
+        // Convert to BigInt and add 20% buffer
+        const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
+        console.log(
+            `✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
+        );
+
+        // Get current gas price
+        const feeData = await ethers.provider.getFeeData();
+        if (!feeData.gasPrice) {
+            throw new Error("Failed to get gas price");
+        }
+
+        const tx = await vault.redeemTransferWithPayload(vaaBytes, {
+            gasLimit: gasLimit,
+            gasPrice: feeData.gasPrice,
+        });
+
         console.log("Transaction sent. Waiting for confirmation...");
         const receipt = await tx.wait();
         console.log("Redemption Successful! Hash:", receipt.hash);
     } catch (err) {
         console.error("Contract Execution Failed.");
-        console.error(err.reason || err.message);
+        console.error(err);
     }
 }
 
