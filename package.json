@@ -46,6 +46,7 @@
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@wormhole-foundation/sdk": "^4.9.1",
+    "@wormhole-foundation/wormhole-solidity-sdk": "^1.0.1",
     "axios": "^1.13.4",
     "forge-std": "^1.1.2"
   }

@@ -2145,6 +2145,11 @@
     "@wormhole-foundation/sdk-sui-core" "4.9.1"
     "@wormhole-foundation/sdk-sui-tokenbridge" "4.9.1"
 
+"@wormhole-foundation/wormhole-solidity-sdk@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.npmjs.org/@wormhole-foundation/wormhole-solidity-sdk/-/wormhole-solidity-sdk-1.0.1.tgz"
+  integrity sha512-TpF9wKXSbVDyCVIxJOijxmSpf1KJiR2KYYC8KtiSdODKV6Uqnjimd8POupSGumOK46e7b9OKF1Epucp7vrKd7g==
+
 abbrev@1, abbrev@1.0.x:
   version "1.0.9"
   resolved "https://registry.npmjs.org/abbrev/-/abbrev-1.0.9.tgz"

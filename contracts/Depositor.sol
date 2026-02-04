@@ -76,6 +76,14 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     );
 
     /**
+     * @notice Emitted when cross chain config is set.
+     * @param crossChainVaultAddress The address of the cross chain vault.
+     */
+    event CrossChainConfigSet(
+        address indexed crossChainVaultAddress
+    );
+
+    /**
      * @notice Emitted when a deposit is made.
      * @param user The address of the user making the deposit.
      * @param amount The amount of tokens deposited.
@@ -134,6 +142,21 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     }
 
     // --- Public Functions ---
+
+    /**
+     * @notice Initializes the contract with the provided token addresses and AML signer.
+     * @dev Can only be called once during contract deployment.
+     * @param crossChainVaultAddress The cross chain vault address.
+     */
+    function setCrossChainConfig(
+        address crossChainVaultAddress
+    ) external onlyRole(DESTINATION_MANAGER_ROLE) {
+        if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
+
+        crossChainVault = CrossChainVault(crossChainVaultAddress);
+
+        emit CrossChainConfigSet(crossChainVaultAddress);
+    }
 
     /**
      * @notice Deposits tokens after user provides a separate `approve`.
@@ -241,6 +264,15 @@ contract Depositor is Initializable, AccessControlUpgradeable {
             batchId, 
             bytes32(uint256(uint160(_destinationAddress)))
         );
+    }
+
+    /**
+     * @notice Get the cross chain vault address
+     * @dev Helper function to get the full list of addresses.
+     * @return The address of the cross chain vault
+     */
+    function getCrossChainContractAddress() public view returns (address) {
+        return address(crossChainVault);
     }
 
     /**
