@@ -1,0 +1,184 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ICircleBridge",
+  "sourceName": "contracts/modules/wormhole/ICircleBridge.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "_destinationDomain",
+          "type": "uint32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_mintRecipient",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "_burnToken",
+          "type": "address"
+        }
+      ],
+      "name": "depositForBurn",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "_nonce",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "_destinationDomain",
+          "type": "uint32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_mintRecipient",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "_burnToken",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_destinationCaller",
+          "type": "bytes32"
+        }
+      ],
+      "name": "depositForBurnWithCaller",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "_nonce",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "_remoteDomain",
+          "type": "uint32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_sender",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "messageBody",
+          "type": "bytes"
+        }
+      ],
+      "name": "handleReceiveMessage",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "localMessageTransmitter",
+      "outputs": [
+        {
+          "internalType": "contract IMessageTransmitter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "localMinter",
+      "outputs": [
+        {
+          "internalType": "contract ITokenMinter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "domain",
+          "type": "uint32"
+        }
+      ],
+      "name": "remoteCircleBridges",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -13,13 +13,13 @@ async function main() {
     console.log("Using vault address:", vaultCrossChain);
 
     // 2. Get the Token Bridge for Sepolia
-    const chainContext = wh.getChain("Sepolia"); 
+    const chainContext = wh.getChain("Sepolia");
     const tb = await chainContext.getTokenBridge();
 
     // 3. Define the source token info
     // If the token is from Solana, use the chain name "Solana"
-    const sourceChain = "BaseSepolia"; 
-    
+    const sourceChain = "BaseSepolia";
+
     // We convert the string address into a UniversalAddress the SDK understands
     const sourceAddress = Wormhole.chainAddress(sourceChain, vaultCrossChain);
 
@@ -27,7 +27,7 @@ async function main() {
     // 4. Get the local (wrapped) address on Sepolia
     try {
         const localAddress = await tb.getWrappedAsset(sourceAddress);
-        
+
         if (!localAddress) {
             console.log("This token has no wrapped counterpart on Sepolia yet.");
         } else {

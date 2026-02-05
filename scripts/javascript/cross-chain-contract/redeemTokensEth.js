@@ -1,15 +1,16 @@
 const hre = require("hardhat");
-const { wormhole, encoding } = require("@wormhole-foundation/sdk");
+const { wormhole, serialize } = require("@wormhole-foundation/sdk");
 const evm = require("@wormhole-foundation/sdk/evm");
-const { serialize, VAA } = require("@wormhole-foundation/sdk-definitions");
+const { AbiCoder, keccak256 } = require("ethers");
 
 async function main() {
     // Initialize the Wormhole SDK
     // Note: ensure the platforms (like evm) are passed in an array
     const wh = await wormhole("Testnet", [evm.default || evm]);
+    const chain = wh.getChain("BaseSepolia");
 
     // Source chain transaction ID
-    const txid = "0x518494ca99260fc00d88de6a0d9adf14068a5864430973a15be8e94582084017";
+    const txid = "0x504747fedad7f5884c535a2ffd24973397bacd7e050c66b2a1291e840a9d7717";
 
     // Fetch the VAA and decode it
     const vaa = await wh.getVaa(txid, "Uint8Array", 60000);
@@ -25,30 +26,32 @@ async function main() {
     const vaultAddress = process.env.VAULT_CROSS_CHAIN_ETH;
     const vault = await hre.ethers.getContractAt("CrossChainVault", vaultAddress);
 
+    const client = await chain.getRpc();
+    const receipt = await client.getTransactionReceipt(txid);
+
+    // Circle MessageTransmitter 'MessageSent' Topic
+    const CIRCLE_TOPIC = "0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036";
+    const circleLog = receipt.logs.find((l) => l.topics[0] === CIRCLE_TOPIC);
+
+    if (!circleLog) throw new Error("Circle MessageSent log not found");
+
+    // The message is the first (and only) non-indexed parameter in MessageSent
+    const abiCoder = AbiCoder.defaultAbiCoder();
+    const [circleBridgeMessage] = abiCoder.decode(["bytes"], circleLog.data);
+
+    console.log("Fetching attestations (this may take 1-2 minutes)...");
+
+    const circleMsgHash = keccak256(circleBridgeMessage);
+
+    console.log("Circle Message Hash:", circleMsgHash);
+
+    const attestations = await wh.getCircleAttestation(circleMsgHash);
+
     console.log("Submitting VAA to contract...");
     try {
-        // Estimate gas for the standard redeem function
-        console.log("\nEstimating gas for redeem...");
-        const estimatedGas = await vault.redeemTransferWithPayload.estimateGas(vaaBytes);
-
-        // Convert to BigInt and add 20% buffer
-        const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-        console.log(
-            `✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
-        );
-
-        // Get current gas price
-        const feeData = await ethers.provider.getFeeData();
-        if (!feeData.gasPrice) {
-            throw new Error("Failed to get gas price");
-        }
-
-        const tx = await vault.redeemTransferWithPayload(vaaBytes, {
-            gasLimit: gasLimit,
-            gasPrice: feeData.gasPrice,
-        });
-
+        const tx = await vault.redeemTransferWithPayload(vaaBytes, circleBridgeMessage, attestations);
         console.log("Transaction sent. Waiting for confirmation...");
+
         const receipt = await tx.wait();
         console.log("Redemption Successful! Hash:", receipt.hash);
     } catch (err) {

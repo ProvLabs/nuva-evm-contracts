@@ -1,33 +1,27 @@
-const hre = require("hardhat");
 const { wormhole, serialize } = require("@wormhole-foundation/sdk");
 const evm = require("@wormhole-foundation/sdk/evm");
 const { AbiCoder, keccak256 } = require("ethers");
 
 async function main() {
-    // Initialize the Wormhole SDK
-    // Note: ensure the platforms (like evm) are passed in an array
-    const wh = await wormhole("Testnet", [evm.default || evm]);
-    const chain = wh.getChain("Sepolia");
-
     // Source chain transaction ID
-    const txid = "0x294fb04f8900570bb26d54444be010ed47535fc194bb9b4260e2e1b95df4d6ff";
+    const sourceTxHash = "0x504747fedad7f5884c535a2ffd24973397bacd7e050c66b2a1291e840a9d7717";
+    const wh = await wormhole("Testnet", [evm.default || evm]);
+    const chain = wh.getChain("BaseSepolia");
 
     // Fetch the VAA and decode it
-    const vaa = await wh.getVaa(txid, "Uint8Array", 60000);
+    const vaa = await wh.getVaa(sourceTxHash, "Uint8Array", 60000);
 
     if (!vaa) {
         console.error("❌ VAA not found");
         process.exit(1);
     }
-
+    
     // Serialize the VAA object back to bytes
     const vaaBytes = serialize(vaa);
-
-    const vaultAddress = process.env.VAULT_CROSS_CHAIN;
-    const vault = await hre.ethers.getContractAt("CrossChainVault", vaultAddress);
+    const vaaHex = Buffer.from(vaaBytes).toString("hex");
 
     const client = await chain.getRpc();
-    const receipt = await client.getTransactionReceipt(txid);
+    const receipt = await client.getTransactionReceipt(sourceTxHash);
 
     // Circle MessageTransmitter 'MessageSent' Topic
     const CIRCLE_TOPIC = "0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036";
@@ -47,20 +41,18 @@ async function main() {
 
     const attestations = await wh.getCircleAttestation(circleMsgHash);
 
-    console.log("Submitting VAA to contract...");
-    try {
-        const tx = await vault.redeemTransferWithPayload(vaaBytes, circleBridgeMessage, attestations);
-        console.log("Transaction sent. Waiting for confirmation...");
+    const redeemParams = {
+        encodedWormholeMessage: vaaHex,
+        circleBridgeMessage: circleBridgeMessage,
+        circleAttestation: attestations,
+    };
 
-        const receipt = await tx.wait();
-        console.log("Redemption Successful! Hash:", receipt.hash);
-    } catch (err) {
-        console.error("Contract Execution Failed.");
-        console.error(err.reason || err.message);
-    }
+    console.log(redeemParams);
 }
 
-main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-});
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error(err);
+        process.exit(1);
+    });

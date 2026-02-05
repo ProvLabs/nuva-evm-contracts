@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IWormhole} from "./modules/wormhole/IWormhole.sol";
 import {ITokenBridge} from "./modules/wormhole/ITokenBridge.sol";
+import {ICircleIntegration} from "./modules/wormhole/ICircleIntegration.sol";
 
 import {CrossChainVaultSetters} from "./CrossChainVaultSetters.sol";
 
@@ -34,6 +35,14 @@ contract CrossChainVaultGetters is CrossChainVaultSetters {
      */
     function tokenBridge() public view returns (ITokenBridge) {
         return ITokenBridge(payable(_state.tokenBridge));
+    }
+
+    /**
+     * @notice Returns the Circle Integration contract
+     * @return The ICircleIntegration contract instance
+     */
+    function circleIntegration() public view returns (ICircleIntegration) {
+        return ICircleIntegration(payable(_state.tokenBridge));
     }
 
     /**

@@ -6,7 +6,7 @@ import {BytesLib} from "./modules/utils/BytesLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ITokenBridge} from "./modules/wormhole/ITokenBridge.sol";
+import {ICircleIntegration} from "./modules/wormhole/ICircleIntegration.sol";
 import {CrossChainVaultGovernance} from "./CrossChainVaultGovernance.sol";
 import {CrossChainVaultMessages} from "./CrossChainVaultMessages.sol";
 
@@ -147,14 +147,21 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
         );
 
         // cache TokenBridge instance
-        ITokenBridge bridge = tokenBridge();
+        ICircleIntegration integration = circleIntegration();
 
         // approve the token bridge to spend the specified tokens
         SafeERC20.forceApprove(
             IERC20(token),
-            address(bridge),
+            address(integration),
             amountReceived
         );
+
+         ICircleIntegration.TransferParameters memory transferParams = ICircleIntegration.TransferParameters( {
+            token: token,
+            amount: amountReceived,
+            targetChain: targetChain,
+            mintRecipient: targetContract
+         });
 
         /**
          * Call `transferTokensWithPayload`method on the token bridge and pay
@@ -162,11 +169,8 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
          * message with an encoded `TransferWithPayload` struct (see the
          * ITokenBridge.sol interface file in this repo).
          */
-        messageSequence = bridge.transferTokensWithPayload{value: wormholeFee}(
-            token,
-            amountReceived,
-            targetChain,
-            targetContract,
+        messageSequence = integration.transferTokensWithPayload{value: wormholeFee}(
+            transferParams,
             batchId,
             messagePayload
         );
@@ -185,7 +189,11 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
      * Token contract.
      * @param encodedTransferMessage Encoded `TransferWithPayload` message
      */
-    function redeemTransferWithPayload(bytes memory encodedTransferMessage) public {
+    function redeemTransferWithPayload(
+        bytes memory encodedTransferMessage,
+        bytes memory circleBridgeMessage,
+        bytes memory circleAttestation
+    ) public {
         /**
          * parse the encoded Wormhole message
          *
@@ -198,56 +206,34 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
             encodedTransferMessage
         );
 
-        /**
-         * Since this contract allows transfers for any token, it needs
-         * to find the token address (on this chain) before redeeming the transfer
-         * so that it can compute the balance change before and after redeeming
-         * the transfer. The amount encoded in the payload could be incorrect,
-         * since fee-on-transfer tokens are supported by the token bridge.
-         *
-         * NOTE: The token bridge truncates the encoded amount for any token
-         * with decimals greater than 8. This is to support blockchains that
-         * cannot handle transfer amounts exceeding max(uint64).
-         */
-        address localTokenAddress = fetchLocalAddressFromTransferMessage(
-            parsedMessage.payload
-        );
-
-        // check balance before completing the transfer
-        uint256 balanceBefore = getBalance(localTokenAddress);
-
         // cache the token bridge instance
-        ITokenBridge bridge = tokenBridge();
+        ICircleIntegration integration = circleIntegration();
+    
+        ICircleIntegration.RedeemParameters memory redeemParams = ICircleIntegration.RedeemParameters({
+            encodedWormholeMessage: encodedTransferMessage,
+            circleBridgeMessage: circleBridgeMessage,
+            circleAttestation: circleAttestation
+        });
 
-        /**
-         * Call `completeTransferWithPayload` on the token bridge. This
-         * method acts as a reentrancy protection since it does not allow
-         * transfers to be redeemed more than once.
-         */
-        bytes memory transferPayload = bridge.completeTransferWithPayload(
-            encodedTransferMessage
+        ICircleIntegration.DepositWithPayload memory deposit = integration.redeemTokensWithPayload(
+            redeemParams
         );
 
-        // compute and save the balance difference after completing the transfer
-        uint256 amountTransferred = getBalance(localTokenAddress) - balanceBefore;
-
-        // parse the wormhole message payload into the `TransferWithPayload` struct
-        ITokenBridge.TransferWithPayload memory transfer =
-            bridge.parseTransferWithPayload(transferPayload);
+        address localTokenAddress = bytes32ToAddress(deposit.token);
 
         // confirm that the message sender is a registered Token contract
         require(
-            transfer.fromAddress == getRegisteredEmitter(parsedMessage.emitterChainId),
+            deposit.fromAddress == getRegisteredEmitter(parsedMessage.emitterChainId),
             EmitterNotRegisteredForChain()
         );
 
         // parse the Token payload from the `TransferWithPayload` struct
         CrossChainVaultMessage memory tokenPayload = decodePayload(
-            transfer.payload
+            deposit.payload
         );
 
         // compute the relayer fee in terms of the transferred token
-        uint256 relayerFee = calculateRelayerFee(amountTransferred);
+        uint256 relayerFee = calculateRelayerFee(deposit.amount);
 
         // cache the recipient address
         address recipient = bytes32ToAddress(tokenPayload.targetRecipient);
@@ -262,7 +248,7 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
             SafeERC20.safeTransfer(
                 IERC20(localTokenAddress),
                 recipient,
-                amountTransferred
+                deposit.amount
             );
         } else {
             // pay the relayer
@@ -276,7 +262,7 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
             SafeERC20.safeTransfer(
                 IERC20(localTokenAddress),
                 recipient,
-                amountTransferred - relayerFee
+                deposit.amount - relayerFee
             );
         }
     }
@@ -290,33 +276,6 @@ contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, 
      */
     function calculateRelayerFee(uint256 amount) public view returns (uint256) {
         return amount * relayerFeePercentage() / feePrecision();
-    }
-
-    /**
-     * @notice Parses the encoded address and chainId from a `TransferWithPayload`
-     * message. Finds the address of the wrapped token contract if the token is not
-     * native to this chain.
-     * @param payload Encoded `TransferWithPayload` message
-     * @return localAddress Address of the encoded (bytes32 format) token address on
-     * this chain.
-     */
-    function fetchLocalAddressFromTransferMessage(
-        bytes memory payload
-    ) public view returns (address localAddress) {
-        // parse the source token address and chainId
-        bytes32 sourceAddress = payload.toBytes32(33);
-        uint16 tokenChain = payload.toUint16(65);
-
-        // Fetch the wrapped address from the token bridge if the token
-        // is not from this chain.
-        if (tokenChain != chainId()) {
-            // identify wormhole token bridge wrapper
-            localAddress = tokenBridge().wrappedAsset(tokenChain, sourceAddress);
-            require(localAddress != address(0), TokenNotAttested());
-        } else {
-            // return the encoded address if the token is native to this chain
-            localAddress = bytes32ToAddress(sourceAddress);
-        }
     }
     
     /**

@@ -4,7 +4,7 @@ async function main() {
     const deployVault = await ethers.getContractFactory("CrossChainVault");
 
     const wormhole = "0x79A1027a6A159502049F10906D333EC57E95F083";
-    const tokenBridge = "0x86F55A04690fd7815A3D802bD587e83eA888B239";
+    const tokenBridge = "0x2703483B1a5a7c577e8680de9Df8Be03c6f30e3c";
     const chainId = 10004;
     const wormholeFinality = 1;
     const feePrecision = 1000000;
