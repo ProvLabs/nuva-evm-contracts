@@ -4,7 +4,7 @@ const { AbiCoder, keccak256 } = require("ethers");
 
 async function main() {
     // Source chain transaction ID
-    const sourceTxHash = "0x504747fedad7f5884c535a2ffd24973397bacd7e050c66b2a1291e840a9d7717";
+    const sourceTxHash = "0x3a50f76d89d3e6346229f4f5687a3a91ebcdbaa2f2cddfca637639f1f6a726d9";
     const wh = await wormhole("Testnet", [evm.default || evm]);
     const chain = wh.getChain("BaseSepolia");
 
@@ -15,7 +15,7 @@ async function main() {
         console.error("❌ VAA not found");
         process.exit(1);
     }
-    
+
     // Serialize the VAA object back to bytes
     const vaaBytes = serialize(vaa);
     const vaaHex = Buffer.from(vaaBytes).toString("hex");

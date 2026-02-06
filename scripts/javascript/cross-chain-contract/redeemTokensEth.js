@@ -10,7 +10,7 @@ async function main() {
     const chain = wh.getChain("BaseSepolia");
 
     // Source chain transaction ID
-    const txid = "0x504747fedad7f5884c535a2ffd24973397bacd7e050c66b2a1291e840a9d7717";
+    const txid = "0xd880757ddf46b917fc2abea2f00377840ea56d8111069edfae3982adb9f98a61";
 
     // Fetch the VAA and decode it
     const vaa = await wh.getVaa(txid, "Uint8Array", 60000);

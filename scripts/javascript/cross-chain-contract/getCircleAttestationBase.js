@@ -1,26 +1,27 @@
-const { wormhole, serialize } = require("@wormhole-foundation/sdk");
+const { wormhole } = require("@wormhole-foundation/sdk");
 const evm = require("@wormhole-foundation/sdk/evm");
 const { AbiCoder, keccak256 } = require("ethers");
 
 async function main() {
     // Source chain transaction ID
-    const sourceTxHash = "0x294fb04f8900570bb26d54444be010ed47535fc194bb9b4260e2e1b95df4d6ff";
+    const sourceTxHash = "0x3ef3cf8a5b355baa2f3234c8cebe1a7a8ee4a834e324f5a20bdec0f60b0dd106";
     const wh = await wormhole("Testnet", [evm.default || evm]);
-    const chain = wh.getChain("Sepolia");
+    const sourceChain = wh.getChain("Sepolia");
+
+    const msgs = await sourceChain.parseTransaction(sourceTxHash);
 
     // Fetch the VAA and decode it
-    const vaa = await wh.getVaa(sourceTxHash, "Uint8Array", 60000);
+    const vaaBytes = await wh.getVaaBytes(msgs[0]);
 
-    if (!vaa) {
+    if (!vaaBytes) {
         console.error("❌ VAA not found");
         process.exit(1);
     }
-    
-    // Serialize the VAA object back to bytes
-    const vaaBytes = serialize(vaa);
-    const vaaHex = Buffer.from(vaaBytes).toString("hex");
 
-    const client = await chain.getRpc();
+    // Serialize the VAA object back to bytes
+    const vaaHex = '0x' + Buffer.from(vaaBytes).toString("hex");
+
+    const client = await sourceChain.getRpc();
     const receipt = await client.getTransactionReceipt(sourceTxHash);
 
     // Circle MessageTransmitter 'MessageSent' Topic

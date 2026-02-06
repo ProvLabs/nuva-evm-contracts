@@ -1,5 +1,5 @@
 const hre = require("hardhat");
-const { wormhole, serialize } = require("@wormhole-foundation/sdk");
+const { wormhole } = require("@wormhole-foundation/sdk");
 const evm = require("@wormhole-foundation/sdk/evm");
 const { AbiCoder, keccak256 } = require("ethers");
 
@@ -7,26 +7,28 @@ async function main() {
     // Initialize the Wormhole SDK
     // Note: ensure the platforms (like evm) are passed in an array
     const wh = await wormhole("Testnet", [evm.default || evm]);
-    const chain = wh.getChain("Sepolia");
+    const sourceChain = wh.getChain("Sepolia");
 
     // Source chain transaction ID
-    const txid = "0x294fb04f8900570bb26d54444be010ed47535fc194bb9b4260e2e1b95df4d6ff";
+    const txid = "0x3a50f76d89d3e6346229f4f5687a3a91ebcdbaa2f2cddfca637639f1f6a726d9";
+
+    const msgs = await sourceChain.parseTransaction(txid);
 
     // Fetch the VAA and decode it
-    const vaa = await wh.getVaa(txid, "Uint8Array", 60000);
+    const vaaBytes = await wh.getVaaBytes(msgs[0]);
 
-    if (!vaa) {
+    if (!vaaBytes) {
         console.error("❌ VAA not found");
         process.exit(1);
     }
 
     // Serialize the VAA object back to bytes
-    const vaaBytes = serialize(vaa);
+    const vaaHex = '0x' + Buffer.from(vaaBytes).toString("hex");
 
     const vaultAddress = process.env.VAULT_CROSS_CHAIN;
     const vault = await hre.ethers.getContractAt("CrossChainVault", vaultAddress);
 
-    const client = await chain.getRpc();
+    const client = await sourceChain.getRpc();
     const receipt = await client.getTransactionReceipt(txid);
 
     // Circle MessageTransmitter 'MessageSent' Topic
@@ -49,7 +51,7 @@ async function main() {
 
     console.log("Submitting VAA to contract...");
     try {
-        const tx = await vault.redeemTransferWithPayload(vaaBytes, circleBridgeMessage, attestations);
+        const tx = await vault.redeemTransferWithPayload(vaaHex, circleBridgeMessage, attestations);
         console.log("Transaction sent. Waiting for confirmation...");
 
         const receipt = await tx.wait();
