@@ -10,12 +10,13 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol"; // NEW
 
 // Interface for the Disposable Proxy we deploy
 interface IRedemptionProxy {
-    function initialize(address _assetVault, address _stakingVault, address _receiver) external;
+    function initialize(address _assetVault, address _stakingVault, address _nuvaVault, address _user) external;
 
-    function triggerRedeem(uint256 _amountStakingShares) external returns (uint256 requestId);
+    function triggerRedeem(uint256 _amountNuvaShares) external;
 
     function sweep(uint256 _amount) external returns (uint256);
 }
@@ -32,12 +33,18 @@ contract DedicatedVaultRouter is Initializable, UUPSUpgradeable, Ownable2StepUpg
     IERC20 public nuvaAsset; // New: Nuva Asset
     address public amlSigner;
 
+    address public redemptionProxyImplementation; // NEW: Master copy of RedemptionProxy
+    mapping(address => address) public redemptionProxyToUser; // Maps redemption proxy to their user
+
     mapping(bytes32 => bool) public usedSignatures;
 
     // --- Events ---
     event Deposited(address indexed user, uint256 assets, uint256 shares, uint256 stakingShares, uint256 nuvaShares);
     event NuvaDeposited(address indexed user, uint256 stakingShares, uint256 nuvaShares); // New: Nuva Deposited event
     event AmlSignerUpdated(address indexed oldSigner, address indexed newSigner);
+    event RedemptionProxyImplementationUpdated(address indexed oldImplementation, address indexed newImplementation); // NEW
+    event RedemptionRequested(address indexed user, address indexed redemptionProxy); // NEW
+    event RedemptionsSwept(address[] users, uint256 totalSweptAmount); // NEW
 
     // --- Custom Errors ---
     error InvalidVault();
@@ -47,6 +54,8 @@ contract DedicatedVaultRouter is Initializable, UUPSUpgradeable, Ownable2StepUpg
     error InvalidAmlSignature();
     error FundsStuck(uint256 amount);
     error SlippageExceeded(uint256 minShares, uint256 actualShares);
+    error InvalidRedemptionProxyImplementation();
+    error RedemptionAlreadyPending();
 
     bytes32 private constant DEPOSIT_TYPEHASH =
         keccak256(
@@ -172,12 +181,59 @@ contract DedicatedVaultRouter is Initializable, UUPSUpgradeable, Ownable2StepUpg
         nuvaAsset.forceApprove(address(nuvaVault), stakingShares);
         nuvaShares = nuvaVault.deposit(stakingShares, _receiver);
 
-        if (nuvaShares < _minNuvaVaultSharesOut)
-            revert SlippageExceeded(_minNuvaVaultSharesOut, nuvaShares);
+        if (nuvaShares < _minNuvaVaultSharesOut) revert SlippageExceeded(_minNuvaVaultSharesOut, nuvaShares);
         if (nuvaAsset.balanceOf(address(this)) > nuvaAssetBalBefore) revert FundsStuck(3); // Changed error code
 
         emit Deposited(msg.sender, _amount, vaultShares, stakingShares, nuvaShares); // Updated event
         emit NuvaDeposited(msg.sender, stakingShares, nuvaShares); // New event
+    }
+
+    // --- Redemption Functions --- // NEW Section
+
+    function requestRedeem(uint256 _amountNuvaShares) external nonReentrant {
+        uint256 balBefore = nuvaVault.balanceOf(address(this));
+
+        if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
+
+        // Deploy a minimal proxy clone of RedemptionProxy
+        address redemptionProxyAddress = Clones.clone(redemptionProxyImplementation);
+        IRedemptionProxy redemptionProxy = IRedemptionProxy(redemptionProxyAddress);
+
+        // Initialize the clone
+        redemptionProxy.initialize(address(assetVault), address(stakingVault), address(nuvaVault), msg.sender);
+
+        // Transfer nuvaVault shares from user to the RedemptionProxy clone
+        IERC20(address(nuvaVault)).safeTransferFrom(msg.sender, address(this), _amountNuvaShares);
+        IERC20(address(nuvaVault)).forceApprove(redemptionProxyAddress, _amountNuvaShares);
+        redemptionProxy.triggerRedeem(_amountNuvaShares);
+
+        if (nuvaVault.balanceOf(address(this)) > balBefore) revert FundsStuck(1); // Changed error code
+
+        // Trigger the redemption flow in the clone
+
+        redemptionProxyToUser[redemptionProxyAddress] = msg.sender;
+        emit RedemptionRequested(msg.sender, redemptionProxyAddress);
+    }
+
+    function sweepRedemptions(address[] calldata _proxyAddresses) external onlyOwner {
+        if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
+
+        uint256 totalSwept = 0;
+        for (uint256 i = 0; i < _proxyAddresses.length; i++) {
+            address proxyAddress = _proxyAddresses[i];
+            address user = redemptionProxyToUser[proxyAddress];
+
+            if (user == address(0)) {
+                // Skip if proxy doesn't exist or already swept
+                continue;
+            }
+
+            IRedemptionProxy redemptionProxy = IRedemptionProxy(proxyAddress);
+            totalSwept += redemptionProxy.sweep(0); // Sweep all available assets
+
+            delete redemptionProxyToUser[proxyAddress];
+        }
+        emit RedemptionsSwept(_proxyAddresses, totalSwept);
     }
 
     // --- Admin Functions ---
@@ -186,6 +242,13 @@ contract DedicatedVaultRouter is Initializable, UUPSUpgradeable, Ownable2StepUpg
         if (_newAmlSigner == address(0)) revert InvalidAmlSigner();
         emit AmlSignerUpdated(amlSigner, _newAmlSigner);
         amlSigner = _newAmlSigner;
+    }
+
+    // NEW: Admin function to set the RedemptionProxy master copy
+    function setRedemptionProxyImplementation(address _newImplementation) external onlyOwner {
+        if (_newImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
+        emit RedemptionProxyImplementationUpdated(redemptionProxyImplementation, _newImplementation);
+        redemptionProxyImplementation = _newImplementation;
     }
 
     // --- Internal Helpers ---
@@ -238,9 +301,9 @@ contract DedicatedVaultRouter is Initializable, UUPSUpgradeable, Ownable2StepUpg
     }
 
     // --- Upgrade Safety ---
-    // 7 slots: assetVault, asset, stakingVault, stakingAsset, nuvaVault, nuvaAsset, amlSigner
+    // 10 slots: assetVault, asset, stakingVault, stakingAsset, nuvaVault, nuvaAsset, amlSigner, redemptionProxyImplementation, _nextRequestId, requestIdToRedemptionProxy (mapping base)
     // reentrancyStatus slot is namespaced
-    uint256[43] private __gap;
+    uint256[41] private __gap;
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

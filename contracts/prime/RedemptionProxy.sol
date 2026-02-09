@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 interface IAsyncRedemptionVault is IERC4626 {
-    function requestRedeem(uint256 shares) external returns (uint256 requestId);
+    function requestRedeem(uint256 shares) external;
 }
 
 /**
@@ -74,9 +74,8 @@ contract RedemptionProxy is Initializable {
     /**
      * @notice Unwinds NuvaShares -> StakingShares -> AssetShares -> RequestRedeem (Async Lock)
      * @param _amountNuvaShares Amount of Nuva Vault shares to redeem
-     * @return requestId The ID returned by the underlying vault (if any)
      */
-    function triggerRedeem(uint256 _amountNuvaShares) external onlyRouter returns (uint256 requestId) {
+    function triggerRedeem(uint256 _amountNuvaShares) external onlyRouter {
         // Snapshots for post-condition checks
         uint256 nuvaBalBefore = IERC20(address(nuvaVault)).balanceOf(address(this));
         uint256 stakingBalBefore = IERC20(address(stakingVault)).balanceOf(address(this));
@@ -94,7 +93,7 @@ contract RedemptionProxy is Initializable {
             revert FundsStuck();
         }
 
-        // 3. Redeem Staking Shares -> AssetVault Shares
+        // 2. Redeem Staking Shares -> AssetVault Shares
         // Approve StakingVault to take its own shares back
         IERC20(address(stakingVault)).forceApprove(address(stakingVault), amountStakingShares);
         uint256 amountAssetShares = stakingVault.redeem(amountStakingShares, address(this), address(this));
@@ -104,11 +103,10 @@ contract RedemptionProxy is Initializable {
             revert FundsStuck();
         }
 
-        // 4. Request Redeem on AssetVault
+        // 3. Request Redeem on AssetVault
         // Approve AssetVault to take its own shares back
         IERC20(address(assetVault)).forceApprove(address(assetVault), amountAssetShares);
-
-        requestId = assetVault.requestRedeem(amountAssetShares);
+        assetVault.requestRedeem(amountAssetShares);
 
         // CHECK 3: Ensure AssetVault actually took the shares
         if (IERC20(address(assetVault)).balanceOf(address(this)) > assetSharesBalBefore) {

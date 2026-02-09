@@ -17,7 +17,12 @@
         },
         {
           "internalType": "address",
-          "name": "_receiver",
+          "name": "_nuvaVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_user",
           "type": "address"
         }
       ],
@@ -49,18 +54,12 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "_amountStakingShares",
+          "name": "_amountNuvaShares",
           "type": "uint256"
         }
       ],
       "name": "triggerRedeem",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "requestId",
-          "type": "uint256"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     }
