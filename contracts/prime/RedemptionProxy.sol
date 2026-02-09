@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
+/**
+ * @title IAsyncRedemptionVault
+ * @notice Interface for a vault that supports asynchronous redemption requests.
+ */
 interface IAsyncRedemptionVault is IERC4626 {
+    /**
+     * @notice Requests a redemption of shares for the underlying asset.
+     * @param shares The amount of shares to redeem.
+     */
     function requestRedeem(uint256 shares) external;
 }
 
@@ -14,26 +22,34 @@ interface IAsyncRedemptionVault is IERC4626 {
  * @title RedemptionProxy
  * @notice Disposable proxy contract deployed via EIP-1167 Clones.
  * @dev Handles the async redemption flow for a single batch of users to isolate accounting.
+ * @author Nuva Finance
  */
 contract RedemptionProxy is Initializable {
     using SafeERC20 for IERC20;
 
     // --- State Variables ---
+    /// @notice The address of the DedicatedVaultRouter that deployed this proxy.
     address public router;
+
+    /// @notice The address of the user who initiated the redemption.
     address public user;
 
-    // The "Inner" Vault (e.g. YLDS) - Holds the USDC
+    /// @notice The "Inner" Vault (e.g. YLDS) - Holds the USDC
     IAsyncRedemptionVault public assetVault;
 
-    // The "Outer" Vault (e.g. Staking Wrapper) - Holds the AssetVault Shares
+    /// @notice The "Outer" Vault (e.g. Staking Wrapper) - Holds the AssetVault Shares
     IERC4626 public stakingVault;
-    IERC20 public stakingAsset; // NEW: Staking Asset for consistency
 
-    // The "Nuva" Vault - Holds the StakingVault Shares
-    IERC4626 public nuvaVault; // NEW
-    IERC20 public nuvaAsset; // NEW
+    /// @notice The asset required for staking in the stakingVault.
+    IERC20 public stakingAsset;
 
-    // The Underlying Asset (e.g. USDC)
+    /// @notice The "Nuva" Vault - Holds the StakingVault Shares
+    IERC4626 public nuvaVault;
+
+    /// @notice The asset required for the nuvaVault.
+    IERC20 public nuvaAsset;
+
+    /// @notice The underlying base asset (e.g. USDC).
     IERC20 public asset;
 
     // --- Custom Errors ---
@@ -50,6 +66,14 @@ contract RedemptionProxy is Initializable {
     }
 
     // --- Initialization ---
+
+    /**
+     * @notice Initializes the proxy with vault and user information.
+     * @param _assetVault The address of the asynchronous redemption vault.
+     * @param _stakingVault The address of the staking vault.
+     * @param _nuvaVault The address of the Nuva vault.
+     * @param _user The address of the user receiving the redeemed assets.
+     */
     function initialize(address _assetVault, address _stakingVault, address _nuvaVault, address _user) external initializer {
         // Validation: Ensure critical addresses are set
         if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0) || _user == address(0)) { // UPDATED validation
@@ -95,7 +119,6 @@ contract RedemptionProxy is Initializable {
 
         // 2. Redeem Staking Shares -> AssetVault Shares
         // Approve StakingVault to take its own shares back
-        IERC20(address(stakingVault)).forceApprove(address(stakingVault), amountStakingShares);
         uint256 amountAssetShares = stakingVault.redeem(amountStakingShares, address(this), address(this));
 
         // CHECK 2: Ensure Staking Shares were actually consumed
@@ -118,8 +141,9 @@ contract RedemptionProxy is Initializable {
      * @notice Sweeps exact amount of USDC to the user.
      * @dev Leaves excess funds (dust/tainted) behind in the proxy.
      * @param _amount The exact amount expected from the Admin payout.
+     * @return sweptAmount The actual amount of assets swept to the user.
      */
-    function sweep(uint256 _amount) external onlyRouter returns (uint256) {
+    function sweep(uint256 _amount) external onlyRouter returns (uint256 sweptAmount) {
         uint256 balBefore = asset.balanceOf(address(this));
 
         // 1. Pre-Check: Do we actually have the funds?
