@@ -337,6 +337,48 @@ contract DedicatedVaultRouter is
      * @param _amountNuvaShares The amount of Nuva shares to redeem.
      */
     function requestRedeem(uint256 _amountNuvaShares) external nonReentrant {
+        _doRequestRedeem(_amountNuvaShares);
+    }
+
+    /**
+     * @notice Initiates an asynchronous redemption using ERC20 permit for vault shares.
+     * @param _amountNuvaShares The amount of Nuva shares to redeem.
+     * @param _permitDeadline The expiration timestamp of the permit.
+     * @param _v V component of the permit signature.
+     * @param _r R component of the permit signature.
+     * @param _s S component of the permit signature.
+     */
+    function requestRedeemWithPermit(
+        uint256 _amountNuvaShares,
+        uint256 _permitDeadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external nonReentrant {
+        try
+            IERC20Permit(address(nuvaVault)).permit(
+                msg.sender,
+                address(this),
+                _amountNuvaShares,
+                _permitDeadline,
+                _v,
+                _r,
+                _s
+            )
+        {
+            // Permit successful
+        } catch {
+            // Permit failed or not supported
+        }
+
+        _doRequestRedeem(_amountNuvaShares);
+    }
+
+    /**
+     * @notice Internal helper to execute the redemption request logic.
+     * @param _amountNuvaShares Amount of Nuva shares to redeem.
+     */
+    function _doRequestRedeem(uint256 _amountNuvaShares) internal {
         uint256 balBefore = nuvaVault.balanceOf(address(this));
 
         if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();

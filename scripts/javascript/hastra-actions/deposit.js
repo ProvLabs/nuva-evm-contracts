@@ -1,29 +1,36 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    // 1. Setup - Replace with your actual deployed Proxy address
-    const ROUTER_ADDRESS = "0x0388B608E12DbDb0f6080dCcB7c1388aE6a767ef";
-    const ASSET_ADDRESS = "0xba16f5b2fdf7d5686d55c2917f323fecbfef76e6";
+    // 1. Setup - Use environment variables or defaults
+    const ROUTER_ADDRESS = process.env.ROUTER_PROXY_ADDRESS;
+    const ASSET_ADDRESS = process.env.ASSET_ADDRESS;
+
+    if (!ROUTER_ADDRESS || !ASSET_ADDRESS) {
+        throw new Error("Missing ROUTER_PROXY_ADDRESS or ASSET_ADDRESS environment variables");
+    }
 
     const [user] = await ethers.getSigners();
     const router = await ethers.getContractAt("DedicatedVaultRouter", ROUTER_ADDRESS);
     const asset = await ethers.getContractAt(
-        "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol:ERC20Permit",
+        "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol:IERC20Permit",
         ASSET_ADDRESS
     );
 
     // 2. Parameters
-    const amount = ethers.parseUnits("100", 6); // USDC usually has 6 decimals
-    const receiver = user.address;
-    const minVaultShares = 0n;
-    const minStakingShares = 0n;
+    const amount = ethers.parseUnits(process.env.DEPOSIT_AMOUNT || "100", 6); // Default 100 USDC (6 decimals)
+    const receiver = process.env.RECEIVER_ADDRESS || user.address;
+    const minVaultShares = BigInt(process.env.MIN_VAULT_SHARES || "0");
+    const minStakingShares = BigInt(process.env.MIN_STAKING_SHARES || "0");
+    const minNuvaShares = BigInt(process.env.MIN_NUVA_SHARES || "0");
     const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
-    console.log(`Preparing deposit for ${user.address}...`);
+    console.log(`Preparing deposit of ${ethers.formatUnits(amount, 6)} assets for ${receiver}...`);
 
     // --- STEP A: GENERATE AML SIGNATURE (Simulating your backend) ---
-    // In production, your JS/Python backend does this with its private key
     const amlSignerKey = process.env.AML_PRIVATE_KEY;
+    if (!amlSignerKey) {
+        throw new Error("Missing AML_PRIVATE_KEY environment variable");
+    }
     const amlWallet = new ethers.Wallet(amlSignerKey, ethers.provider);
 
     const domain = {
@@ -40,7 +47,7 @@ async function main() {
             { name: "receiver", type: "address" },
             { name: "minVaultShares", type: "uint256" },
             { name: "minStakingShares", type: "uint256" },
-            { name: "minNuvaVaultShares", type: "uint256" }, // NEW
+            { name: "minNuvaVaultShares", type: "uint256" },
             { name: "deadline", type: "uint256" }
         ]
     };
@@ -51,7 +58,7 @@ async function main() {
         receiver: receiver,
         minVaultShares: minVaultShares,
         minStakingShares: minStakingShares,
-        minNuvaVaultShares: 0n, // NEW
+        minNuvaVaultShares: minNuvaShares,
         deadline: deadline
     };
 
@@ -59,12 +66,13 @@ async function main() {
     console.log("✅ AML Signature generated");
 
     // --- STEP B: GENERATE PERMIT SIGNATURE (The User signs this) ---
+    const assetContract = await ethers.getContractAt("ERC20", ASSET_ADDRESS);
+    const assetName = await assetContract.name();
     const nonce = await asset.nonces(user.address);
-    const assetName = await asset.name();
 
     const permitDomain = {
         name: assetName,
-        version: "1", // Note: Some USDC versions use "2"
+        version: "1", 
         chainId: (await ethers.provider.getNetwork()).chainId,
         verifyingContract: ASSET_ADDRESS
     };
@@ -99,7 +107,7 @@ async function main() {
         receiver,
         minVaultShares,
         minStakingShares,
-        0n, // NEW: minNuvaVaultShares
+        minNuvaShares,
         amlSignature,
         deadline,
         deadline, // permitDeadline
