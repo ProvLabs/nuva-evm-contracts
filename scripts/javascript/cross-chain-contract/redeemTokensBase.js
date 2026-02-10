@@ -10,7 +10,7 @@ async function main() {
     const sourceChain = wh.getChain("Sepolia");
 
     // Source chain transaction ID
-    const txid = "0x3a50f76d89d3e6346229f4f5687a3a91ebcdbaa2f2cddfca637639f1f6a726d9";
+    const txid = "0xd47e71d398f44429f2c18b0c65447eae571a6222e02970cbbd36ced15529e09b";
 
     const msgs = await sourceChain.parseTransaction(txid);
 
