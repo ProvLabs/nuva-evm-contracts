@@ -573,7 +573,7 @@ describe("DedicatedVaultRouter", function () {
         ).to.equal(expectedNuvaShares);
     });
 
-    it("Should successfully deposit into the Nuva Vault and emit NuvaDeposited event", async function () {
+    it("Should successfully deposit into the Nuva Vault and emit Deposited event", async function () {
         const { router, asset, user, amlSigner, amount, nuvaVault } = await loadFixture(deployRouterFixture);
         const deadline = Math.floor(Date.now() / 1000) + 3600;
 
@@ -593,8 +593,8 @@ describe("DedicatedVaultRouter", function () {
 
         const expectedNuvaShares = amount * 1000000000000n;
         await expect(router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline))
-            .to.emit(router, "NuvaDeposited")
-            .withArgs(user.address, amount, expectedNuvaShares);
+            .to.emit(router, "Deposited")
+            .withArgs(user.address, amount, amount, amount, expectedNuvaShares);
 
         // Verify final shares reached the user in Nuva Vault
         expect(

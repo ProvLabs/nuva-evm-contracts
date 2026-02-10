@@ -102,13 +102,6 @@ contract DedicatedVaultRouter is
         uint256 nuvaShares
     );
     /**
-     * @notice Emitted specifically when Nuva vault shares are minted.
-     * @param user The address of the user.
-     * @param stakingShares The amount of StakingVault shares used.
-     * @param nuvaShares The amount of Nuva shares minted.
-     */
-    event NuvaDeposited(address indexed user, uint256 indexed stakingShares, uint256 indexed nuvaShares);
-    /**
      * @notice Emitted when the AML signer address is updated.
      * @param oldSigner The previous AML signer address.
      * @param newSigner The new AML signer address.
@@ -333,7 +326,6 @@ contract DedicatedVaultRouter is
         if (nuvaAsset.balanceOf(address(this)) > nuvaAssetBalBefore) revert FundsStuck(3);
 
         emit Deposited(msg.sender, _amount, vaultShares, stakingShares, nuvaShares);
-        emit NuvaDeposited(msg.sender, stakingShares, nuvaShares);
     }
 
     // --- Redemption Functions ---
