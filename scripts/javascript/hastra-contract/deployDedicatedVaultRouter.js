@@ -19,16 +19,11 @@ async function main() {
     const NuvaVault = await ethers.getContractFactory("NuvaVault");
     const nuvaVault = await upgrades.deployProxy(
         NuvaVault,
-        [
-            stakingVaultAddr,
-            "Nuva Prime Vault",
-            "nvPRIME",
-            adminAddr
-        ],
+        [stakingVaultAddr, "Nuva Prime Vault", "nvPRIME", adminAddr],
         {
             initializer: "initialize",
-            kind: "uups"
-        }
+            kind: "uups",
+        },
     );
     await nuvaVault.waitForDeployment();
     const nuvaVaultAddr = await nuvaVault.getAddress();
@@ -46,12 +41,12 @@ async function main() {
             stakingVaultAddr,
             nuvaVaultAddr, // NEW: Pass nuvaVaultAddr
             amlSignerAddr,
-            adminAddr
+            adminAddr,
         ],
         {
             initializer: "initialize",
-            kind: "uups"
-        }
+            kind: "uups",
+        },
     );
 
     await router.waitForDeployment();

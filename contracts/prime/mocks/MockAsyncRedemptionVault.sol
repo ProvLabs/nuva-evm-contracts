@@ -9,16 +9,12 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
  * @notice A specialized mock vault that implements an asynchronous requestRedeem function with Permit support.
  */
 contract MockAsyncRedemptionVault is ERC4626, ERC20Permit {
-    uint256 private _nextRequestId;
-    mapping(uint256 => uint256) private _requestIdToAmount;
-    mapping(uint256 => address) private _requestIdToReceiver;
 
     constructor(
         address asset,
         string memory name,
         string memory symbol
     ) ERC4626(IERC20(asset)) ERC20(name, symbol) ERC20Permit(name) {
-        _nextRequestId = 1;
     }
 
     /**
@@ -35,12 +31,8 @@ contract MockAsyncRedemptionVault is ERC4626, ERC20Permit {
      * @param shares The amount of shares to redeem.
      */
     function requestRedeem(uint256 shares) public {
-        uint256 assets = previewRedeem(shares);
+        // uint256 assets = previewRedeem(shares);
         _burn(msg.sender, shares);
-
-        uint256 requestId = _nextRequestId++;
-        _requestIdToAmount[requestId] = assets;
-        _requestIdToReceiver[requestId] = msg.sender;
     }
 
     // Simple 1:1 implementation for testing

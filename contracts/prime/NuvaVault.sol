@@ -54,8 +54,8 @@ contract NuvaVault is
         if (_asset == address(0)) revert InvalidAsset();
 
         __ERC20_init(_name, _symbol);
-        __ERC20Permit_init(_name);
         __ERC4626_init(IERC20(_asset));
+        __ERC20Permit_init(_name);
         __Ownable_init_unchained(_initialOwner);
         __Ownable2Step_init_unchained();
         __UUPSUpgradeable_init();
@@ -83,9 +83,7 @@ contract NuvaVault is
      * @notice Authorizes a contract upgrade. Only callable by the owner.
      * @param newImplementation The address of the new implementation.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
-        // Upgrade authorized
-    }
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // --- Overrides ---
 

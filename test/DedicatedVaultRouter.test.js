@@ -3,7 +3,6 @@ const { ethers, upgrades } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 describe("DedicatedVaultRouter", function () {
-
     async function deployRouterFixture() {
         const [owner, amlSigner, user] = await ethers.getSigners();
 
@@ -21,22 +20,25 @@ describe("DedicatedVaultRouter", function () {
 
         // 4. Deploy NuvaVault via Proxy (Underlying is StakingVault Shares!)
         const NuvaVault = await ethers.getContractFactory("NuvaVault");
-        const nuvaVault = await upgrades.deployProxy(NuvaVault, [
-            await stakingVault.getAddress(),
-            "Nuva Shares",
-            "nuvUSDC",
-            owner.address
-        ], { kind: 'uups' });
+        const nuvaVault = await upgrades.deployProxy(
+            NuvaVault,
+            [await stakingVault.getAddress(), "Nuva Shares", "nuvUSDC", owner.address],
+            { kind: "uups" },
+        );
 
         // 5. Deploy Router via Proxy
         const Router = await ethers.getContractFactory("DedicatedVaultRouter");
-        const router = await upgrades.deployProxy(Router, [
-            await assetVault.getAddress(),
-            await stakingVault.getAddress(),
-            await nuvaVault.getAddress(), // NEW: Pass nuvaVault address
-            await amlSigner.getAddress(),
-            await owner.getAddress()
-        ], { kind: 'uups' });
+        const router = await upgrades.deployProxy(
+            Router,
+            [
+                await assetVault.getAddress(),
+                await stakingVault.getAddress(),
+                await nuvaVault.getAddress(), // NEW: Pass nuvaVault address
+                await amlSigner.getAddress(),
+                await owner.getAddress(),
+            ],
+            { kind: "uups" },
+        );
 
         // 6. Setup balances
         const amount = ethers.parseUnits("100", 18);
@@ -61,7 +63,7 @@ describe("DedicatedVaultRouter", function () {
             name: "DedicatedVaultRouter",
             version: "1",
             chainId: network.chainId,
-            verifyingContract: routerAddr
+            verifyingContract: routerAddr,
         };
 
         const types = {
@@ -72,8 +74,8 @@ describe("DedicatedVaultRouter", function () {
                 { name: "minVaultShares", type: "uint256" },
                 { name: "minStakingShares", type: "uint256" },
                 { name: "minNuvaVaultShares", type: "uint256" }, // NEW
-                { name: "deadline", type: "uint256" }
-            ]
+                { name: "deadline", type: "uint256" },
+            ],
         };
 
         const value = {
@@ -83,7 +85,34 @@ describe("DedicatedVaultRouter", function () {
             minVaultShares: minVault,
             minStakingShares: minStaking,
             minNuvaVaultShares: minNuva, // NEW
-            deadline: deadline
+            deadline: deadline,
+        };
+
+        return await signer.signTypedData(domain, types, value);
+    }
+
+    async function signRedeemAML(signer, routerAddr, userAddr, amountNuvaShares, deadline) {
+        const network = await ethers.provider.getNetwork();
+
+        const domain = {
+            name: "DedicatedVaultRouter",
+            version: "1",
+            chainId: network.chainId,
+            verifyingContract: routerAddr,
+        };
+
+        const types = {
+            Redeem: [
+                { name: "sender", type: "address" },
+                { name: "amountNuvaShares", type: "uint256" },
+                { name: "deadline", type: "uint256" },
+            ],
+        };
+
+        const value = {
+            sender: userAddr,
+            amountNuvaShares: amountNuvaShares,
+            deadline: deadline,
         };
 
         return await signer.signTypedData(domain, types, value);
@@ -110,24 +139,28 @@ describe("DedicatedVaultRouter", function () {
             minVault,
             minStaking,
             minNuva, // NEW
-            deadline
+            deadline,
         );
 
         // Execute
         const expectedNuvaShares = amount * 1000000000000n; // NuvaVault has decimalsOffset = 12
-        await expect(router.connect(user).depositWithPermit(
-            amount,
-            user.address,
-            minVault,
-            minStaking,
-            minNuva, // NEW
-            signature,
-            deadline,
-            0, // permitDeadline
-            0, // v
-            ethers.ZeroHash, // r
-            ethers.ZeroHash  // s
-        )).to.emit(router, "Deposited").withArgs(user.address, amount, amount, amount, expectedNuvaShares);
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                user.address,
+                minVault,
+                minStaking,
+                minNuva, // NEW
+                signature,
+                deadline,
+                0, // permitDeadline
+                0, // v
+                ethers.ZeroHash, // r
+                ethers.ZeroHash, // s
+            ),
+        )
+            .to.emit(router, "Deposited")
+            .withArgs(user.address, amount, amount, amount, expectedNuvaShares);
     }); // FIX: Added missing closing brace
 
     it("Should revert if the AML signature is tampered with", async function () {
@@ -135,23 +168,67 @@ describe("DedicatedVaultRouter", function () {
         const deadline = Math.floor(Date.now() / 1000) + 3600;
 
         // Sign for 0 slippage
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline); // NEW: Added 0n for minNuva
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        ); // NEW: Added 0n for minNuva
 
         // Attempt to execute with 50 slippage (Signature mismatch)
-        await expect(router.connect(user).depositWithPermit(
-            amount, user.address, 50n, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash // NEW: Added 0n for minNuvaVaultSharesOut
-        )).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                user.address,
+                50n,
+                0n,
+                0n,
+                signature,
+                deadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash, // NEW: Added 0n for minNuvaVaultSharesOut
+            ),
+        ).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
     });
 
     it("Should revert if the AML signature has expired", async function () {
         const { router, amlSigner, user, amount } = await loadFixture(deployRouterFixture);
         const pastDeadline = Math.floor(Date.now() / 1000) - 60; // 1 minute ago
 
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, pastDeadline); // NEW: Added 0n for minNuva
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            pastDeadline,
+        ); // NEW: Added 0n for minNuva
 
-        await expect(router.connect(user).depositWithPermit(
-            amount, user.address, 0n, 0n, 0n, signature, pastDeadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash // NEW: Added 0n for minNuvaVaultSharesOut
-        )).to.be.revertedWithCustomError(router, "AmlSignatureExpired");
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                signature,
+                pastDeadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash, // NEW: Added 0n for minNuvaVaultSharesOut
+            ),
+        ).to.be.revertedWithCustomError(router, "AmlSignatureExpired");
     });
 
     it("Should prevent reusing the same AML signature", async function () {
@@ -159,15 +236,51 @@ describe("DedicatedVaultRouter", function () {
         const deadline = Math.floor(Date.now() / 1000) + 3600;
 
         await asset.connect(user).approve(await router.getAddress(), amount * 2n);
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline); // NEW: Added 0n for minNuva
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        ); // NEW: Added 0n for minNuva
 
         // First use: Success
-        await router.connect(user).depositWithPermit(amount, user.address, 0n, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash); // NEW: Added 0n for minNuvaVaultSharesOut
+        await router
+            .connect(user)
+            .depositWithPermit(
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                signature,
+                deadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash,
+            ); // NEW: Added 0n for minNuvaVaultSharesOut
 
         // Second use: Revert
-        await expect(router.connect(user).depositWithPermit(
-            amount, user.address, 0n, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash // NEW: Added 0n for minNuvaVaultSharesOut
-        )).to.be.revertedWithCustomError(router, "AmlSignatureAlreadyUsed");
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                signature,
+                deadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash, // NEW: Added 0n for minNuvaVaultSharesOut
+            ),
+        ).to.be.revertedWithCustomError(router, "AmlSignatureAlreadyUsed");
     });
 
     it("Should revert if the vault returns fewer shares than minVaultSharesOut", async function () {
@@ -178,11 +291,33 @@ describe("DedicatedVaultRouter", function () {
         const minVaultOut = amount + 1n;
 
         await asset.connect(user).approve(await router.getAddress(), amount);
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, minVaultOut, 0n, 0n, deadline); // NEW: Added 0n for minNuva
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            minVaultOut,
+            0n,
+            0n,
+            deadline,
+        ); // NEW: Added 0n for minNuva
 
-        await expect(router.connect(user).depositWithPermit(
-            amount, user.address, minVaultOut, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash // NEW: Added 0n for minNuvaVaultSharesOut
-        )).to.be.revertedWithCustomError(router, "SlippageExceeded");
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                user.address,
+                minVaultOut,
+                0n,
+                0n,
+                signature,
+                deadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash, // NEW: Added 0n for minNuvaVaultSharesOut
+            ),
+        ).to.be.revertedWithCustomError(router, "SlippageExceeded");
     });
 
     it("Should revert if the receiver does not match the signed receiver", async function () {
@@ -191,14 +326,36 @@ describe("DedicatedVaultRouter", function () {
         const attacker = (await ethers.getSigners())[4];
 
         // Signature is for user.address
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline); // NEW: Added 0n for minNuva
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        ); // NEW: Added 0n for minNuva
 
         await asset.connect(user).approve(await router.getAddress(), amount);
 
         // Attempt to send shares to attacker instead of user
-        await expect(router.connect(user).depositWithPermit(
-            amount, attacker.address, 0n, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash // NEW: Added 0n for minNuvaVaultSharesOut
-        )).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                attacker.address,
+                0n,
+                0n,
+                0n,
+                signature,
+                deadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash, // NEW: Added 0n for minNuvaVaultSharesOut
+            ),
+        ).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
     });
 
     it("Should still deposit via standard approval if permit fails (Incompatibility Test)", async function () {
@@ -209,14 +366,38 @@ describe("DedicatedVaultRouter", function () {
         await asset.connect(user).approve(await router.getAddress(), amount);
 
         // 2. Generate AML signature (This is still required by your contract logic)
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline); // NEW: Added 0n for minNuva
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        ); // NEW: Added 0n for minNuva
 
         // 3. Call with GARBAGE permit data (v=0, r/s=Zero)
         // The try/catch will swallow the permit failure, and safeTransferFrom will use the manual approval.
         const expectedNuvaShares = amount * 1000000000000n;
-        await expect(router.connect(user).depositWithPermit(
-            amount, user.address, 0n, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash // NEW: Added 0n for minNuvaVaultSharesOut
-        )).to.emit(router, "Deposited").withArgs(user.address, amount, amount, amount, expectedNuvaShares);
+        await expect(
+            router.connect(user).depositWithPermit(
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                signature,
+                deadline,
+                0,
+                0,
+                ethers.ZeroHash,
+                ethers.ZeroHash, // NEW: Added 0n for minNuvaVaultSharesOut
+            ),
+        )
+            .to.emit(router, "Deposited")
+            .withArgs(user.address, amount, amount, amount, expectedNuvaShares);
     });
 
     it("Should upgrade the contract and preserve state", async function () {
@@ -292,7 +473,9 @@ describe("DedicatedVaultRouter", function () {
          * SLOT 5: nuvaAsset // NEW
          */
         const rawSlot5 = await ethers.provider.getStorage(routerAddress, 5);
-        const expectedSlot5 = ethers.zeroPadValue(await (await ethers.getContractAt("IERC4626", await nuvaVault.getAddress())).asset(), 32).toLowerCase();
+        const expectedSlot5 = ethers
+            .zeroPadValue(await (await ethers.getContractAt("IERC4626", await nuvaVault.getAddress())).asset(), 32)
+            .toLowerCase();
         expect(rawSlot5.toLowerCase()).to.equal(expectedSlot5, "nuvaAsset is not in Slot 5!");
 
         /**
@@ -308,8 +491,6 @@ describe("DedicatedVaultRouter", function () {
         const rawSlot7 = await ethers.provider.getStorage(routerAddress, 7);
         const expectedSlot7 = ethers.zeroPadValue(await redemptionProxyImplementation.getAddress(), 32).toLowerCase();
         expect(rawSlot7.toLowerCase()).to.equal(expectedSlot7, "redemptionProxyImplementation is not in Slot 7!");
-
-
 
         /**
          * SLOT 8: requestIdToRedemptionProxy (mapping base) // UPDATED
@@ -338,9 +519,7 @@ describe("DedicatedVaultRouter", function () {
         // Formula: keccak256(keccak256("openzeppelin.storage.ReentrancyGuard") - 1) & ~0xff
         const namespace = "openzeppelin.storage.ReentrancyGuard";
         const baseSlot = ethers.keccak256(ethers.toUtf8Bytes(namespace));
-        const reentrancySlot = BigInt(ethers.keccak256(
-            ethers.toBeArray(BigInt(baseSlot) - 1n)
-        )) & ~0xffn;
+        const reentrancySlot = BigInt(ethers.keccak256(ethers.toBeArray(BigInt(baseSlot) - 1n))) & ~0xffn;
 
         // 3. Look up the value at that specific hashed location
         const namespacedValue = await ethers.provider.getStorage(routerAddress, reentrancySlot);
@@ -365,25 +544,33 @@ describe("DedicatedVaultRouter", function () {
             user.address,
             amount,
             user.address,
-            0n, 0n, 0n, deadline // NEW: Added 0n for minNuva
+            0n,
+            0n,
+            0n,
+            deadline, // NEW: Added 0n for minNuva
         );
 
         // 3. Execute standard deposit
         const expectedNuvaShares = amount * 1000000000000n;
-        await expect(router.connect(user).deposit(
-            amount,
-            user.address,
-            0n,
-            0n,
-            0n, // NEW: minNuvaVaultSharesOut
-            signature,
-            deadline
-        )).to.emit(router, "Deposited").withArgs(user.address, amount, amount, amount, expectedNuvaShares);
+        await expect(
+            router.connect(user).deposit(
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n, // NEW: minNuvaVaultSharesOut
+                signature,
+                deadline,
+            ),
+        )
+            .to.emit(router, "Deposited")
+            .withArgs(user.address, amount, amount, amount, expectedNuvaShares);
 
         // Verify final shares reached the user
         // (Assuming your MockVault gives 1:1 shares)
-        expect(await (await ethers.getContractAt("NuvaVault", await nuvaVault.getAddress())).balanceOf(user.address))
-            .to.equal(expectedNuvaShares);
+        expect(
+            await (await ethers.getContractAt("NuvaVault", await nuvaVault.getAddress())).balanceOf(user.address),
+        ).to.equal(expectedNuvaShares);
     });
 
     it("Should successfully deposit into the Nuva Vault and emit NuvaDeposited event", async function () {
@@ -398,25 +585,21 @@ describe("DedicatedVaultRouter", function () {
             user.address,
             amount,
             user.address,
-            0n, 0n, 0n, deadline
+            0n,
+            0n,
+            0n,
+            deadline,
         );
 
         const expectedNuvaShares = amount * 1000000000000n;
-        await expect(router.connect(user).deposit(
-            amount,
-            user.address,
-            0n,
-            0n,
-            0n,
-            signature,
-            deadline
-        ))
+        await expect(router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline))
             .to.emit(router, "NuvaDeposited")
             .withArgs(user.address, amount, expectedNuvaShares);
 
         // Verify final shares reached the user in Nuva Vault
-        expect(await (await ethers.getContractAt("NuvaVault", await nuvaVault.getAddress())).balanceOf(user.address))
-            .to.equal(expectedNuvaShares);
+        expect(
+            await (await ethers.getContractAt("NuvaVault", await nuvaVault.getAddress())).balanceOf(user.address),
+        ).to.equal(expectedNuvaShares);
     });
 
     it("Should revert if deposit is called without prior approval", async function () {
@@ -431,20 +614,28 @@ describe("DedicatedVaultRouter", function () {
             user.address,
             amount,
             user.address,
-            0n, 0n, 0n, deadline // NEW: Added 0n for minNuva
+            0n,
+            0n,
+            0n,
+            deadline, // NEW: Added 0n for minNuva
         );
 
         // Should revert because the Router doesn't have allowance to pull tokens
         // Note: Standard OpenZeppelin ERC20s revert with 'ERC20InsufficientAllowance'
-        await expect(router.connect(user).deposit(
-            amount,
-            user.address,
-            0n,
-            0n,
-            0n, // NEW: minNuvaVaultSharesOut
-            signature,
-            deadline
-        )).to.be.revertedWithCustomError(await ethers.getContractAt("MockERC20", await router.asset()), "ERC20InsufficientAllowance");
+        await expect(
+            router.connect(user).deposit(
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n, // NEW: minNuvaVaultSharesOut
+                signature,
+                deadline,
+            ),
+        ).to.be.revertedWithCustomError(
+            await ethers.getContractAt("MockERC20", await router.asset()),
+            "ERC20InsufficientAllowance",
+        );
     });
 
     it("Should revert if deposit (standard) is called with a tampered AML signature", async function () {
@@ -454,12 +645,22 @@ describe("DedicatedVaultRouter", function () {
         await asset.connect(user).approve(await router.getAddress(), amount);
 
         // Sign for 0 slippage
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline);
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        );
 
         // Attempt to execute with 50 slippage for minVaultSharesOut (Signature mismatch)
-        await expect(router.connect(user).deposit(
-            amount, user.address, 50n, 0n, 0n, signature, deadline
-        )).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
+        await expect(
+            router.connect(user).deposit(amount, user.address, 50n, 0n, 0n, signature, deadline),
+        ).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
     });
 
     it("Should revert if deposit (standard) is called with an expired AML signature", async function () {
@@ -468,11 +669,21 @@ describe("DedicatedVaultRouter", function () {
 
         await asset.connect(user).approve(await router.getAddress(), amount);
 
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, pastDeadline);
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            pastDeadline,
+        );
 
-        await expect(router.connect(user).deposit(
-            amount, user.address, 0n, 0n, 0n, signature, pastDeadline
-        )).to.be.revertedWithCustomError(router, "AmlSignatureExpired");
+        await expect(
+            router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, pastDeadline),
+        ).to.be.revertedWithCustomError(router, "AmlSignatureExpired");
     });
 
     it("Should prevent reusing the same AML signature for standard deposit", async function () {
@@ -480,15 +691,25 @@ describe("DedicatedVaultRouter", function () {
         const deadline = Math.floor(Date.now() / 1000) + 3600;
 
         await asset.connect(user).approve(await router.getAddress(), amount * 2n); // Approve for two deposits
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline);
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        );
 
         // First use: Success
         await router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline);
 
         // Second use: Revert
-        await expect(router.connect(user).deposit(
-            amount, user.address, 0n, 0n, 0n, signature, deadline
-        )).to.be.revertedWithCustomError(router, "AmlSignatureAlreadyUsed");
+        await expect(
+            router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline),
+        ).to.be.revertedWithCustomError(router, "AmlSignatureAlreadyUsed");
     });
 
     it("Should revert if deposit (standard) returns fewer shares than minVaultSharesOut", async function () {
@@ -499,11 +720,21 @@ describe("DedicatedVaultRouter", function () {
         const minVaultOut = amount + 1n;
 
         await asset.connect(user).approve(await router.getAddress(), amount);
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, minVaultOut, 0n, 0n, deadline);
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            minVaultOut,
+            0n,
+            0n,
+            deadline,
+        );
 
-        await expect(router.connect(user).deposit(
-            amount, user.address, minVaultOut, 0n, 0n, signature, deadline
-        )).to.be.revertedWithCustomError(router, "SlippageExceeded");
+        await expect(
+            router.connect(user).deposit(amount, user.address, minVaultOut, 0n, 0n, signature, deadline),
+        ).to.be.revertedWithCustomError(router, "SlippageExceeded");
     });
 
     it("Should revert if deposit (standard) receiver does not match the signed receiver", async function () {
@@ -512,14 +743,24 @@ describe("DedicatedVaultRouter", function () {
         const attacker = (await ethers.getSigners())[4];
 
         // Signature is for user.address
-        const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline);
+        const signature = await signAML(
+            amlSigner,
+            await router.getAddress(),
+            user.address,
+            amount,
+            user.address,
+            0n,
+            0n,
+            0n,
+            deadline,
+        );
 
         await asset.connect(user).approve(await router.getAddress(), amount);
 
         // Attempt to send shares to attacker instead of user
-        await expect(router.connect(user).deposit(
-            amount, attacker.address, 0n, 0n, 0n, signature, deadline
-        )).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
+        await expect(
+            router.connect(user).deposit(amount, attacker.address, 0n, 0n, 0n, signature, deadline),
+        ).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
     });
 
     // NEW: Tests for Redemption Proxy functionality
@@ -528,44 +769,85 @@ describe("DedicatedVaultRouter", function () {
             const { router, owner } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
 
-            await expect(router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()))
+            await expect(
+                router
+                    .connect(owner)
+                    .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()),
+            )
                 .to.emit(router, "RedemptionProxyImplementationUpdated")
                 .withArgs(ethers.ZeroAddress, await redemptionProxyImplementation.getAddress());
 
-            expect(await router.redemptionProxyImplementation()).to.equal(await redemptionProxyImplementation.getAddress());
+            expect(await router.redemptionProxyImplementation()).to.equal(
+                await redemptionProxyImplementation.getAddress(),
+            );
         });
 
         it("Should not allow non-owner to set redemption proxy implementation", async function () {
             const { router, user } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
 
-            await expect(router.connect(user).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()))
-                .to.be.revertedWithCustomError(router, "OwnableUnauthorizedAccount");
+            await expect(
+                router.connect(user).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()),
+            ).to.be.revertedWithCustomError(router, "OwnableUnauthorizedAccount");
         });
 
         it("Should revert if redemption proxy implementation is set to zero address", async function () {
             const { router, owner } = await loadFixture(deployRouterFixture);
 
-            await expect(router.connect(owner).setRedemptionProxyImplementation(ethers.ZeroAddress))
-                .to.be.revertedWithCustomError(router, "InvalidRedemptionProxyImplementation");
+            await expect(
+                router.connect(owner).setRedemptionProxyImplementation(ethers.ZeroAddress),
+            ).to.be.revertedWithCustomError(router, "InvalidRedemptionProxyImplementation");
         });
 
         it("Should allow a user to request redemption and create a RedemptionProxy clone", async function () {
-            const { router, assetVault, stakingVault, nuvaVault, owner, user, amount, asset: routerAsset } = await loadFixture(deployRouterFixture); // FIX: Destructure routerAsset
+            const {
+                router,
+                assetVault,
+                stakingVault,
+                nuvaVault,
+                owner,
+                user,
+                amount,
+                asset: routerAsset,
+            } = await loadFixture(deployRouterFixture); // FIX: Destructure routerAsset
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
 
             // Set the redemption proxy implementation
-            await router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
 
             // User first deposits to get nuvaShares
             const deadline = Math.floor(Date.now() / 1000) + 3600;
             const routerAddress = await router.getAddress(); // FIX: Define routerAddress for signAML
             await routerAsset.connect(user).approve(routerAddress, amount); // FIX: Use routerAsset
             const amlSigner = (await ethers.getSigners())[1]; // Get amlSigner for the deposit
-            const signature = await signAML(amlSigner, routerAddress, user.address, amount, user.address, 0n, 0n, 0n, deadline); // FIX: Pass routerAddress
-            await router.connect(user).depositWithPermit(
-                amount, user.address, 0n, 0n, 0n, signature, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash
-            );
+            const signature = await signAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            ); // FIX: Pass routerAddress
+            await router
+                .connect(user)
+                .depositWithPermit(
+                    amount,
+                    user.address,
+                    0n,
+                    0n,
+                    0n,
+                    signature,
+                    deadline,
+                    0,
+                    0,
+                    ethers.ZeroHash,
+                    ethers.ZeroHash,
+                );
 
             const userNuvaBalance = await nuvaVault.balanceOf(user.address);
             expect(userNuvaBalance).to.equal(amount * 1000000000000n);
@@ -575,9 +857,22 @@ describe("DedicatedVaultRouter", function () {
 
             // Request redemption
             const amountToRedeem = userNuvaBalance;
-            const requestRedeemTx = await router.connect(user).requestRedeem(amountToRedeem);
+            const redeemDeadline = Math.floor(Date.now() / 1000) + 3600;
+            const redeemSignature = await signRedeemAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                amountToRedeem,
+                redeemDeadline,
+            );
+
+            const requestRedeemTx = await router
+                .connect(user)
+                .requestRedeem(amountToRedeem, redeemSignature, redeemDeadline);
             const requestRedeemReceipt = await requestRedeemTx.wait();
-            const redemptionRequestedEvent = requestRedeemReceipt.logs.find(log => log.fragment && log.fragment.name === "RedemptionRequested");
+            const redemptionRequestedEvent = requestRedeemReceipt.logs.find(
+                (log) => log.fragment && log.fragment.name === "RedemptionRequested",
+            );
             const emittedUser = redemptionRequestedEvent.args[0];
             const redemptionProxyCloneAddress = redemptionRequestedEvent.args[1];
 
@@ -592,21 +887,54 @@ describe("DedicatedVaultRouter", function () {
 
             // Verify that user's nuvaBalance decreased
             expect(await nuvaVault.balanceOf(user.address)).to.equal(0n);
-
         });
 
         it("Should allow a user to request redemption using Permit", async function () {
-            const { router, nuvaVault, owner, user, amount, asset: routerAsset } = await loadFixture(deployRouterFixture);
+            const {
+                router,
+                nuvaVault,
+                owner,
+                user,
+                amount,
+                asset: routerAsset,
+                amlSigner,
+            } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
 
-            await router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
 
             // 1. Get Nuva Shares
             const deadline = Math.floor(Date.now() / 1000) + 3600;
             const routerAddress = await router.getAddress();
             await routerAsset.connect(user).approve(routerAddress, amount);
-            const sigAML = await signAML((await ethers.getSigners())[1], routerAddress, user.address, amount, user.address, 0n, 0n, 0n, deadline);
-            await router.connect(user).depositWithPermit(amount, user.address, 0n, 0n, 0n, sigAML, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash);
+            const sigAML = await signAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await router
+                .connect(user)
+                .depositWithPermit(
+                    amount,
+                    user.address,
+                    0n,
+                    0n,
+                    0n,
+                    sigAML,
+                    deadline,
+                    0,
+                    0,
+                    ethers.ZeroHash,
+                    ethers.ZeroHash,
+                );
 
             const expectedNuvaBalance = amount * 1000000000000n;
             const userNuvaBalance = await nuvaVault.balanceOf(user.address);
@@ -621,7 +949,7 @@ describe("DedicatedVaultRouter", function () {
                 name: name,
                 version: "1",
                 chainId: network.chainId,
-                verifyingContract: await nuvaVault.getAddress()
+                verifyingContract: await nuvaVault.getAddress(),
             };
 
             const types = {
@@ -630,8 +958,8 @@ describe("DedicatedVaultRouter", function () {
                     { name: "spender", type: "address" },
                     { name: "value", type: "uint256" },
                     { name: "nonce", type: "uint256" },
-                    { name: "deadline", type: "uint256" }
-                ]
+                    { name: "deadline", type: "uint256" },
+                ],
             };
 
             const value = {
@@ -639,27 +967,99 @@ describe("DedicatedVaultRouter", function () {
                 spender: routerAddress,
                 value: userNuvaBalance,
                 nonce: nonce,
-                deadline: deadline
+                deadline: deadline,
             };
 
             const permitSignature = await user.signTypedData(domain, types, value);
             const { v, r, s } = ethers.Signature.from(permitSignature);
 
-            // 3. Request Redeem with Permit
-            await expect(router.connect(user).requestRedeemWithPermit(userNuvaBalance, deadline, v, r, s))
-                .to.emit(router, "RedemptionRequested");
+            // 3. Generate AML Signature for redemption
+            const redeemDeadline = Math.floor(Date.now() / 1000) + 3600;
+            const redeemSignature = await signRedeemAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                userNuvaBalance,
+                redeemDeadline,
+            );
+
+            // 4. Request Redeem with Permit
+            await expect(
+                router
+                    .connect(user)
+                    .requestRedeemWithPermit(userNuvaBalance, redeemSignature, redeemDeadline, deadline, v, r, s),
+            ).to.emit(router, "RedemptionRequested");
 
             expect(await nuvaVault.balanceOf(user.address)).to.equal(0n);
         });
 
+        it("Should revert if redemption AML signature is tampered with", async function () {
+            const {
+                router,
+                nuvaVault,
+                owner,
+                user,
+                amount,
+                asset: routerAsset,
+                amlSigner,
+            } = await loadFixture(deployRouterFixture);
+            const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
+
+            // 1. Get Nuva Shares
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const routerAddress = await router.getAddress();
+            await routerAsset.connect(user).approve(routerAddress, amount);
+            const sigAML = await signAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, sigAML, deadline);
+
+            const userNuvaBalance = await nuvaVault.balanceOf(user.address);
+            await nuvaVault.connect(user).approve(routerAddress, userNuvaBalance);
+
+            // 2. Sign for one amount, try to redeem another
+            const redeemDeadline = Math.floor(Date.now() / 1000) + 3600;
+            const redeemSignature = await signRedeemAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                userNuvaBalance,
+                redeemDeadline,
+            );
+
+            await expect(
+                router.connect(user).requestRedeem(userNuvaBalance - 1n, redeemSignature, redeemDeadline),
+            ).to.be.revertedWithCustomError(router, "InvalidAmlSignature");
+        });
+
         it("Should allow the owner to sweep redemptions from multiple proxies", async function () {
-            const { router, nuvaVault, owner, user, amount, asset: routerAsset } = await loadFixture(deployRouterFixture);
+            const {
+                router,
+                nuvaVault,
+                owner,
+                user,
+                amount,
+                asset: routerAsset,
+            } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
             const user2 = (await ethers.getSigners())[4];
             const routerAddress = await router.getAddress();
 
             // 1. Setup Implementation
-            await router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
 
             // --- Helper to create a redemption ---
             async function createRedemption(targetUser) {
@@ -673,18 +1073,50 @@ describe("DedicatedVaultRouter", function () {
                 }
 
                 await routerAsset.connect(targetUser).approve(routerAddress, amount);
-                const sig = await signAML(amlSigner, routerAddress, targetUser.address, amount, targetUser.address, 0n, 0n, 0n, deadline);
-
-                await router.connect(targetUser).depositWithPermit(
-                    amount, targetUser.address, 0n, 0n, 0n, sig, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash
+                const sig = await signAML(
+                    amlSigner,
+                    routerAddress,
+                    targetUser.address,
+                    amount,
+                    targetUser.address,
+                    0n,
+                    0n,
+                    0n,
+                    deadline,
                 );
+
+                await router
+                    .connect(targetUser)
+                    .depositWithPermit(
+                        amount,
+                        targetUser.address,
+                        0n,
+                        0n,
+                        0n,
+                        sig,
+                        deadline,
+                        0,
+                        0,
+                        ethers.ZeroHash,
+                        ethers.ZeroHash,
+                    );
 
                 // B. Request Redeem
                 const nuvaShares = await nuvaVault.balanceOf(targetUser.address);
                 await nuvaVault.connect(targetUser).approve(routerAddress, nuvaShares);
-                const tx = await router.connect(targetUser).requestRedeem(nuvaShares);
+
+                const redeemDeadline = Math.floor(Date.now() / 1000) + 3600;
+                const redeemSig = await signRedeemAML(
+                    amlSigner,
+                    routerAddress,
+                    targetUser.address,
+                    nuvaShares,
+                    redeemDeadline,
+                );
+
+                const tx = await router.connect(targetUser).requestRedeem(nuvaShares, redeemSig, redeemDeadline);
                 const receipt = await tx.wait();
-                const event = receipt.logs.find(log => log.fragment && log.fragment.name === "RedemptionRequested");
+                const event = receipt.logs.find((log) => log.fragment && log.fragment.name === "RedemptionRequested");
                 return event.args[1]; // Returns proxyAddress
             }
 
@@ -719,13 +1151,14 @@ describe("DedicatedVaultRouter", function () {
                 .withArgs(proxies, 0);
         });
 
-
         it("Should handle sweeping of non-existent or already swept redemptions", async function () {
             const { router, owner } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture); // FIX: Add redemptionProxyImplementation
 
             // Set the redemption proxy implementation
-            await router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()); // FIX: Set implementation
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()); // FIX: Set implementation
 
             // Attempt to sweep a non-existent user address
             const nonExistentUser = (await ethers.getSigners())[5].address;
@@ -735,24 +1168,67 @@ describe("DedicatedVaultRouter", function () {
         });
 
         it("Should allow partial sweeps (installments)", async function () {
-            const { router, nuvaVault, owner, user, amount, asset: routerAsset } = await loadFixture(deployRouterFixture);
+            const {
+                router,
+                nuvaVault,
+                owner,
+                user,
+                amount,
+                asset: routerAsset,
+            } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
             const routerAddress = await router.getAddress();
 
-            await router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
 
             // 1. Create Redemption
             const deadline = Math.floor(Date.now() / 1000) + 3600;
             const amlSigner = (await ethers.getSigners())[1];
             await routerAsset.connect(user).approve(routerAddress, amount);
-            const sig = await signAML(amlSigner, routerAddress, user.address, amount, user.address, 0n, 0n, 0n, deadline);
-            await router.connect(user).depositWithPermit(amount, user.address, 0n, 0n, 0n, sig, deadline, 0, 0, ethers.ZeroHash, ethers.ZeroHash);
-            
+            const sig = await signAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await router
+                .connect(user)
+                .depositWithPermit(
+                    amount,
+                    user.address,
+                    0n,
+                    0n,
+                    0n,
+                    sig,
+                    deadline,
+                    0,
+                    0,
+                    ethers.ZeroHash,
+                    ethers.ZeroHash,
+                );
+
             const expectedNuvaShares = await nuvaVault.balanceOf(user.address);
             await nuvaVault.connect(user).approve(routerAddress, expectedNuvaShares);
-            const tx = await router.connect(user).requestRedeem(expectedNuvaShares);
+
+            const redeemDeadline = Math.floor(Date.now() / 1000) + 3600;
+            const redeemSig = await signRedeemAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                expectedNuvaShares,
+                redeemDeadline,
+            );
+
+            const tx = await router.connect(user).requestRedeem(expectedNuvaShares, redeemSig, redeemDeadline);
             const receipt = await tx.wait();
-            const event = receipt.logs.find(log => log.fragment && log.fragment.name === "RedemptionRequested");
+            const event = receipt.logs.find((log) => log.fragment && log.fragment.name === "RedemptionRequested");
             const proxyAddress = event.args[1];
 
             // 2. Fund Proxy
@@ -776,25 +1252,69 @@ describe("DedicatedVaultRouter", function () {
         });
 
         it("Should allow a designated keeper to sweep redemptions", async function () {
-            const { router, owner, user, amount, asset: routerAsset, nuvaVault } = await loadFixture(deployRouterFixture);
+            const {
+                router,
+                owner,
+                user,
+                amount,
+                asset: routerAsset,
+                nuvaVault,
+            } = await loadFixture(deployRouterFixture);
             const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
             const keeper = (await ethers.getSigners())[6];
             const KEEPER_ROLE = await router.KEEPER_ROLE();
 
-            await router.connect(owner).setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
             await router.connect(owner).grantRole(KEEPER_ROLE, keeper.address);
 
             // 1. Setup Redemption
             const routerAddress = await router.getAddress();
             await routerAsset.connect(user).approve(routerAddress, amount);
-            const sig = await signAML((await ethers.getSigners())[1], routerAddress, user.address, amount, user.address, 0n, 0n, 0n, Math.floor(Date.now() / 1000) + 3600);
-            await router.connect(user).depositWithPermit(amount, user.address, 0n, 0n, 0n, sig, Math.floor(Date.now() / 1000) + 3600, 0, 0, ethers.ZeroHash, ethers.ZeroHash);
-            
+            const sig = await signAML(
+                (await ethers.getSigners())[1],
+                routerAddress,
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                Math.floor(Date.now() / 1000) + 3600,
+            );
+            await router
+                .connect(user)
+                .depositWithPermit(
+                    amount,
+                    user.address,
+                    0n,
+                    0n,
+                    0n,
+                    sig,
+                    Math.floor(Date.now() / 1000) + 3600,
+                    0,
+                    0,
+                    ethers.ZeroHash,
+                    ethers.ZeroHash,
+                );
+
             const nuvaShares = await nuvaVault.balanceOf(user.address);
             await nuvaVault.connect(user).approve(routerAddress, nuvaShares);
-            const tx = await router.connect(user).requestRedeem(nuvaShares);
+
+            const redeemDeadline = Math.floor(Date.now() / 1000) + 3600;
+            const redeemSig = await signRedeemAML(
+                (await ethers.getSigners())[1],
+                routerAddress,
+                user.address,
+                nuvaShares,
+                redeemDeadline,
+            );
+
+            const tx = await router.connect(user).requestRedeem(nuvaShares, redeemSig, redeemDeadline);
             const receipt = await tx.wait();
-            const proxyAddress = receipt.logs.find(log => log.fragment && log.fragment.name === "RedemptionRequested").args[1];
+            const proxyAddress = receipt.logs.find((log) => log.fragment && log.fragment.name === "RedemptionRequested")
+                .args[1];
 
             await routerAsset.mint(proxyAddress, amount);
 
@@ -861,7 +1381,15 @@ describe("DedicatedVaultRouter", function () {
 
     describe("NuvaVault Pausing", function () {
         it("Should block deposits when NuvaVault is paused", async function () {
-            const { router, nuvaVault, owner, user, amlSigner, amount, asset: routerAsset } = await loadFixture(deployRouterFixture);
+            const {
+                router,
+                nuvaVault,
+                owner,
+                user,
+                amlSigner,
+                amount,
+                asset: routerAsset,
+            } = await loadFixture(deployRouterFixture);
             const deadline = Math.floor(Date.now() / 1000) + 3600;
 
             // Pause the vault
@@ -871,16 +1399,87 @@ describe("DedicatedVaultRouter", function () {
 
             // Setup deposit
             await routerAsset.connect(user).approve(await router.getAddress(), amount);
-            const signature = await signAML(amlSigner, await router.getAddress(), user.address, amount, user.address, 0n, 0n, 0n, deadline);
+            const signature = await signAML(
+                amlSigner,
+                await router.getAddress(),
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
 
             // Attempt deposit (should revert because the final hop to NuvaVault is paused)
-            await expect(router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline))
-                .to.be.revertedWithCustomError(vault, "EnforcedPause");
+            await expect(
+                router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline),
+            ).to.be.revertedWithCustomError(vault, "EnforcedPause");
 
             // Unpause and verify it works
             await vault.connect(owner).unpause();
-            await expect(router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline))
-                .to.emit(router, "Deposited");
+            await expect(router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline)).to.emit(
+                router,
+                "Deposited",
+            );
+        });
+    });
+
+    describe("NuvaVault Upgradeability", function () {
+        it("Should upgrade NuvaVault and preserve state", async function () {
+            const { nuvaVault, owner, user, amount, amlSigner, router } = await loadFixture(deployRouterFixture);
+
+            // 1. Setup initial state: Perform a deposit to NuvaVault
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const routerAddress = await router.getAddress();
+            const routerAsset = await ethers.getContractAt("MockERC20", await router.asset());
+            await routerAsset.connect(user).approve(routerAddress, amount);
+
+            const signature = await signAML(
+                amlSigner,
+                routerAddress,
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await router.connect(user).deposit(amount, user.address, 0n, 0n, 0n, signature, deadline);
+
+            const expectedNuvaShares = amount * 1000000000000n;
+            const balanceBefore = await nuvaVault.balanceOf(user.address);
+            const totalAssetsBefore = await nuvaVault.totalAssets();
+            const ownerBefore = await nuvaVault.owner();
+            const assetBefore = await nuvaVault.asset();
+
+            expect(balanceBefore).to.equal(expectedNuvaShares);
+
+            // 2. Upgrade to V2
+            const NuvaVaultV2 = await ethers.getContractFactory("NuvaVaultV2");
+            const upgraded = await upgrades.upgradeProxy(await nuvaVault.getAddress(), NuvaVaultV2);
+
+            // 3. Verify state is preserved
+            expect(await upgraded.balanceOf(user.address)).to.equal(balanceBefore);
+            expect(await upgraded.totalAssets()).to.equal(totalAssetsBefore);
+            expect(await upgraded.owner()).to.equal(ownerBefore);
+            expect(await upgraded.asset()).to.equal(assetBefore);
+
+            // 4. Verify new logic works
+            expect(await upgraded.version()).to.equal("V2");
+            expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
+            await upgraded.enableVersion2Functionality();
+            expect(await upgraded.version2FunctionalityEnabled()).to.be.true;
+        });
+
+        it("Should prevent non-owners from upgrading NuvaVault", async function () {
+            const { nuvaVault, user } = await loadFixture(deployRouterFixture);
+            const NuvaVaultV2 = await ethers.getContractFactory("NuvaVaultV2");
+
+            await expect(upgrades.upgradeProxy(await nuvaVault.getAddress(), NuvaVaultV2.connect(user)))
+                .to.be.revertedWithCustomError(nuvaVault, "OwnableUnauthorizedAccount")
+                .withArgs(user.address);
         });
     });
 });

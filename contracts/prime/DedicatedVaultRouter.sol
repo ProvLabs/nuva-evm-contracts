@@ -63,27 +63,27 @@ contract DedicatedVaultRouter is
 
     // --- State Variables ---
     /// @notice The first hop vault in the multi-hop deposit flow.
-    IERC4626 public assetVault; // Slot 0
+    IERC4626 public assetVault;
     /// @notice The underlying base asset (e.g. USDC).
-    IERC20 public asset; // Slot 1
+    IERC20 public asset;
     /// @notice The second hop vault (staking wrapper).
-    IERC4626 public stakingVault; // Slot 2
+    IERC4626 public stakingVault;
     /// @notice The asset required for the stakingVault.
-    IERC20 public stakingAsset; // Slot 3
+    IERC20 public stakingAsset;
     /// @notice The final hop vault (Nuva).
-    IERC4626 public nuvaVault; // Slot 4
+    IERC4626 public nuvaVault;
     /// @notice The asset required for the nuvaVault.
-    IERC20 public nuvaAsset; // Slot 5
+    IERC20 public nuvaAsset;
     /// @notice The address authorized to sign AML approvals.
-    address public amlSigner; // Slot 6
+    address public amlSigner;
 
     /// @notice The master copy implementation for RedemptionProxy clones.
-    address public redemptionProxyImplementation; // Slot 7
+    address public redemptionProxyImplementation;
     /// @notice Mapping from a RedemptionProxy clone to the user who owns it.
-    mapping(address => address) public redemptionProxyToUser; // Slot 8
+    mapping(address => address) public redemptionProxyToUser;
 
     /// @notice Mapping to track used AML signatures to prevent replay attacks.
-    mapping(bytes32 => bool) public usedSignatures; // Slot 9
+    mapping(bytes32 => bool) public usedSignatures;
 
     // --- Events ---
     /**
@@ -107,7 +107,7 @@ contract DedicatedVaultRouter is
      * @param stakingShares The amount of StakingVault shares used.
      * @param nuvaShares The amount of Nuva shares minted.
      */
-    event NuvaDeposited(address indexed user, uint256 indexed stakingShares, uint256 indexed nuvaShares); // New: Nuva Deposited event
+    event NuvaDeposited(address indexed user, uint256 indexed stakingShares, uint256 indexed nuvaShares);
     /**
      * @notice Emitted when the AML signer address is updated.
      * @param oldSigner The previous AML signer address.
@@ -119,19 +119,19 @@ contract DedicatedVaultRouter is
      * @param oldImplementation The previous implementation address.
      * @param newImplementation The new implementation address.
      */
-    event RedemptionProxyImplementationUpdated(address indexed oldImplementation, address indexed newImplementation); // NEW
+    event RedemptionProxyImplementationUpdated(address indexed oldImplementation, address indexed newImplementation);
     /**
      * @notice Emitted when a new redemption is requested.
      * @param user The address of the user requesting redemption.
      * @param redemptionProxy The address of the deployed proxy clone.
      */
-    event RedemptionRequested(address indexed user, address indexed redemptionProxy); // NEW
+    event RedemptionRequested(address indexed user, address indexed redemptionProxy);
     /**
      * @notice Emitted when redemptions are swept back to users.
      * @param users The array of user addresses (from proxy addresses).
      * @param totalSweptAmount The total amount of assets swept.
      */
-    event RedemptionsSwept(address[] users, uint256 totalSweptAmount); // NEW
+    event RedemptionsSwept(address[] users, uint256 totalSweptAmount);
 
     // --- Custom Errors ---
     error InvalidVault();
@@ -154,6 +154,12 @@ contract DedicatedVaultRouter is
         );
 
     /**
+     * @notice EIP-712 typehash for redemption authorization.
+     */
+    bytes32 private constant REDEEM_TYPEHASH =
+        keccak256("Redeem(address sender,uint256 amountNuvaShares,uint256 deadline)");
+
+    /**
      * @custom:oz-upgrades-unsafe-allow constructor
      * @notice Constructor to disable initializers for the logic contract.
      */
@@ -172,7 +178,7 @@ contract DedicatedVaultRouter is
     function initialize(
         address _assetVault,
         address _stakingVault,
-        address _nuvaVault, // New: Nuva Vault address
+        address _nuvaVault,
         address _amlSigner,
         address _initialOwner
     ) public initializer {
@@ -185,7 +191,7 @@ contract DedicatedVaultRouter is
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
         _grantRole(KEEPER_ROLE, _initialOwner);
 
-        if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0)) revert InvalidVault(); // Updated validation
+        if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0)) revert InvalidVault();
         if (_amlSigner == address(0)) revert InvalidAmlSigner();
 
         assetVault = IERC4626(_assetVault);
@@ -194,8 +200,8 @@ contract DedicatedVaultRouter is
         stakingVault = IERC4626(_stakingVault);
         stakingAsset = IERC20(stakingVault.asset());
 
-        nuvaVault = IERC4626(_nuvaVault); // New: Set nuvaVault
-        nuvaAsset = IERC20(nuvaVault.asset()); // New: Set nuvaAsset
+        nuvaVault = IERC4626(_nuvaVault);
+        nuvaAsset = IERC20(nuvaVault.asset());
 
         amlSigner = _amlSigner;
     }
@@ -216,7 +222,7 @@ contract DedicatedVaultRouter is
         address _receiver,
         uint256 _minVaultSharesOut,
         uint256 _minStakingVaultSharesOut,
-        uint256 _minNuvaVaultSharesOut, // New: Min Nuva Vault Shares
+        uint256 _minNuvaVaultSharesOut,
         bytes calldata _amlSignature,
         uint256 _amlDeadline
     ) external nonReentrant returns (uint256 nuvaShares) {
@@ -225,12 +231,12 @@ contract DedicatedVaultRouter is
             _receiver,
             _minVaultSharesOut,
             _minStakingVaultSharesOut,
-            _minNuvaVaultSharesOut, // New: Pass to _getMessageHash
+            _minNuvaVaultSharesOut,
             _amlDeadline
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        return _doDeposit(_amount, _receiver, _minVaultSharesOut, _minStakingVaultSharesOut, _minNuvaVaultSharesOut); // New: Pass to _doDeposit
+        return _doDeposit(_amount, _receiver, _minVaultSharesOut, _minStakingVaultSharesOut, _minNuvaVaultSharesOut);
     }
 
     /**
@@ -253,7 +259,7 @@ contract DedicatedVaultRouter is
         address _receiver,
         uint256 _minVaultSharesOut,
         uint256 _minStakingVaultSharesOut,
-        uint256 _minNuvaVaultSharesOut, // New: Min Nuva Vault Shares
+        uint256 _minNuvaVaultSharesOut,
         bytes calldata _amlSignature,
         uint256 _amlDeadline,
         uint256 _permitDeadline,
@@ -266,7 +272,7 @@ contract DedicatedVaultRouter is
             _receiver,
             _minVaultSharesOut,
             _minStakingVaultSharesOut,
-            _minNuvaVaultSharesOut, // New: Pass to _getMessageHash
+            _minNuvaVaultSharesOut,
             _amlDeadline
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
@@ -279,7 +285,7 @@ contract DedicatedVaultRouter is
             // Permit failed or not supported, proceeding with existing allowance
         }
 
-        return _doDeposit(_amount, _receiver, _minVaultSharesOut, _minStakingVaultSharesOut, _minNuvaVaultSharesOut); // New: Pass to _doDeposit
+        return _doDeposit(_amount, _receiver, _minVaultSharesOut, _minStakingVaultSharesOut, _minNuvaVaultSharesOut);
     }
 
     /**
@@ -296,11 +302,11 @@ contract DedicatedVaultRouter is
         address _receiver,
         uint256 _minVaultSharesOut,
         uint256 _minStakingVaultSharesOut,
-        uint256 _minNuvaVaultSharesOut // New: Min Nuva Vault Shares
+        uint256 _minNuvaVaultSharesOut
     ) internal returns (uint256 nuvaShares) {
         uint256 assetBalBefore = asset.balanceOf(address(this));
         uint256 stakingAssetBalBefore = stakingAsset.balanceOf(address(this));
-        uint256 nuvaAssetBalBefore = nuvaAsset.balanceOf(address(this)); // New: Nuva Asset balance before
+        uint256 nuvaAssetBalBefore = nuvaAsset.balanceOf(address(this));
 
         // 1. Asset Vault Hop
         asset.safeTransferFrom(msg.sender, address(this), _amount);
@@ -309,40 +315,51 @@ contract DedicatedVaultRouter is
         uint256 vaultShares = assetVault.deposit(_amount, address(this));
 
         if (vaultShares < _minVaultSharesOut) revert SlippageExceeded(_minVaultSharesOut, vaultShares);
-        if (asset.balanceOf(address(this)) > assetBalBefore) revert FundsStuck(1); // Changed error code
+        if (asset.balanceOf(address(this)) > assetBalBefore) revert FundsStuck(1);
 
         // 2. Staking Vault Hop
         stakingAsset.forceApprove(address(stakingVault), vaultShares);
-        uint256 stakingShares = stakingVault.deposit(vaultShares, address(this)); // Deposit to router itself for next hop
+        uint256 stakingShares = stakingVault.deposit(vaultShares, address(this));
 
         if (stakingShares < _minStakingVaultSharesOut)
             revert SlippageExceeded(_minStakingVaultSharesOut, stakingShares);
-        if (stakingAsset.balanceOf(address(this)) > stakingAssetBalBefore) revert FundsStuck(2); // Changed error code
+        if (stakingAsset.balanceOf(address(this)) > stakingAssetBalBefore) revert FundsStuck(2);
 
-        // 3. Nuva Vault Hop (New)
+        // 3. Nuva Vault Hop
         nuvaAsset.forceApprove(address(nuvaVault), stakingShares);
         nuvaShares = nuvaVault.deposit(stakingShares, _receiver);
 
         if (nuvaShares < _minNuvaVaultSharesOut) revert SlippageExceeded(_minNuvaVaultSharesOut, nuvaShares);
-        if (nuvaAsset.balanceOf(address(this)) > nuvaAssetBalBefore) revert FundsStuck(3); // Changed error code
+        if (nuvaAsset.balanceOf(address(this)) > nuvaAssetBalBefore) revert FundsStuck(3);
 
-        emit Deposited(msg.sender, _amount, vaultShares, stakingShares, nuvaShares); // Updated event
-        emit NuvaDeposited(msg.sender, stakingShares, nuvaShares); // New event
+        emit Deposited(msg.sender, _amount, vaultShares, stakingShares, nuvaShares);
+        emit NuvaDeposited(msg.sender, stakingShares, nuvaShares);
     }
 
-    // --- Redemption Functions --- // NEW Section
+    // --- Redemption Functions ---
 
     /**
      * @notice Initiates an asynchronous redemption by deploying a RedemptionProxy clone.
      * @param _amountNuvaShares The amount of Nuva shares to redeem.
+     * @param _amlSignature The AML signature from the authorized signer.
+     * @param _amlDeadline The expiration timestamp of the AML signature.
      */
-    function requestRedeem(uint256 _amountNuvaShares) external nonReentrant {
+    function requestRedeem(
+        uint256 _amountNuvaShares,
+        bytes calldata _amlSignature,
+        uint256 _amlDeadline
+    ) external nonReentrant {
+        bytes32 messageHash = _getRedeemMessageHash(_amountNuvaShares, _amlDeadline);
+        _verifyAML(messageHash, _amlSignature, _amlDeadline);
+
         _doRequestRedeem(_amountNuvaShares);
     }
 
     /**
      * @notice Initiates an asynchronous redemption using ERC20 permit for vault shares.
      * @param _amountNuvaShares The amount of Nuva shares to redeem.
+     * @param _amlSignature The AML signature from the authorized signer.
+     * @param _amlDeadline The expiration timestamp of the AML signature.
      * @param _permitDeadline The expiration timestamp of the permit.
      * @param _v V component of the permit signature.
      * @param _r R component of the permit signature.
@@ -350,11 +367,16 @@ contract DedicatedVaultRouter is
      */
     function requestRedeemWithPermit(
         uint256 _amountNuvaShares,
+        bytes calldata _amlSignature,
+        uint256 _amlDeadline,
         uint256 _permitDeadline,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
     ) external nonReentrant {
+        bytes32 messageHash = _getRedeemMessageHash(_amountNuvaShares, _amlDeadline);
+        _verifyAML(messageHash, _amlSignature, _amlDeadline);
+
         try
             IERC20Permit(address(nuvaVault)).permit(
                 msg.sender,
@@ -395,9 +417,7 @@ contract DedicatedVaultRouter is
         IERC20(address(nuvaVault)).forceApprove(redemptionProxyAddress, _amountNuvaShares);
         redemptionProxy.triggerRedeem(_amountNuvaShares);
 
-        if (nuvaVault.balanceOf(address(this)) > balBefore) revert FundsStuck(1); // Changed error code
-
-        // Trigger the redemption flow in the clone
+        if (nuvaVault.balanceOf(address(this)) > balBefore) revert FundsStuck(1);
 
         redemptionProxyToUser[redemptionProxyAddress] = msg.sender;
         emit RedemptionRequested(msg.sender, redemptionProxyAddress);
@@ -491,7 +511,7 @@ contract DedicatedVaultRouter is
         address _receiver,
         uint256 _minVaultShares,
         uint256 _minStakingShares,
-        uint256 _minNuvaVaultShares, // New: Min Nuva Vault Shares
+        uint256 _minNuvaVaultShares,
         uint256 _deadline
     ) private view returns (bytes32) {
         return
@@ -503,10 +523,20 @@ contract DedicatedVaultRouter is
                     _receiver,
                     _minVaultShares,
                     _minStakingShares,
-                    _minNuvaVaultShares, // New: Include in encoding
+                    _minNuvaVaultShares,
                     _deadline
                 )
             );
+    }
+
+    /**
+     * @dev Constructs the message hash for redemption AML verification.
+     * @param _amountNuvaShares Amount of Nuva shares to redeem.
+     * @param _deadline Signature deadline.
+     * @return messageHash The computed EIP-712 message hash.
+     */
+    function _getRedeemMessageHash(uint256 _amountNuvaShares, uint256 _deadline) private view returns (bytes32) {
+        return keccak256(abi.encode(REDEEM_TYPEHASH, msg.sender, _amountNuvaShares, _deadline));
     }
 
     /**

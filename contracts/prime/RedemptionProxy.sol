@@ -75,8 +75,7 @@ contract RedemptionProxy is Initializable {
      * @param _user The address of the user receiving the redeemed assets.
      */
     function initialize(address _assetVault, address _stakingVault, address _nuvaVault, address _user) external initializer {
-        // Validation: Ensure critical addresses are set
-        if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0) || _user == address(0)) { // UPDATED validation
+        if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0) || _user == address(0)) {
             revert InvalidConfiguration();
         }
 
@@ -85,12 +84,11 @@ contract RedemptionProxy is Initializable {
 
         assetVault = IAsyncRedemptionVault(_assetVault);
         stakingVault = IERC4626(_stakingVault);
-        nuvaVault = IERC4626(_nuvaVault); // NEW: Set nuvaVault
+        nuvaVault = IERC4626(_nuvaVault);
 
-        // Cache the underlying tokens for cheaper access later
         asset = IERC20(assetVault.asset());
-        stakingAsset = IERC20(stakingVault.asset()); // NEW: Cache stakingAsset
-        nuvaAsset = IERC20(nuvaVault.asset()); // NEW: Cache nuvaAsset
+        stakingAsset = IERC20(stakingVault.asset());
+        nuvaAsset = IERC20(nuvaVault.asset());
     }
 
     // --- Core Logic ---
@@ -100,38 +98,27 @@ contract RedemptionProxy is Initializable {
      * @param _amountNuvaShares Amount of Nuva Vault shares to redeem
      */
     function triggerRedeem(uint256 _amountNuvaShares) external onlyRouter {
-        // Snapshots for post-condition checks
         uint256 nuvaBalBefore = IERC20(address(nuvaVault)).balanceOf(address(this));
         uint256 stakingBalBefore = IERC20(address(stakingVault)).balanceOf(address(this));
         uint256 assetSharesBalBefore = IERC20(address(assetVault)).balanceOf(address(this));
 
-        // 1. Pull Nuva Vault Shares from Router
         IERC20(address(nuvaVault)).safeTransferFrom(msg.sender, address(this), _amountNuvaShares);
 
-        // 2. Redeem Nuva Shares -> StakingVault Shares
-        // Standard 4626 redeem burns shares from 'owner' (this proxy)
         uint256 amountStakingShares = nuvaVault.redeem(_amountNuvaShares, address(this), address(this));
 
-        // CHECK 1: Ensure Nuva Shares were actually consumed
         if (IERC20(address(nuvaVault)).balanceOf(address(this)) > nuvaBalBefore) {
             revert FundsStuck();
         }
 
-        // 2. Redeem Staking Shares -> AssetVault Shares
-        // Approve StakingVault to take its own shares back
         uint256 amountAssetShares = stakingVault.redeem(amountStakingShares, address(this), address(this));
 
-        // CHECK 2: Ensure Staking Shares were actually consumed
         if (IERC20(address(stakingVault)).balanceOf(address(this)) > stakingBalBefore) {
             revert FundsStuck();
         }
 
-        // 3. Request Redeem on AssetVault
-        // Approve AssetVault to take its own shares back
         IERC20(address(assetVault)).forceApprove(address(assetVault), amountAssetShares);
         assetVault.requestRedeem(amountAssetShares);
 
-        // CHECK 3: Ensure AssetVault actually took the shares
         if (IERC20(address(assetVault)).balanceOf(address(this)) > assetSharesBalBefore) {
             revert FundsStuck();
         }
@@ -146,15 +133,11 @@ contract RedemptionProxy is Initializable {
     function sweep(uint256 _amount) external onlyRouter returns (uint256 sweptAmount) {
         uint256 balBefore = asset.balanceOf(address(this));
 
-        // 1. Pre-Check: Do we actually have the funds?
         if (balBefore < _amount) revert InsufficientBalance();
 
         if (_amount > 0) {
-            // 2. Perform Transfer
             asset.safeTransfer(user, _amount);
 
-            // 3. Post-Check: Did the balance actually decrease by the expected amount?
-            // This catches "Fee-on-Transfer" tokens or "Phantom Success" bugs.
             uint256 balAfter = asset.balanceOf(address(this));
             if (balBefore - balAfter != _amount) revert TransferFailed();
         }

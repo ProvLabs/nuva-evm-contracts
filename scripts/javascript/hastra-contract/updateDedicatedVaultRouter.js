@@ -61,8 +61,7 @@ async function main() {
     const amlSigner = await router.amlSigner();
     const owner = await router.owner();
 
-    console.log("
---- Current Status ---");
+    console.log("\n--- Current Status ---");
     console.log("Proxy Address:         ", proxyAddress);
     console.log("Implementation Address:", implementationAddress);
     console.log("AML Signer:            ", amlSigner);

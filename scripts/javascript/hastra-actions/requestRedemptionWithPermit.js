@@ -5,7 +5,7 @@ const { ethers } = require("hardhat");
  * This script handles:
  * 1. Generating a Permit signature for the Nuva Vault shares.
  * 2. Calling requestRedeemWithPermit on the router.
- * 
+ *
  * Required Env Vars:
  * - ROUTER_PROXY_ADDRESS: Address of the deployed router proxy.
  * - NUVA_VAULT_ADDRESS: Address of the Nuva Vault.
@@ -24,7 +24,7 @@ async function main() {
     const router = await ethers.getContractAt("DedicatedVaultRouter", routerAddress);
     const nuvaVault = await ethers.getContractAt(
         "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol:IERC20Permit",
-        nuvaVaultAddress
+        nuvaVaultAddress,
     );
     const nuvaERC20 = await ethers.getContractAt("ERC20", nuvaVaultAddress);
 
@@ -32,6 +32,37 @@ async function main() {
     const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
     console.log(`Preparing redemption with Permit for ${redeemAmountStr} Nuva shares for ${user.address}...`);
+
+    // --- STEP A: GENERATE AML SIGNATURE (Simulating your backend) ---
+    const amlSignerKey = process.env.AML_PRIVATE_KEY;
+    if (!amlSignerKey) {
+        throw new Error("Missing AML_PRIVATE_KEY environment variable");
+    }
+    const amlWallet = new ethers.Wallet(amlSignerKey, ethers.provider);
+
+    const amlDomain = {
+        name: "DedicatedVaultRouter",
+        version: "1",
+        chainId: (await ethers.provider.getNetwork()).chainId,
+        verifyingContract: routerAddress,
+    };
+
+    const amlTypes = {
+        Redeem: [
+            { name: "sender", type: "address" },
+            { name: "amountNuvaShares", type: "uint256" },
+            { name: "deadline", type: "uint256" },
+        ],
+    };
+
+    const amlValue = {
+        sender: user.address,
+        amountNuvaShares: amount,
+        deadline: deadline,
+    };
+
+    const amlSignature = await amlWallet.signTypedData(amlDomain, amlTypes, amlValue);
+    console.log("✅ AML Signature generated");
 
     // 1. Generate Permit Signature
     const nonce = await nuvaVault.nonces(user.address);
@@ -42,7 +73,7 @@ async function main() {
         name: vaultName,
         version: "1",
         chainId: chainId,
-        verifyingContract: nuvaVaultAddress
+        verifyingContract: nuvaVaultAddress,
     };
 
     const types = {
@@ -51,8 +82,8 @@ async function main() {
             { name: "spender", type: "address" },
             { name: "value", type: "uint256" },
             { name: "nonce", type: "uint256" },
-            { name: "deadline", type: "uint256" }
-        ]
+            { name: "deadline", type: "uint256" },
+        ],
     };
 
     const value = {
@@ -60,7 +91,7 @@ async function main() {
         spender: routerAddress,
         value: amount,
         nonce: nonce,
-        deadline: deadline
+        deadline: deadline,
     };
 
     console.log("Requesting Permit signature from user...");
@@ -70,17 +101,13 @@ async function main() {
 
     // 2. Request Redeem with Permit
     console.log("Calling requestRedeemWithPermit...");
-    const tx = await router.connect(user).requestRedeemWithPermit(
-        amount,
-        deadline,
-        sig.v,
-        sig.r,
-        sig.s
-    );
+    const tx = await router
+        .connect(user)
+        .requestRedeemWithPermit(amount, amlSignature, deadline, deadline, sig.v, sig.r, sig.s);
     const receipt = await tx.wait();
 
     // Find the event to get the proxy address
-    const event = receipt.logs.find(log => log.fragment && log.fragment.name === "RedemptionRequested");
+    const event = receipt.logs.find((log) => log.fragment && log.fragment.name === "RedemptionRequested");
     const proxyAddress = event.args[1];
 
     console.log(`

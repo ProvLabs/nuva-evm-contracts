@@ -13,7 +13,7 @@ async function main() {
     const router = await ethers.getContractAt("DedicatedVaultRouter", ROUTER_ADDRESS);
     const asset = await ethers.getContractAt(
         "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol:IERC20Permit",
-        ASSET_ADDRESS
+        ASSET_ADDRESS,
     );
 
     // 2. Parameters
@@ -37,7 +37,7 @@ async function main() {
         name: "DedicatedVaultRouter",
         version: "1",
         chainId: (await ethers.provider.getNetwork()).chainId,
-        verifyingContract: ROUTER_ADDRESS
+        verifyingContract: ROUTER_ADDRESS,
     };
 
     const types = {
@@ -48,8 +48,8 @@ async function main() {
             { name: "minVaultShares", type: "uint256" },
             { name: "minStakingShares", type: "uint256" },
             { name: "minNuvaVaultShares", type: "uint256" },
-            { name: "deadline", type: "uint256" }
-        ]
+            { name: "deadline", type: "uint256" },
+        ],
     };
 
     const amlValue = {
@@ -59,7 +59,7 @@ async function main() {
         minVaultShares: minVaultShares,
         minStakingShares: minStakingShares,
         minNuvaVaultShares: minNuvaShares,
-        deadline: deadline
+        deadline: deadline,
     };
 
     const amlSignature = await amlWallet.signTypedData(domain, types, amlValue);
@@ -72,9 +72,9 @@ async function main() {
 
     const permitDomain = {
         name: assetName,
-        version: "1", 
+        version: "1",
         chainId: (await ethers.provider.getNetwork()).chainId,
-        verifyingContract: ASSET_ADDRESS
+        verifyingContract: ASSET_ADDRESS,
     };
 
     const permitTypes = {
@@ -83,8 +83,8 @@ async function main() {
             { name: "spender", type: "address" },
             { name: "value", type: "uint256" },
             { name: "nonce", type: "uint256" },
-            { name: "deadline", type: "uint256" }
-        ]
+            { name: "deadline", type: "uint256" },
+        ],
     };
 
     const permitValue = {
@@ -92,7 +92,7 @@ async function main() {
         spender: ROUTER_ADDRESS,
         value: amount,
         nonce: nonce,
-        deadline: deadline
+        deadline: deadline,
     };
 
     const permitSignature = await user.signTypedData(permitDomain, permitTypes, permitValue);
@@ -113,7 +113,7 @@ async function main() {
         deadline, // permitDeadline
         sig.v,
         sig.r,
-        sig.s
+        sig.s,
     );
 
     const receipt = await tx.wait();
