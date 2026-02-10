@@ -6,21 +6,21 @@ const { ethers } = require("hardhat");
 // 1. Internal Configuration Mapping
 // This defines the specific addresses and settings for each target.
 const TARGET_CONFIG = {
-    "nvylds": {
+    nvylds: {
         clone: "0x282C951E8BA3B0aCFE9F35A5C9b805Cf877A9Ce1",
         token: "0x0A1c879E67d4a74c23E7A2D415D59F2570eEF4Ec",
-        decimals: 12
+        decimals: 12,
     },
-    "nvheloc": {
+    nvheloc: {
         clone: "0x8b795b7EAf431D132a4444C73cfc8deBB896e256",
         token: "0xB9725490CD6fee733162B195523F8f764CF0b6Df",
-        decimals: 12
+        decimals: 12,
     },
-    "snuva": {
+    snuva: {
         clone: "0xD8Ee690e664de0c7Cd9932eA706786dE7329EDf3",
         token: "0x681d331C38412E3502ab52EdFe1eF05Fb53810C4",
-        decimals: 12
-    }
+        decimals: 12,
+    },
 };
 
 // Helper to grab arguments from CLI flags OR Environment Variables
@@ -214,7 +214,9 @@ async function main() {
             .withdrawWithPermit.estimateGas(amountToWithdraw, amlSignature, amlDeadline, permitDeadline, v, r, s);
 
         const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-        console.log(`✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`);
+        console.log(
+            `✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
+        );
 
         const feeData = await ethers.provider.getFeeData();
 
@@ -229,7 +231,6 @@ async function main() {
         console.log("Transaction sent, waiting for confirmation...");
         const receipt = await tx.wait(); // Default 1 confirmation
         console.log(`✅ Withdraw successful! Transaction hash: ${receipt.hash}`);
-
     } catch (error) {
         console.error("\n❌ Transaction failed:");
         console.error("Error name:", error.name);

@@ -82,17 +82,11 @@ describe("Withdrawal", function () {
         // Initialize the withdrawal contract with the deployer as the admin and burn user
         await withdrawal.initialize(token.target, paymentToken, amlSigner.address, owner.address);
         const BURN_ROLE = await withdrawal.BURN_ROLE();
-        await expect(withdrawal.connect(owner).grantRole(BURN_ROLE, burner.address)).to.emit(
-            withdrawal,
-            "RoleGranted",
-        );
+        await expect(withdrawal.connect(owner).grantRole(BURN_ROLE, burner.address)).to.emit(withdrawal, "RoleGranted");
 
         // Mint tokens to user and approve when needed
         const MINTER_ROLE = await token.MINTER_ROLE();
-        await expect(token.connect(owner).grantRole(MINTER_ROLE, minter.address)).to.emit(
-            token,
-            "RoleGranted",
-        );
+        await expect(token.connect(owner).grantRole(MINTER_ROLE, minter.address)).to.emit(token, "RoleGranted");
         await token.connect(minter).mint(user.address, ethers.parseUnits("1000", 18));
 
         return {

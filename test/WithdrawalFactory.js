@@ -39,10 +39,7 @@ describe("WithdrawalFactory", function () {
         await paymentToken.waitForDeployment();
 
         var MINTER_ROLE = await paymentToken.MINTER_ROLE();
-        await expect(paymentToken.grantRole(MINTER_ROLE, owner.address)).to.emit(
-            paymentToken,
-            "RoleGranted",
-        );
+        await expect(paymentToken.grantRole(MINTER_ROLE, owner.address)).to.emit(paymentToken, "RoleGranted");
         await paymentToken.mint(owner.address, ethers.parseEther("1000000"));
 
         // Deploy new withdrawal token
@@ -50,10 +47,7 @@ describe("WithdrawalFactory", function () {
         await shareToken.waitForDeployment();
 
         var MINTER_ROLE = await shareToken.MINTER_ROLE();
-        await expect(shareToken.grantRole(MINTER_ROLE, owner.address)).to.emit(
-            shareToken,
-            "RoleGranted",
-        );
+        await expect(shareToken.grantRole(MINTER_ROLE, owner.address)).to.emit(shareToken, "RoleGranted");
         await shareToken.mint(owner.address, ethers.parseUnits("1000000", 6));
 
         // Deploy fresh factory
@@ -83,11 +77,7 @@ describe("WithdrawalFactory", function () {
         it("Should create a new withdrawal contract", async function () {
             const tx = await withdrawalFactory
                 .connect(owner)
-                .createWithdrawal(
-                    paymentToken.target,
-                    shareToken.target,
-                    amlSigner.address,
-                );
+                .createWithdrawal(paymentToken.target, shareToken.target, amlSigner.address);
 
             const txReceipt = await tx.wait();
             const withdrawalCreatedEvent = txReceipt.logs.find((log) => log.fragment?.name === "WithdrawalCreated");
@@ -98,10 +88,7 @@ describe("WithdrawalFactory", function () {
             expect(ethers.isAddress(withdrawalCreatedEvent.args.withdrawalAddress)).to.be.true;
 
             // Verify the withdrawal address is stored correctly
-            const withdrawalAddress = await withdrawalFactory.withdrawals(
-                paymentToken.target,
-                shareToken.target,
-            );
+            const withdrawalAddress = await withdrawalFactory.withdrawals(paymentToken.target, shareToken.target);
             expect(withdrawalAddress).to.not.equal(ethers.ZeroAddress);
         });
 
@@ -109,11 +96,7 @@ describe("WithdrawalFactory", function () {
             await expect(
                 withdrawalFactory
                     .connect(owner)
-                    .createWithdrawal(
-                        ethers.ZeroAddress,
-                        shareToken.target,
-                        amlSigner.address,
-                    ),
+                    .createWithdrawal(ethers.ZeroAddress, shareToken.target, amlSigner.address),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
 
@@ -121,11 +104,7 @@ describe("WithdrawalFactory", function () {
             await expect(
                 withdrawalFactory
                     .connect(owner)
-                    .createWithdrawal(
-                        paymentToken.target,
-                        ethers.ZeroAddress,
-                        amlSigner.address,
-                    ),
+                    .createWithdrawal(paymentToken.target, ethers.ZeroAddress, amlSigner.address),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
 
@@ -133,11 +112,7 @@ describe("WithdrawalFactory", function () {
             await expect(
                 withdrawalFactory
                     .connect(owner)
-                    .createWithdrawal(
-                        paymentToken.target,
-                        shareToken.target,
-                        ethers.ZeroAddress,
-                    ),
+                    .createWithdrawal(paymentToken.target, shareToken.target, ethers.ZeroAddress),
             ).to.be.revertedWithCustomError(withdrawalFactory, "ZeroAddress");
         });
 
@@ -145,21 +120,13 @@ describe("WithdrawalFactory", function () {
             // First creation should succeed
             await withdrawalFactory
                 .connect(owner)
-                .createWithdrawal(
-                    paymentToken.target,
-                    shareToken.target,
-                    amlSigner.address,
-                );
+                .createWithdrawal(paymentToken.target, shareToken.target, amlSigner.address);
 
             // Second creation should fail
             await expect(
                 withdrawalFactory
                     .connect(owner)
-                    .createWithdrawal(
-                        paymentToken.target,
-                        shareToken.target,
-                        amlSigner.address,
-                    ),
+                    .createWithdrawal(paymentToken.target, shareToken.target, amlSigner.address),
             ).to.be.revertedWithCustomError(withdrawalFactory, "WithdrawalAlreadyExists");
         });
     });
@@ -169,17 +136,10 @@ describe("WithdrawalFactory", function () {
             // First create a withdrawal
             const createTx = await withdrawalFactory
                 .connect(owner)
-                .createWithdrawal(
-                    paymentToken.target,
-                    shareToken.target,
-                    amlSigner.address,
-                );
+                .createWithdrawal(paymentToken.target, shareToken.target, amlSigner.address);
             await createTx.wait();
 
-            const oldWithdrawalAddress = await withdrawalFactory.withdrawals(
-                paymentToken.target,
-                shareToken.target,
-            );
+            const oldWithdrawalAddress = await withdrawalFactory.withdrawals(paymentToken.target, shareToken.target);
 
             // Deploy a new implementation
             const Withdrawal = await ethers.getContractFactory("Withdrawal");
@@ -189,18 +149,11 @@ describe("WithdrawalFactory", function () {
             // Migrate to the new implementation
             const migrateTx = await withdrawalFactory
                 .connect(owner)
-                .migrateWithdrawal(
-                    paymentToken.target,
-                    shareToken.target,
-                    amlSigner.address,
-                );
+                .migrateWithdrawal(paymentToken.target, shareToken.target, amlSigner.address);
             await migrateTx.wait();
 
             // Check that the withdrawal address has changed
-            const newWithdrawalAddress = await withdrawalFactory.withdrawals(
-                paymentToken.target,
-                shareToken.target,
-            );
+            const newWithdrawalAddress = await withdrawalFactory.withdrawals(paymentToken.target, shareToken.target);
 
             expect(newWithdrawalAddress).to.not.equal(oldWithdrawalAddress);
             expect(newWithdrawalAddress).to.not.equal(ethers.ZeroAddress);
@@ -221,11 +174,7 @@ describe("WithdrawalFactory", function () {
             await expect(
                 withdrawalFactory
                     .connect(owner)
-                    .migrateWithdrawal(
-                        paymentToken.target,
-                        shareToken.target,
-                        amlSigner.address,
-                    ),
+                    .migrateWithdrawal(paymentToken.target, shareToken.target, amlSigner.address),
             ).to.be.revertedWithCustomError(withdrawalFactory, "NoExistingWithdrawalToMigrate");
         });
 
@@ -233,11 +182,7 @@ describe("WithdrawalFactory", function () {
             // Create a withdrawal
             const createTx = await withdrawalFactory
                 .connect(owner)
-                .createWithdrawal(
-                    paymentToken.target,
-                    shareToken.target,
-                    amlSigner.address,
-                );
+                .createWithdrawal(paymentToken.target, shareToken.target, amlSigner.address);
             await createTx.wait();
 
             // Deploy a new implementation for testing
@@ -248,11 +193,7 @@ describe("WithdrawalFactory", function () {
             await expect(
                 withdrawalFactory
                     .connect(user)
-                    .migrateWithdrawal(
-                        paymentToken.target,
-                        shareToken.target,
-                        amlSigner.address,
-                    ),
+                    .migrateWithdrawal(paymentToken.target, shareToken.target, amlSigner.address),
             ).to.be.revertedWithCustomError(withdrawalFactory, "OwnableUnauthorizedAccount");
         });
     });

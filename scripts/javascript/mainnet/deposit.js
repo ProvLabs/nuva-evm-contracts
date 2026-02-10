@@ -5,8 +5,8 @@ const { ethers } = require("hardhat");
 
 // 1. Internal Mapping of Targets to Addresses
 const CLONE_MAPPING = {
-    "nvylds": "0xe67CFA547E15D18b65510a4de80777BEA3c1550E",
-    "nvheloc": "0x1Bb8a4CFe3Ccf91b0A897227DE51e61580D5FCc7",
+    nvylds: "0xe67CFA547E15D18b65510a4de80777BEA3c1550E",
+    nvheloc: "0x1Bb8a4CFe3Ccf91b0A897227DE51e61580D5FCc7",
 };
 
 // Helper to grab arguments from CLI flags OR Environment Variables
@@ -207,11 +207,13 @@ async function main() {
                 permitDeadline,
                 v,
                 r,
-                s
+                s,
             );
 
         const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-        console.log(`✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`);
+        console.log(
+            `✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
+        );
 
         const feeData = await ethers.provider.getFeeData();
 
@@ -229,7 +231,7 @@ async function main() {
                 {
                     gasLimit: gasLimit,
                     gasPrice: feeData.gasPrice,
-                }
+                },
             );
 
         console.log("Transaction sent. Waiting for confirmation...");

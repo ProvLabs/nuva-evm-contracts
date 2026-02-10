@@ -6,15 +6,15 @@ const { ethers } = require("hardhat");
 // 1. Internal Configuration Mapping
 // This defines the specific addresses and settings for each target.
 const TARGET_CONFIG = {
-    "nvylds": {
+    nvylds: {
         clone: "0x16D582E0A2E21450C107c7d118c88F0aD318790B",
         token: "0x82C9E80F0E099bf61E061EE96E23DF605388D902",
-        decimals: 12
+        decimals: 12,
     },
-    "nvheloc": {
+    nvheloc: {
         clone: "0xC5b72376dFc4123e1fd481736E68dBA35983cF69",
         token: "0x4aCB074fF8152de067be3da282DdA6469992B42d",
-        decimals: 12
+        decimals: 12,
     },
 };
 
@@ -209,7 +209,9 @@ async function main() {
             .withdrawWithPermit.estimateGas(amountToWithdraw, amlSignature, amlDeadline, permitDeadline, v, r, s);
 
         const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-        console.log(`✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`);
+        console.log(
+            `✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
+        );
 
         const feeData = await ethers.provider.getFeeData();
 
@@ -224,7 +226,6 @@ async function main() {
         console.log("Transaction sent, waiting for confirmation...");
         const receipt = await tx.wait(); // Default 1 confirmation
         console.log(`✅ Withdraw successful! Transaction hash: ${receipt.hash}`);
-
     } catch (error) {
         console.error("\n❌ Transaction failed:");
         console.error("Error name:", error.name);

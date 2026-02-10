@@ -54,7 +54,16 @@ async function main() {
 
     console.log("✅ DedicatedVaultRouter Proxy deployed to:", proxyAddress);
 
-    // 3. Grant Keeper Role if KEEPER_ADDRESS is provided
+    // 3. Set RedemptionProxy Implementation if provided
+    const redemptionImpl = process.env.REDEMPTION_PROXY_IMPLEMENTATION;
+    if (redemptionImpl) {
+        console.log("Setting RedemptionProxy implementation to:", redemptionImpl);
+        const tx = await router.setRedemptionProxyImplementation(redemptionImpl);
+        await tx.wait();
+        console.log("✅ RedemptionProxy implementation set.");
+    }
+
+    // 4. Grant Keeper Role if KEEPER_ADDRESS is provided
     const keeperAddr = process.env.KEEPER_ADDRESS;
     if (keeperAddr) {
         console.log("Granting KEEPER_ROLE to:", keeperAddr);

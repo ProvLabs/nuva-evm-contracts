@@ -2,14 +2,6 @@ const { ethers } = require("hardhat");
 
 /**
  * @notice Script to request a redemption from the DedicatedVaultRouter using ERC20 Permit.
- * This script handles:
- * 1. Generating a Permit signature for the Nuva Vault shares.
- * 2. Calling requestRedeemWithPermit on the router.
- *
- * Required Env Vars:
- * - ROUTER_PROXY_ADDRESS: Address of the deployed router proxy.
- * - NUVA_VAULT_ADDRESS: Address of the Nuva Vault.
- * - REDEEM_AMOUNT: Amount of Nuva shares to redeem (in standard units, e.g., "100").
  */
 async function main() {
     const routerAddress = process.env.ROUTER_PROXY_ADDRESS;
@@ -22,23 +14,45 @@ async function main() {
 
     const [user] = await ethers.getSigners();
     const router = await ethers.getContractAt("DedicatedVaultRouter", routerAddress);
-    const nuvaVault = await ethers.getContractAt(
+    const nuvaERC20 = await ethers.getContractAt("ERC20", nuvaVaultAddress);
+    const nuvaPermit = await ethers.getContractAt(
         "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol:IERC20Permit",
         nuvaVaultAddress,
     );
-    const nuvaERC20 = await ethers.getContractAt("ERC20", nuvaVaultAddress);
 
-    const amount = ethers.parseUnits(redeemAmountStr, 18); // Assuming 18 decimals for vault shares
+    // 1. Check User Balance
+    const decimals = await nuvaERC20.decimals();
+    const balance = await nuvaERC20.balanceOf(user.address);
+    const amount = ethers.parseUnits(redeemAmountStr, decimals);
+
+    console.log(`--- Status Check ---`);
+    console.log(`User Address:    `, user.address);
+    console.log(`User Balance:    `, ethers.formatUnits(balance, decimals));
+    console.log(`Requested Amount:`, redeemAmountStr);
+
+    if (balance < amount) {
+        throw new Error(
+            `Insufficient balance! You have ${ethers.formatUnits(balance, decimals)} but requested ${redeemAmountStr}`,
+        );
+    }
+
     const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
-    console.log(`Preparing redemption with Permit for ${redeemAmountStr} Nuva shares for ${user.address}...`);
-
-    // --- STEP A: GENERATE AML SIGNATURE (Simulating your backend) ---
+    // --- STEP A: GENERATE AML SIGNATURE ---
     const amlSignerKey = process.env.AML_PRIVATE_KEY;
     if (!amlSignerKey) {
         throw new Error("Missing AML_PRIVATE_KEY environment variable");
     }
     const amlWallet = new ethers.Wallet(amlSignerKey, ethers.provider);
+    const contractAmlSigner = await router.amlSigner();
+
+    console.log(`\n--- AML Verification ---`);
+    console.log(`Contract AML Signer:`, contractAmlSigner);
+    console.log(`Script AML Signer:  `, amlWallet.address);
+
+    if (contractAmlSigner.toLowerCase() !== amlWallet.address.toLowerCase()) {
+        console.warn("⚠️ WARNING: AML Signer mismatch! Transaction WILL revert.");
+    }
 
     const amlDomain = {
         name: "DedicatedVaultRouter",
@@ -64,19 +78,19 @@ async function main() {
     const amlSignature = await amlWallet.signTypedData(amlDomain, amlTypes, amlValue);
     console.log("✅ AML Signature generated");
 
-    // 1. Generate Permit Signature
-    const nonce = await nuvaVault.nonces(user.address);
+    // --- STEP B: GENERATE PERMIT SIGNATURE ---
+    const nonce = await nuvaPermit.nonces(user.address);
     const vaultName = await nuvaERC20.name();
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
-    const domain = {
+    const permitDomain = {
         name: vaultName,
         version: "1",
         chainId: chainId,
         verifyingContract: nuvaVaultAddress,
     };
 
-    const types = {
+    const permitTypes = {
         Permit: [
             { name: "owner", type: "address" },
             { name: "spender", type: "address" },
@@ -86,7 +100,7 @@ async function main() {
         ],
     };
 
-    const value = {
+    const permitValue = {
         owner: user.address,
         spender: routerAddress,
         value: amount,
@@ -95,25 +109,37 @@ async function main() {
     };
 
     console.log("Requesting Permit signature from user...");
-    const permitSignature = await user.signTypedData(domain, types, value);
+    const permitSignature = await user.signTypedData(permitDomain, permitTypes, permitValue);
     const sig = ethers.Signature.from(permitSignature);
     console.log("✅ Permit signature generated.");
 
-    // 2. Request Redeem with Permit
-    console.log("Calling requestRedeemWithPermit...");
-    const tx = await router
-        .connect(user)
-        .requestRedeemWithPermit(amount, amlSignature, deadline, deadline, sig.v, sig.r, sig.s);
-    const receipt = await tx.wait();
+    // --- STEP C: EXECUTE ---
+    console.log("\nSending requestRedeemWithPermit transaction...");
+    try {
+        const tx = await router
+            .connect(user)
+            .requestRedeemWithPermit(amount, amlSignature, deadline, deadline, sig.v, sig.r, sig.s);
+        const receipt = await tx.wait();
 
-    // Find the event to get the proxy address
-    const event = receipt.logs.find((log) => log.fragment && log.fragment.name === "RedemptionRequested");
-    const proxyAddress = event.args[1];
+        const event = receipt.logs.find((log) => log.fragment && log.fragment.name === "RedemptionRequested");
+        const proxyAddress = event.args[1];
 
-    console.log(`
-🚀 Success! Redemption requested with Permit.`);
-    console.log(`Redemption Proxy Address: ${proxyAddress}`);
-    console.log(`Transaction Hash:         ${receipt.hash}`);
+        console.log(`\n🚀 Success! Redemption requested.`);
+        console.log(`Redemption Proxy Address: ${proxyAddress}`);
+        console.log(`Transaction Hash:         ${receipt.hash}`);
+    } catch (error) {
+        if (error.data) {
+            try {
+                const decodedError = router.interface.parseError(error.data);
+                console.error(`\n❌ Transaction Reverted with: ${decodedError ? decodedError.name : error.data}`);
+            } catch (parseError) {
+                console.error(`\n❌ Transaction Reverted (Raw Data):`, error.data);
+            }
+        } else {
+            console.error(`\n❌ Error:`, error.message);
+        }
+        process.exit(1);
+    }
 }
 
 main().catch((error) => {

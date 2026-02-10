@@ -31,10 +31,7 @@ describe("DepositorFactory", function () {
 
         // Mint some tokens to the owner for testing
         var MINTER_ROLE = await shareToken.MINTER_ROLE();
-        await expect(shareToken.connect(owner).grantRole(MINTER_ROLE, ownerAddress)).to.emit(
-            shareToken,
-            "RoleGranted",
-        );
+        await expect(shareToken.connect(owner).grantRole(MINTER_ROLE, ownerAddress)).to.emit(shareToken, "RoleGranted");
         await shareToken.mint(ownerAddress, ethers.parseEther("1000000"));
 
         // Deploy deposit token with 6 decimals (like USDC)
@@ -82,20 +79,14 @@ describe("DepositorFactory", function () {
         expect(await depositor.depositToken()).to.equal(await depositToken.getAddress());
         expect(await depositor.amlSigner()).to.equal(await amlSigner.getAddress());
         const DESTINATION_MANAGER_ADMIN_ROLE = await depositor.DESTINATION_MANAGER_ADMIN_ROLE();
-        expect(await depositor.hasRole(DESTINATION_MANAGER_ADMIN_ROLE, await owner.getAddress())).to.equal(
-            true
-        );
+        expect(await depositor.hasRole(DESTINATION_MANAGER_ADMIN_ROLE, await owner.getAddress())).to.equal(true);
         const DESTINATION_MANAGER_ROLE = await depositor.DESTINATION_MANAGER_ROLE();
-        expect(await depositor.hasRole(DESTINATION_MANAGER_ROLE, await owner.getAddress())).to.equal(
-            false
-        );
+        expect(await depositor.hasRole(DESTINATION_MANAGER_ROLE, await owner.getAddress())).to.equal(false);
         await expect(depositor.connect(owner).grantRole(DESTINATION_MANAGER_ROLE, await owner.getAddress())).to.emit(
             depositor,
             "RoleGranted",
         );
-        expect(await depositor.hasRole(DESTINATION_MANAGER_ROLE, await owner.getAddress())).to.equal(
-            true
-        );
+        expect(await depositor.hasRole(DESTINATION_MANAGER_ROLE, await owner.getAddress())).to.equal(true);
     });
 
     it("should not allow creating duplicate depositor", async function () {
