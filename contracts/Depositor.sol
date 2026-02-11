@@ -8,7 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CustomToken} from "./CustomToken.sol";
-import {CrossChainVault} from "./CrossChainVault.sol";
+import {CrossChainVaultV0} from "./CrossChainVaultV0.sol";
 
 /*
  * @title Depositor
@@ -45,7 +45,7 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     CustomToken public depositToken;
 
     /// @notice The token that can be deposited into this contract.
-    CrossChainVault public crossChainVault;
+    CrossChainVaultV0 public crossChainVault;
 
     /// @notice The address of the share token, used for event emissions.
     address public shareToken;
@@ -153,7 +153,7 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     ) external onlyRole(DESTINATION_MANAGER_ROLE) {
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
-        crossChainVault = CrossChainVault(crossChainVaultAddress);
+        crossChainVault = CrossChainVaultV0(crossChainVaultAddress);
 
         emit CrossChainConfigSet(crossChainVaultAddress);
     }

@@ -26,7 +26,7 @@ async function fetchAllVAAs(txHash) {
             // Use the low-level API client directly.
             // This bypasses the 'CircleTransfer' logic and the 'payloadDet' crash.
             const vaaBytes = await wh.getVaaBytes(msg);
-            const vaa = '0x' + Buffer.from(vaaBytes).toString("hex");
+            const vaa = "0x" + Buffer.from(vaaBytes).toString("hex");
             console.log(`✅ Raw VAA Fetched: Seq ${vaa}`);
         } catch (e) {
             console.error(`❌ Failed to fetch VAA for sequence ${msg.sequence}:`, e.message);

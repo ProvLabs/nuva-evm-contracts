@@ -1,0 +1,187 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {IWormhole} from "./modules/wormhole/IWormhole.sol";
+import {BytesLib} from "./modules/utils/BytesLib.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ICircleIntegration} from "./modules/wormhole/ICircleIntegration.sol";
+import {ICCTPv1WithExecutor, ExecutorArgs, FeeArgs} from "./modules/wormhole/ICCTPv1WithExecutor.sol";
+
+error InvalidExecutorAddress(); // dev: invalid executor address
+error InvalidTokenAddress(); // dev: invalid token address
+error AmountMustBeGreaterThanZero(); // dev: amount must be greater than zero
+error TargetRecipientCannotBeBytes32Zero(); // dev: target recipient cannot be bytes32(0)
+error NormalizedAmountMustBeGreaterThanZero(); // dev: normalized amount must be greater than zero
+error EmitterNotRegistered(); // dev: emitter not registered
+error InsufficientValue(); // dev: insufficient value
+error EmitterNotRegisteredForChain(); // dev: emitter not registered for chain
+error TokenNotAttested(); // dev: token not attested
+error InvalidEvmAddress(); // dev: invalid EVM address
+
+/**
+ * @title A Cross-Chain Token Application
+ * @notice This contract uses Wormhole's token bridge contract to send tokens
+ * cross chain with an aribtrary message payload.
+ * @author NU Blockchain Technologies
+ */
+contract CrossChainVaultV1 is ReentrancyGuard {
+    using BytesLib for bytes;
+
+    /// @notice The executor contract
+    ICCTPv1WithExecutor public executor;
+
+    /// @notice The destination domain
+    uint32 public destinationDomain;
+
+    /**
+     * @notice Deploys the smart contract and sanity checks initial deployment values
+     * @dev Sets the executor state variable.
+     * @param executor_ The address of the executor contract
+     */
+    constructor(address executor_, uint32 _destinationDomain) {
+        // sanity check input values
+        require(executor_ != address(0), InvalidExecutorAddress());
+
+        // set constructor state variables
+        executor = ICCTPv1WithExecutor(executor_);
+        destinationDomain = _destinationDomain;
+    }
+
+    /**
+     * @notice Transfers specified tokens to any registered Token contract
+     * by invoking the `transferTokensWithPayload` method on the Wormhole token
+     * bridge contract. `transferTokensWithPayload` allows the caller to send
+     * an arbitrary message payload along with a token transfer. In this case,
+     * the arbitrary message includes the transfer recipient's target-chain
+     * wallet address.
+     * @dev reverts if:
+     * - `token` is address(0)
+     * - `amount` is zero
+     * - `targetRecipient` is bytes32(0)
+     * - a registered Token contract does not exist for the `targetChain`
+     * - caller doesn't pass enough value to pay the Wormhole network fee
+     * - normalized `amount` is zero
+     * @param token Address of `token` to be transferred
+     * @param amount Amount of `token` to be transferred
+     * @param targetChain Wormhole chain ID of the target blockchain
+     * @param targetRecipient Address in bytes32 format (zero-left-padded if
+     * less than 20 bytes) of the recipient's wallet on the target blockchain.
+     */
+    function sendTokens(
+        address token,
+        uint256 amount,
+        uint16 targetChain,
+        bytes32 targetRecipient,
+        ExecutorArgs calldata executorArgs,
+        FeeArgs calldata feeArgs
+    ) public payable nonReentrant {
+        // sanity check function arguments
+        require(token != address(0), InvalidTokenAddress());
+        require(amount > 0, AmountMustBeGreaterThanZero());
+        require(
+            targetRecipient != bytes32(0),
+            TargetRecipientCannotBeBytes32Zero()
+        );
+
+        /**
+         * Compute the normalized amount to verify that it's nonzero.
+         * The token bridge peforms the same operation before encoding
+         * the amount in the `TransferWithPayload` message.
+         */
+        require(
+            normalizeAmount(amount, getDecimals(token)) > 0,
+            NormalizedAmountMustBeGreaterThanZero()
+        );
+
+        // transfer tokens from user to the this contract
+        uint256 amountReceived = custodyTokens(token, amount);
+
+        // approve the token bridge to spend the specified tokens
+        SafeERC20.forceApprove(
+            IERC20(token),
+            address(executor),
+            amountReceived
+        );
+
+        executor.depositForBurn{value: msg.value}(
+            amountReceived, 
+            targetChain, 
+            destinationDomain, 
+            targetRecipient, 
+            token, 
+            executorArgs, 
+            feeArgs
+        );
+    }
+
+    /**
+     * @notice Custodies tokens by transferring them from the caller to this contract.
+     * @param token Address of the token to custody.
+     * @param amount Amount of tokens to custody.
+     * @return balanceDifference The difference in token balance after the transfer.
+     */
+    function custodyTokens(
+        address token,
+        uint256 amount
+    ) internal returns (uint256) {
+        // query own token balance before transfer
+        uint256 balanceBefore = getBalance(token);
+
+        // deposit tokens
+        SafeERC20.safeTransferFrom(
+            IERC20(token),
+            msg.sender,
+            address(this),
+            amount
+        );
+
+        // return the balance difference
+        return getBalance(token) - balanceBefore;
+    }
+
+    /**
+     * @notice Gets the balance of the specified token for this contract.
+     * @param token Address of the token to check.
+     * @return balance The balance of the specified token for this contract.
+     */
+    function getBalance(address token) internal view returns (uint256 balance) {
+        // fetch the specified token balance for this contract
+        (, bytes memory queriedBalance) =
+            token.staticcall(
+                abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
+            );
+        balance = abi.decode(queriedBalance, (uint256));
+    }
+
+    /**
+     * @notice Gets the decimals of the specified token.
+     * @param token Address of the token to check.
+     * @return decimals The decimals of the specified token.
+     */
+    function getDecimals(
+        address token
+    ) internal view returns (uint8) {
+        (,bytes memory queriedDecimals) = token.staticcall(
+            abi.encodeWithSignature("decimals()")
+        );
+        return abi.decode(queriedDecimals, (uint8));
+    }
+
+    /**
+     * @notice Normalizes the amount of tokens to a standard unit.
+     * @param amount The amount of tokens to normalize.
+     * @param decimals The decimals of the token.
+     * @return normalizedAmount The normalized amount of tokens.
+     */
+    function normalizeAmount(
+        uint256 amount,
+        uint8 decimals
+    ) internal pure returns(uint256) {
+        if (decimals > 8) {
+            amount /= 10 ** (decimals - 8);
+        }
+        return amount;
+    }
+}

@@ -1,5 +1,5 @@
 const hre = require("hardhat");
-const { wormhole } = require("@wormhole-foundation/sdk");
+const { wormhole, serialize } = require("@wormhole-foundation/sdk");
 const evm = require("@wormhole-foundation/sdk/evm");
 const { AbiCoder, keccak256 } = require("ethers");
 
@@ -7,28 +7,26 @@ async function main() {
     // Initialize the Wormhole SDK
     // Note: ensure the platforms (like evm) are passed in an array
     const wh = await wormhole("Testnet", [evm.default || evm]);
-    const sourceChain = wh.getChain("Sepolia");
+    const chain = wh.getChain("BaseSepolia");
 
     // Source chain transaction ID
-    const txid = "0xd47e71d398f44429f2c18b0c65447eae571a6222e02970cbbd36ced15529e09b";
-
-    const msgs = await sourceChain.parseTransaction(txid);
+    const txid = "0xd880757ddf46b917fc2abea2f00377840ea56d8111069edfae3982adb9f98a61";
 
     // Fetch the VAA and decode it
-    const vaaBytes = await wh.getVaaBytes(msgs[0]);
+    const vaa = await wh.getVaa(txid, "Uint8Array", 60000);
 
-    if (!vaaBytes) {
+    if (!vaa) {
         console.error("❌ VAA not found");
         process.exit(1);
     }
 
     // Serialize the VAA object back to bytes
-    const vaaHex = '0x' + Buffer.from(vaaBytes).toString("hex");
+    const vaaBytes = serialize(vaa);
 
-    const vaultAddress = process.env.VAULT_CROSS_CHAIN;
-    const vault = await hre.ethers.getContractAt("CrossChainVault", vaultAddress);
+    const vaultAddress = process.env.VAULT_CROSS_CHAIN_ETH;
+    const vault = await hre.ethers.getContractAt("CrossChainVaultV0", vaultAddress);
 
-    const client = await sourceChain.getRpc();
+    const client = await chain.getRpc();
     const receipt = await client.getTransactionReceipt(txid);
 
     // Circle MessageTransmitter 'MessageSent' Topic
@@ -51,14 +49,14 @@ async function main() {
 
     console.log("Submitting VAA to contract...");
     try {
-        const tx = await vault.redeemTransferWithPayload(vaaHex, circleBridgeMessage, attestations);
+        const tx = await vault.redeemTransferWithPayload(vaaBytes, circleBridgeMessage, attestations);
         console.log("Transaction sent. Waiting for confirmation...");
 
         const receipt = await tx.wait();
         console.log("Redemption Successful! Hash:", receipt.hash);
     } catch (err) {
         console.error("Contract Execution Failed.");
-        console.error(err.reason || err.message);
+        console.error(err);
     }
 }
 

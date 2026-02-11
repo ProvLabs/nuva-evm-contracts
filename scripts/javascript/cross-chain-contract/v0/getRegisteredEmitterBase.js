@@ -7,14 +7,13 @@ async function main() {
     }
     console.log("Using vault:", vaultCrossChain);
 
-    const vault = await hre.ethers.getContractAt("CrossChainVault", vaultCrossChain);
+    const vault = await hre.ethers.getContractAt("CrossChainVaultV0", vaultCrossChain);
 
-    const wormholeFee = await vault
-        .wormhole()
-        .then((w) => hre.ethers.getContractAt("IWormhole", w))
-        .then((c) => c.messageFee());
+    const targetChain = 10002;
 
-    console.log("Fee:", wormholeFee);
+    const emitter = await vault.getRegisteredEmitter(targetChain);
+
+    console.log("Emitter:", emitter);
 }
 
 main()

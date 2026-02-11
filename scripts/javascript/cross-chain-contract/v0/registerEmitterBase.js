@@ -8,20 +8,21 @@ async function main() {
     }
     console.log("Using vault:", vaultCrossChain);
 
-    const vault = await hre.ethers.getContractAt("CrossChainVault", vaultCrossChain);
+    const vault = await hre.ethers.getContractAt("CrossChainVaultV0", vaultCrossChain);
 
-    const rawAddress = process.env.PUBLIC_KEY;
+    const emitterChainId = 10002;
+
+    const rawAddress = process.env.VAULT_CROSS_CHAIN_ETH;
     if (!rawAddress) {
-        throw new Error("PUBLIC_KEY is not set.");
+        throw new Error("VAULT_CROSS_CHAIN_ETH is not set.");
     }
-    const targetRecipient = zeroPadValue(getAddress(rawAddress), 32);
+    const emitterAddress = zeroPadValue(getAddress(rawAddress), 32);
 
-    const encodePayload = await vault.encodePayload({
-        payloadID: 1,
-        targetRecipient: targetRecipient,
-    });
+    const tx = await vault.registerEmitter(emitterChainId, emitterAddress);
 
-    console.log("encodePayload:", encodePayload);
+    const receipt = await tx.wait();
+
+    console.log("register tx:", receipt.hash);
 }
 
 main()

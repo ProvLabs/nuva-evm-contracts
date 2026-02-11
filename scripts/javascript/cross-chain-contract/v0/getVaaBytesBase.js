@@ -20,7 +20,7 @@ async function main() {
     }
 
     // Serialize the VAA object back to bytes
-    const vaaHex = '0x' + Buffer.from(vaaBytes).toString("hex");
+    const vaaHex = "0x" + Buffer.from(vaaBytes).toString("hex");
 
     console.log(`VAA Bytes (hex):\n${vaaHex}`);
 }

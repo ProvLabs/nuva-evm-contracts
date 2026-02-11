@@ -7,7 +7,7 @@ async function main() {
     }
     console.log("Using vault:", vaultCrossChain);
 
-    const vault = await hre.ethers.getContractAt("CrossChainVault", vaultCrossChain);
+    const vault = await hre.ethers.getContractAt("CrossChainVaultV0", vaultCrossChain);
 
     const targetChain = 10004;
 

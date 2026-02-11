@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "CrossChainVault",
-  "sourceName": "contracts/CrossChainVault.sol",
+  "contractName": "CrossChainVaultV0",
+  "sourceName": "contracts/CrossChainVaultV0.sol",
   "abi": [
     {
       "inputs": [

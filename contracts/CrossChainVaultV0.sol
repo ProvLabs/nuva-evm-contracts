@@ -31,7 +31,7 @@ error InvalidEvmAddress(); // dev: invalid EVM address
  * cross chain with an aribtrary message payload.
  * @author NU Blockchain Technologies
  */
-contract CrossChainVault is CrossChainVaultGovernance, CrossChainVaultMessages, ReentrancyGuard {
+contract CrossChainVaultV0 is CrossChainVaultGovernance, CrossChainVaultMessages, ReentrancyGuard {
     using BytesLib for bytes;
 
     /**

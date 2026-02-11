@@ -386,7 +386,7 @@
       "name": "crossChainVault",
       "outputs": [
         {
-          "internalType": "contract CrossChainVault",
+          "internalType": "contract CrossChainVaultV0",
           "name": "",
           "type": "address"
         }

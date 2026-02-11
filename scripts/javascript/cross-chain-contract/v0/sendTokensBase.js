@@ -2,18 +2,18 @@ const hre = require("hardhat");
 const { zeroPadValue, getAddress } = require("ethers");
 
 async function main() {
-    const vaultCrossChain = process.env.VAULT_CROSS_CHAIN_ETH;
+    const vaultCrossChain = process.env.VAULT_CROSS_CHAIN;
     if (!vaultCrossChain) {
-        throw new Error("VAULT_CROSS_CHAIN_ETH is not set.");
+        throw new Error("VAULT_CROSS_CHAIN is not set.");
     }
     console.log("Using vault:", vaultCrossChain);
 
-    const vault = await hre.ethers.getContractAt("CrossChainVault", vaultCrossChain);
+    const vault = await hre.ethers.getContractAt("CrossChainVaultV0", vaultCrossChain);
 
     const decimals = 6;
     const amount = hre.ethers.parseUnits("1", decimals);
-    // Eth USDC Token Address
-    const token = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238";
+    // Base USDC Token Address
+    const token = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
     const erc20ABI = [
         "function approve(address spender, uint256 amount) public returns (bool)",
         "function allowance(address owner, address spender) public view returns (uint256)",
@@ -38,7 +38,7 @@ async function main() {
     const fee = await wormhole.messageFee();
     console.log(`Current Wormhole Fee: ${fee.toString()} wei`);
 
-    const targetChain = 10004;
+    const targetChain = 10002;
     const batchId = 1;
 
     const rawAddress = process.env.PUBLIC_KEY;
