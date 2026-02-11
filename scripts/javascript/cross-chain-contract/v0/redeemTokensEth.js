@@ -23,7 +23,7 @@ async function main() {
     // Serialize the VAA object back to bytes
     const vaaBytes = serialize(vaa);
 
-    const vaultAddress = process.env.VAULT_CROSS_CHAIN_ETH;
+    const vaultAddress = process.env.VAULT_CROSS_CHAIN_ETH_V0;
     const vault = await hre.ethers.getContractAt("CrossChainVaultV0", vaultAddress);
 
     const client = await chain.getRpc();

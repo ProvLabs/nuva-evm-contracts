@@ -6,9 +6,9 @@ async function main() {
     const evmPlatform = evm.default || evm;
     const wh = await wormhole("Testnet", [evmPlatform]);
 
-    const vaultCrossChain = process.env.VAULT_CROSS_CHAIN;
+    const vaultCrossChain = process.env.VAULT_CROSS_CHAIN_BASE_V0;
     if (!vaultCrossChain) {
-        throw new Error("VAULT_CROSS_CHAIN is not set.");
+        throw new Error("VAULT_CROSS_CHAIN_BASE_V0 is not set.");
     }
     console.log("Using vault address:", vaultCrossChain);
 

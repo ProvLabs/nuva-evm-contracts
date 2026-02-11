@@ -7,9 +7,9 @@ if (!CLONE_ADDRESS) {
     throw new Error("DEPOSITOR_CLONE_ADDRESS is not set.");
 }
 
-const CROSS_CHAIN_VAULT_ADDRESS = process.env.VAULT_CROSS_CHAIN;
+const CROSS_CHAIN_VAULT_ADDRESS = process.env.VAULT_CROSS_CHAIN_BASE_V0;
 if (!CROSS_CHAIN_VAULT_ADDRESS) {
-    throw new Error("VAULT_CROSS_CHAIN is not set.");
+    throw new Error("VAULT_CROSS_CHAIN_BASE_V0 is not set.");
 }
 
 async function main() {
