@@ -5,9 +5,9 @@ const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definition
 const { default: axios } = require("axios");
 
 async function main() {
-    const vaultCrossChain = process.env.VAULT_CROSS_CHAIN_BASE_V1;
+    const vaultCrossChain = process.env.VAULT_CROSS_CHAIN_ETH_V1;
     if (!vaultCrossChain) {
-        throw new Error("VAULT_CROSS_CHAIN_BASE_V1 is not set.");
+        throw new Error("VAULT_CROSS_CHAIN_ETH_V1 is not set.");
     }
     console.log("Using vault:", vaultCrossChain);
 
@@ -16,7 +16,7 @@ async function main() {
     const decimals = 6;
     const amount = hre.ethers.parseUnits("1", decimals);
     // Base USDC Token Address
-    const token = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
+    const token = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238";
     const erc20ABI = [
         "function approve(address spender, uint256 amount) public returns (bool)",
         "function allowance(address owner, address spender) public view returns (uint256)",
@@ -36,9 +36,9 @@ async function main() {
         console.log("Sufficient allowance already exists.");
     }
 
-    const srcChain = 10004;
-    const targetChain = 10002;
-    const targetDomain = 0;
+    const srcChain = 10002;
+    const targetChain = 10004;
+    const targetDomain = 6;
 
     const rawAddress = process.env.PUBLIC_KEY;
     if (!rawAddress) {
@@ -99,12 +99,6 @@ async function main() {
         const receipt = await tx.wait();
 
         console.log("send tx:", receipt.hash);
-
-        const res = await axios.post(`${EXECUTOR_URL}/v0/status/tx`, {
-            txHash,
-            chainId,
-        });
-        console.log(res);
     } catch (error) {
         console.log("Actual Revert Reason:", error);
     }

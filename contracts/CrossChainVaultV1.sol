@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IWormhole} from "./modules/wormhole/IWormhole.sol";
 import {BytesLib} from "./modules/utils/BytesLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ICircleIntegration} from "./modules/wormhole/ICircleIntegration.sol";
 import {ICCTPv1WithExecutor, ExecutorArgs, FeeArgs} from "./modules/wormhole/ICCTPv1WithExecutor.sol";
 
 error InvalidExecutorAddress(); // dev: invalid executor address
@@ -32,27 +30,23 @@ contract CrossChainVaultV1 is ReentrancyGuard {
     /// @notice The executor contract
     ICCTPv1WithExecutor public executor;
 
-    /// @notice The destination domain
-    uint32 public destinationDomain;
-
     /**
      * @notice Deploys the smart contract and sanity checks initial deployment values
      * @dev Sets the executor state variable.
      * @param executor_ The address of the executor contract
      */
-    constructor(address executor_, uint32 _destinationDomain) {
+    constructor(address executor_) {
         // sanity check input values
         require(executor_ != address(0), InvalidExecutorAddress());
 
         // set constructor state variables
         executor = ICCTPv1WithExecutor(executor_);
-        destinationDomain = _destinationDomain;
     }
 
     /**
      * @notice Transfers specified tokens to any registered Token contract
-     * by invoking the `transferTokensWithPayload` method on the Wormhole token
-     * bridge contract. `transferTokensWithPayload` allows the caller to send
+     * by invoking the `depositForBurn` method on the Wormhole token
+     * bridge contract. `depositForBurn` allows the caller to send
      * an arbitrary message payload along with a token transfer. In this case,
      * the arbitrary message includes the transfer recipient's target-chain
      * wallet address.
@@ -66,13 +60,17 @@ contract CrossChainVaultV1 is ReentrancyGuard {
      * @param token Address of `token` to be transferred
      * @param amount Amount of `token` to be transferred
      * @param targetChain Wormhole chain ID of the target blockchain
+     * @param targetDomain Circle's domain ID of the target blockchain
      * @param targetRecipient Address in bytes32 format (zero-left-padded if
      * less than 20 bytes) of the recipient's wallet on the target blockchain.
+     * @param executorArgs The executor arguments
+     * @param feeArgs The fee arguments
      */
     function sendTokens(
         address token,
         uint256 amount,
         uint16 targetChain,
+        uint32 targetDomain,
         bytes32 targetRecipient,
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
@@ -88,7 +86,7 @@ contract CrossChainVaultV1 is ReentrancyGuard {
         /**
          * Compute the normalized amount to verify that it's nonzero.
          * The token bridge peforms the same operation before encoding
-         * the amount in the `TransferWithPayload` message.
+         * the amount in the `depositForBurn` message.
          */
         require(
             normalizeAmount(amount, getDecimals(token)) > 0,
@@ -105,10 +103,13 @@ contract CrossChainVaultV1 is ReentrancyGuard {
             amountReceived
         );
 
+        // removed fees from the token amount
+        uint256 amountTransferred = amountReceived - feeArgs.transferTokenFee;
+
         executor.depositForBurn{value: msg.value}(
-            amountReceived, 
+            amountTransferred, 
             targetChain, 
-            destinationDomain, 
+            targetDomain, 
             targetRecipient, 
             token, 
             executorArgs, 
