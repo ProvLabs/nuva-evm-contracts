@@ -99,12 +99,6 @@ async function main() {
         const receipt = await tx.wait();
 
         console.log("send tx:", receipt.hash);
-
-        const res = await axios.post(`${EXECUTOR_URL}/v0/status/tx`, {
-            txHash,
-            chainId,
-        });
-        console.log(res);
     } catch (error) {
         console.log("Actual Revert Reason:", error);
     }

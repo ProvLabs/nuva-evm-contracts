@@ -92,7 +92,7 @@ async function main() {
             executorArgs,
             feeArgs,
             {
-                value: BigInt(estimatedCost) + feeArgs.nativeTokenFee,
+                value: BigInt(estimatedCost) + feeArgs.nativeTokenFee + hre.ethers.parseUnits("2"),
                 gasLimit: 500000n,
             },
         );

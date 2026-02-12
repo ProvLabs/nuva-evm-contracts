@@ -11,8 +11,10 @@ async function main() {
             chainId,
         });
         console.log(res.data);
-        console.log(`https://wormholelabs-xyz.github.io/executor-explorer/#/chain/${chainId}tx/${txHash}?endpoint=${encodeURIComponent(EXECUTOR_URL)}`);
-
+        console.log(
+            `https://wormholelabs-xyz.github.io/executor-explorer/#/chain/${chainId}tx/${txHash}?endpoint=${encodeURIComponent(EXECUTOR_URL)}`,
+        );
+        console.log(JSON.stringify(res.data));
     } catch (error) {
         console.log("Actual Revert Reason:", error);
     }

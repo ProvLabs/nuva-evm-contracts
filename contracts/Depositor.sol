@@ -5,10 +5,9 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {CustomToken} from "./CustomToken.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {CustomToken} from "./CustomToken.sol";
-import {CrossChainVaultV0} from "./CrossChainVaultV0.sol";
 
 /*
  * @title Depositor
@@ -44,9 +43,6 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     /// @notice The token that can be deposited into this contract.
     CustomToken public depositToken;
 
-    /// @notice The token that can be deposited into this contract.
-    CrossChainVaultV0 public crossChainVault;
-
     /// @notice The address of the share token, used for event emissions.
     address public shareToken;
 
@@ -73,14 +69,6 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         address shareTokenAddress,
         address amlSignerAddress,
         address destinationManagerAddress
-    );
-
-    /**
-     * @notice Emitted when cross chain config is set.
-     * @param crossChainVaultAddress The address of the cross chain vault.
-     */
-    event CrossChainConfigSet(
-        address indexed crossChainVaultAddress
     );
 
     /**
@@ -144,21 +132,6 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     // --- Public Functions ---
 
     /**
-     * @notice Initializes the contract with the provided token addresses and AML signer.
-     * @dev Can only be called once during contract deployment.
-     * @param crossChainVaultAddress The cross chain vault address.
-     */
-    function setCrossChainConfig(
-        address crossChainVaultAddress
-    ) external onlyRole(DESTINATION_MANAGER_ROLE) {
-        if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
-
-        crossChainVault = CrossChainVaultV0(crossChainVaultAddress);
-
-        emit CrossChainConfigSet(crossChainVaultAddress);
-    }
-
-    /**
      * @notice Deposits tokens after user provides a separate `approve`.
      * @dev Requires AML signature.
      * @param _amount The amount of tokens to deposit.
@@ -215,64 +188,6 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         );
 
         _doDeposit(_amount, _destinationAddress);
-    }
-
-    /**
-     * @notice Deposits tokens using an off-chain 'permit' signature.
-     * @dev This allows for a single-transaction approve+deposit.
-     * @param _amount The amount of tokens to deposit.
-     * @param _destinationAddress The address to send the tokens to.
-     * @param _amlSignature The address to send the tokens to.
-     * @param _amlDeadline The time at which the AML signature expires.
-     * @param _permitDeadline The time at which the permit signature expires.
-     * @param _v The recovery byte of the EIP-712 permit signature.
-     * @param _r First 32 bytes of the EIP-712 permit signature.
-     * @param _s Second 32 bytes of the EIP-712 permit signature.
-     * @param targetChain The target chain to deposit to.
-     * @param batchId The batch ID of the deposit.
-     */
-    function depositCrossChain(
-        uint256 _amount,
-        address _destinationAddress,
-        bytes calldata _amlSignature,
-        uint256 _amlDeadline,
-        uint256 _permitDeadline,
-        uint8 _v,
-        bytes32 _r,
-        bytes32 _s,
-        uint16 targetChain,
-        uint32 batchId
-    ) external {
-        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
-        _verifyAML(messageHash, _amlSignature, _amlDeadline);
-
-        // This call will fail if the signature is invalid or deadline passed.
-        IERC20Permit(address(depositToken)).permit(
-            msg.sender, // The user (owner)
-            address(this), // The spender (this contract)
-            _amount, // The amount
-            _permitDeadline, // Expiration
-            _v,
-            _r,
-            _s // The user's signature
-        );
-
-        crossChainVault.sendTokensWithPayload(
-            address(depositToken), 
-            _amount, 
-            targetChain, 
-            batchId, 
-            bytes32(uint256(uint160(_destinationAddress)))
-        );
-    }
-
-    /**
-     * @notice Get the cross chain vault address
-     * @dev Helper function to get the full list of addresses.
-     * @return The address of the cross chain vault
-     */
-    function getCrossChainContractAddress() public view returns (address) {
-        return address(crossChainVault);
     }
 
     /**
@@ -394,7 +309,7 @@ contract Depositor is Initializable, AccessControlUpgradeable {
      */
     function _getMessageHash(
         uint256 _amount,
-        address _destinationAddress, // base_chain_id = 1
+        address _destinationAddress,
         uint256 _deadline
     ) private view returns (bytes32) {
         return
