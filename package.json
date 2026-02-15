@@ -23,6 +23,10 @@
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@nomicfoundation/hardhat-verify": "^2.1.0",
     "@nomicfoundation/ignition-core": "^0.15.13",
+<<<<<<< HEAD
+=======
+    "@openzeppelin/contracts-upgradeable": "^5.4.0",
+>>>>>>> 286c7e4 (feat: added CrossChainManager contract)
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
@@ -45,7 +49,6 @@
     "@certusone/wormhole-sdk": "^0.10.18",
     "@nomicfoundation/solidity-analyzer-darwin-arm64": "^0.1.2",
     "@openzeppelin/contracts": "^5.4.0",
-    "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@wormhole-foundation/sdk": "^4.9.1",
     "@wormhole-foundation/sdk-connect": "^4.10.0",
     "@wormhole-foundation/wormhole-solidity-sdk": "^1.0.1",
