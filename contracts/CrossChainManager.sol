@@ -12,6 +12,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CustomToken} from "./CustomToken.sol";
 import {CrossChainVaultV1, ExecutorArgs, FeeArgs} from "./CrossChainVaultV1.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /*
  * @title Depositor
@@ -215,7 +216,7 @@ contract CrossChainManager is
         uint32 targetDomain,
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
-    ) external {
+    ) external payable nonReentrant {
         bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
@@ -368,6 +369,13 @@ contract CrossChainManager is
         if (_destinationAddress == address(0)) revert InvalidAddress("destination");
         if (!isDestination(_destinationAddress)) revert InvalidAddress("destination");
 
+        // Pull tokens from the user to this contract
+        depositToken.safeTransferFrom(msg.sender, address(this), _amount);
+
+        // Approve the Vault to spend the tokens just pulled
+        depositToken.forceApprove(address(crossChainVault), _amount);
+
+        // Calling the vault
         crossChainVault.sendTokens{value: msg.value}(
             address(depositToken), 
             _amount, 

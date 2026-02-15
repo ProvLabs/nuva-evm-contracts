@@ -72,41 +72,35 @@ async function main() {
 
     const amlDeadline = Math.floor(Date.now() / 1000) + 60 * 60;
 
-    // 1. Create the Type Hash (must match the string in Solidity exactly)
-    const TYPE_HASH = ethers.id("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+    // Define the EIP-712 Domain
+    const domain = {
+        name: "Depositor",
+        version: "1",
+        chainId: (await ethers.provider.getNetwork()).chainId,
+        verifyingContract: CROSS_CHAIN_MANAGER_ADDRESS,
+    };
 
-    // 2. Encode using abi.encode logic (non-packed)
-    const abiCoder = new ethers.AbiCoder();
-    const structHash = ethers.keccak256(
-        abiCoder.encode(
-            ["bytes32", "address", "uint256", "address", "uint256"],
-            [TYPE_HASH, user.address, AMOUNT_TO_DEPOSIT, DESTINATION_ADDRESS, amlDeadline],
-        ),
-    );
+    // Define the Types (matches your Solidity struct exactly)
+    const types = {
+        Deposit: [
+            { name: "sender", type: "address" },
+            { name: "amount", type: "uint256" },
+            { name: "destinationAddress", type: "address" },
+            { name: "deadline", type: "uint256" },
+        ],
+    };
 
-    // 3. Domain Separator (This is required because your contract uses MessageHashUtils.toTypedDataHash)
-    const domainSeparator = ethers.keccak256(
-        abiCoder.encode(
-            ["bytes32", "bytes32", "bytes32", "uint256", "address"],
-            [
-                ethers.id("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                ethers.id("Depositor"),
-                ethers.id("1"),
-                (await ethers.provider.getNetwork()).chainId,
-                CROSS_CHAIN_MANAGER_ADDRESS,
-            ],
-        ),
-    );
+    // Define the Values
+    const value = {
+        sender: user.address,
+        amount: AMOUNT_TO_DEPOSIT,
+        destinationAddress: DESTINATION_ADDRESS,
+        deadline: amlDeadline,
+    };
 
-    // 4. Final EIP-712 Hash
-    const finalHash = ethers.solidityPackedKeccak256(
-        ["string", "bytes32", "bytes32"],
-        ["\x19\x01", domainSeparator, structHash],
-    );
-
-    // 5. Sign (Since we already did the 0x19 01 prefixing, use signMessage or signTypedData)
-    const amlSignature = await amlSigner.signMessage(ethers.getBytes(finalHash));
-    console.log("   ✅ AML Signature created.");
+    // Sign using signTypedData (No manual hashing required!)
+    const amlSignature = await amlSigner.signTypedData(domain, types, value);
+    console.log("   ✅ AML Signature created successfully.");
 
     // --- STEP 1: APPROVE ---
     // The user approves the proxy contract to spend their tokens
@@ -166,20 +160,7 @@ async function main() {
         payee: DESTINATION_ADDRESS,
     };
 
-    console.log({
-        AMOUNT_TO_DEPOSIT,
-        DESTINATION_ADDRESS,
-        amlSignature,
-        amlDeadline,
-        targetChain,
-        targetDomain,
-        executorArgs,
-        feeArgs,
-        value: BigInt(estimatedCost) + BigInt(feeArgs.nativeTokenFee),
-        gasLimit: 500000n,
-    });
-
-    // Note: We connect the `user` to the `crossChainManager` contract
+    // connect the `user` to the `crossChainManager` contract
     try {
         const depositTx = await crossChainManager
             .connect(user)
