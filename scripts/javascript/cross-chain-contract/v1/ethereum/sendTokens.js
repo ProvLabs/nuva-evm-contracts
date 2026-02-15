@@ -77,8 +77,8 @@ async function main() {
     };
 
     const feeArgs = {
-        transferTokenFee: (amount * 1n) / 100n,
-        nativeTokenFee: 1000000000000n,
+        transferTokenFee: 0n,
+        nativeTokenFee: 0n,
         payee: rawAddress,
     };
 
@@ -92,7 +92,7 @@ async function main() {
             executorArgs,
             feeArgs,
             {
-                value: BigInt(estimatedCost) + feeArgs.nativeTokenFee + hre.ethers.parseUnits("2"),
+                value: BigInt(estimatedCost) + feeArgs.nativeTokenFee,
                 gasLimit: 500000n,
             },
         );

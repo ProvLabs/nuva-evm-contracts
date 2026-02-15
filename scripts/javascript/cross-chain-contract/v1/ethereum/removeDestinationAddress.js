@@ -1,15 +1,13 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const [user] = await ethers.getSigners();
-
-    const PROXY_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY;
+    const PROXY_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
     if (!PROXY_ADDRESS) {
-        throw new Error("CROSS_CHAIN_MANAGER_PROXY is not set.");
+        throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
     }
 
-    const NEW_DESTINATION = process.env.PUBLIC_KEY;
-    if (!NEW_DESTINATION) {
+    const ADDRESS_TO_REMOVE = process.env.PUBLIC_KEY;
+    if (!ADDRESS_TO_REMOVE) {
         throw new Error("PUBLIC_KEY is not set.");
     }
 
@@ -29,12 +27,12 @@ async function main() {
         console.log("Role granted successfully.");
     }
 
-    // 3. Now add the destination
-    console.log(`Adding ${NEW_DESTINATION} to allowlist...`);
-    const tx = await manager.addDestinationAddress(NEW_DESTINATION);
+    // 3. Now remove the destination
+    console.log(`Removing ${ADDRESS_TO_REMOVE} from allowlist...`);
+    const tx = await manager.removeDestinationAddress(ADDRESS_TO_REMOVE);
     await tx.wait();
 
-    console.log("Success: Destination added.");
+    console.log("Success: Destination removed.");
 }
 
 main().catch((error) => {

@@ -6,9 +6,9 @@ const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definition
 const { default: axios } = require("axios");
 
 // --- START: Configuration ---
-const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY;
+const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
 if (!CROSS_CHAIN_MANAGER_ADDRESS) {
-    throw new Error("CROSS_CHAIN_MANAGER_PROXY is not set.");
+    throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
 }
 
 const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
@@ -43,7 +43,7 @@ async function main() {
     // 1. Get our "user" (signer 1)
     const [user] = await ethers.getSigners();
     const amlSigner = getAmlSigner();
-    const DEPOSIT_TOKEN_ADDRESS = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
+    const DEPOSIT_TOKEN_ADDRESS = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238";
 
     console.log(`Simulating deposit as user: ${user.address}`);
     console.log(`AML Signer (server): ${amlSigner.address}`);
@@ -120,9 +120,9 @@ async function main() {
     // The user calls the deposit function on the proxy
     console.log("2. Calling deposit() on the proxy contract...");
 
-    const srcChain = 10004;
-    const targetChain = 10002;
-    const targetDomain = 0;
+    const srcChain = 10002;
+    const targetChain = 10004;
+    const targetDomain = 6;
 
     const relayInstructions = serializeLayout(relayInstructionsLayout, {
         requests: [
