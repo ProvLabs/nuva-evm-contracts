@@ -1,7 +1,7 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const deployVault = await ethers.getContractFactory("CrossChainVaultV1");
+    const deployVault = await ethers.getContractFactory("CrossChainVault");
 
     const executor = "0x96846c31e4f87c0f186a322926c61d4183439f0a";
 

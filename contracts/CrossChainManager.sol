@@ -11,7 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CustomToken} from "./CustomToken.sol";
-import {CrossChainVaultV1, ExecutorArgs, FeeArgs} from "./CrossChainVaultV1.sol";
+import {CrossChainVault, ExecutorArgs, FeeArgs} from "./CrossChainVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /*
@@ -57,7 +57,7 @@ contract CrossChainManager is
     CustomToken public depositToken;
 
     /// @notice The token that can be deposited into this contract.
-    CrossChainVaultV1 public crossChainVault;
+    CrossChainVault public crossChainVault;
 
     /// @notice The address of the share token, used for event emissions.
     address public shareToken;
@@ -164,7 +164,7 @@ contract CrossChainManager is
         depositToken = CustomToken(_depositTokenAddress);
         shareToken = _shareTokenAddress;
         amlSigner = _amlSignerAddress;
-        crossChainVault = CrossChainVaultV1(crossChainVaultAddress);
+        crossChainVault = CrossChainVault(crossChainVaultAddress);
 
         _setRoleAdmin(DESTINATION_MANAGER_ROLE, DESTINATION_MANAGER_ADMIN_ROLE);
         _grantRole(DESTINATION_MANAGER_ADMIN_ROLE, _destinationManagerAddress);
@@ -190,7 +190,7 @@ contract CrossChainManager is
     ) external onlyRole(DESTINATION_MANAGER_ROLE) {
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
-        crossChainVault = CrossChainVaultV1(crossChainVaultAddress);
+        crossChainVault = CrossChainVault(crossChainVaultAddress);
 
         emit CrossChainConfigUpdated(crossChainVaultAddress);
     }

@@ -227,7 +227,9 @@ async function main() {
 
     // Convert to BigInt and add 20% buffer
     const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-    console.log(`✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`);
+    console.log(
+        `   ✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
+    );
 
     // Get current gas price
     const feeData = await ethers.provider.getFeeData();

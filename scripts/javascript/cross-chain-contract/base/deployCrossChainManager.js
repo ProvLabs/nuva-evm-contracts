@@ -10,9 +10,9 @@ if (!AML_SIGNER) {
     throw new Error("AML_SIGNER_KEY is not set.");
 }
 
-const CROSS_CHAIN_VAULT = process.env.VAULT_CROSS_CHAIN_BASE_V1;
+const CROSS_CHAIN_VAULT = process.env.VAULT_CROSS_CHAIN_BASE;
 if (!CROSS_CHAIN_VAULT) {
-    throw new Error("VAULT_CROSS_CHAIN_BASE_V1 is not set.");
+    throw new Error("VAULT_CROSS_CHAIN_BASE is not set.");
 }
 
 async function main() {
