@@ -124,10 +124,12 @@ contract DedicatedVaultRouter is
      * @param users The array of user addresses (from proxy addresses).
      * @param totalSweptAmount The total amount of assets swept.
      */
-    event RedemptionsSwept(address[] users, uint256 totalSweptAmount);
+    event RedemptionsSwept(address[] users, uint256[] amounts, uint256 totalSweptAmount);
 
     // --- Custom Errors ---
     error InvalidVault();
+    error InvalidAmount();
+    error InvalidAddress();
     error InvalidAmlSigner();
     error AmlSignatureExpired();
     error AmlSignatureAlreadyUsed();
@@ -270,9 +272,7 @@ contract DedicatedVaultRouter is
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        try
-            IERC20Permit(address(asset)).permit(msg.sender, address(this), _amount, _permitDeadline, _v, _r, _s)
-        {
+        try IERC20Permit(address(asset)).permit(msg.sender, address(this), _amount, _permitDeadline, _v, _r, _s) {
             // Permit successful
         } catch {
             // Permit failed or not supported, proceeding with existing allowance
@@ -297,13 +297,15 @@ contract DedicatedVaultRouter is
         uint256 _minStakingVaultSharesOut,
         uint256 _minNuvaVaultSharesOut
     ) internal returns (uint256 nuvaShares) {
+        if (_amount == 0) revert InvalidAmount();
+        if (_receiver == address(0)) revert InvalidAddress();
+
         uint256 assetBalBefore = asset.balanceOf(address(this));
         uint256 stakingAssetBalBefore = stakingAsset.balanceOf(address(this));
         uint256 nuvaAssetBalBefore = nuvaAsset.balanceOf(address(this));
 
         // 1. Asset Vault Hop
         asset.safeTransferFrom(msg.sender, address(this), _amount);
-
         asset.forceApprove(address(assetVault), _amount);
         uint256 vaultShares = assetVault.deposit(_amount, address(this));
 
@@ -393,9 +395,10 @@ contract DedicatedVaultRouter is
      * @param _amountNuvaShares Amount of Nuva shares to redeem.
      */
     function _doRequestRedeem(uint256 _amountNuvaShares) internal {
-        uint256 balBefore = nuvaVault.balanceOf(address(this));
-
+        if (_amountNuvaShares == 0) revert InvalidAmount();
         if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
+
+        uint256 balBefore = nuvaVault.balanceOf(address(this));
 
         // Deploy a minimal proxy clone of RedemptionProxy
         address redemptionProxyAddress = Clones.clone(redemptionProxyImplementation);
@@ -420,10 +423,10 @@ contract DedicatedVaultRouter is
      * @param _proxyAddresses Array of proxy addresses to sweep from.
      * @param _amounts Array of amounts to sweep for each proxy.
      */
-    function sweepRedemptions(address[] calldata _proxyAddresses, uint256[] calldata _amounts)
-        external
-        onlyRole(KEEPER_ROLE)
-    {
+    function sweepRedemptions(
+        address[] calldata _proxyAddresses,
+        uint256[] calldata _amounts
+    ) external onlyRole(KEEPER_ROLE) {
         if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
         if (_proxyAddresses.length != _amounts.length) revert ArrayLengthMismatch();
 
@@ -434,17 +437,14 @@ contract DedicatedVaultRouter is
             uint256 amountToSweep = _amounts[i];
             address user = redemptionProxyToUser[proxyAddress];
 
-            if (user == address(0)) {
-                // Skip if proxy doesn't exist or already swept
-                continue;
+            if (user != address(0) && amountToSweep > 0) {
+                IRedemptionProxy redemptionProxy = IRedemptionProxy(proxyAddress);
+                totalSwept += redemptionProxy.sweep(amountToSweep);
+
+                delete redemptionProxyToUser[proxyAddress];
             }
-
-            IRedemptionProxy redemptionProxy = IRedemptionProxy(proxyAddress);
-            totalSwept += redemptionProxy.sweep(amountToSweep); // Sweep all available assets
-
-            delete redemptionProxyToUser[proxyAddress];
         }
-        emit RedemptionsSwept(_proxyAddresses, totalSwept);
+        emit RedemptionsSwept(_proxyAddresses, _amounts, totalSwept);
     }
 
     // --- Admin Functions ---

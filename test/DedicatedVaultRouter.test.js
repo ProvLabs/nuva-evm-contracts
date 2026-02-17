@@ -1138,7 +1138,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(router.connect(owner).sweepRedemptions(proxies, amounts))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs(proxies, amount * 2n);
+                .withArgs(proxies, amounts, amount * 2n);
 
             // 5. Verify funds reached users
             expect(await routerAsset.balanceOf(user.address)).to.equal(balanceBefore + amount);
@@ -1148,23 +1148,27 @@ describe("DedicatedVaultRouter", function () {
             // Attempting to sweep again should yield 0 swept
             await expect(router.connect(owner).sweepRedemptions(proxies, amounts))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs(proxies, 0);
+                .withArgs(proxies, amounts, 0);
         });
 
         it("Should handle sweeping of non-existent or already swept redemptions", async function () {
             const { router, owner } = await loadFixture(deployRouterFixture);
-            const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture); // FIX: Add redemptionProxyImplementation
+            const { redemptionProxyImplementation } = await loadFixture(
+                deployRedemptionProxyFixture,
+            );
 
             // Set the redemption proxy implementation
             await router
                 .connect(owner)
-                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress()); // FIX: Set implementation
+                .setRedemptionProxyImplementation(
+                    await redemptionProxyImplementation.getAddress(),
+                );
 
-            // Attempt to sweep a non-existent user address
+            // Attempt to sweep a non-existent user address - should not revert, just emit 0 swept
             const nonExistentUser = (await ethers.getSigners())[5].address;
             await expect(router.connect(owner).sweepRedemptions([nonExistentUser], [0n]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([nonExistentUser], 0); // No amount swept
+                .withArgs([nonExistentUser], [0n], 0);
         });
 
         it("Should allow partial sweeps (installments)", async function () {
@@ -1245,10 +1249,10 @@ describe("DedicatedVaultRouter", function () {
             await router.connect(owner).sweepRedemptions([proxyAddress], [firstHalf]);
             expect(await routerAsset.balanceOf(user.address)).to.be.at.least(firstHalf);
 
-            // Second Sweep - Should do nothing because mapping was cleared
+            // Second Sweep - Should not revert, just emit 0 swept because mapping was cleared
             await expect(router.connect(owner).sweepRedemptions([proxyAddress], [secondHalf]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([proxyAddress], 0);
+                .withArgs([proxyAddress], [secondHalf], 0);
         });
 
         it("Should allow a designated keeper to sweep redemptions", async function () {
@@ -1321,7 +1325,7 @@ describe("DedicatedVaultRouter", function () {
             // 2. Keeper Sweep
             await expect(router.connect(keeper).sweepRedemptions([proxyAddress], [amount]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([proxyAddress], amount);
+                .withArgs([proxyAddress], [amount], amount);
 
             expect(await routerAsset.balanceOf(user.address)).to.be.at.least(amount);
         });
@@ -1480,6 +1484,180 @@ describe("DedicatedVaultRouter", function () {
             await expect(upgrades.upgradeProxy(await nuvaVault.getAddress(), NuvaVaultV2.connect(user)))
                 .to.be.revertedWithCustomError(nuvaVault, "OwnableUnauthorizedAccount")
                 .withArgs(user.address);
+        });
+    });
+
+    describe("Input Validation (New Changes)", function () {
+        it("Should revert deposit if amount is zero", async function () {
+            const { router, user, amlSigner } = await loadFixture(deployRouterFixture);
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const signature = await signAML(
+                amlSigner,
+                await router.getAddress(),
+                user.address,
+                0n,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await expect(
+                router
+                    .connect(user)
+                    .depositWithPermit(
+                        0n,
+                        user.address,
+                        0n,
+                        0n,
+                        0n,
+                        signature,
+                        deadline,
+                        0,
+                        0,
+                        ethers.ZeroHash,
+                        ethers.ZeroHash,
+                    ),
+            ).to.be.revertedWithCustomError(router, "InvalidAmount");
+        });
+
+        it("Should revert deposit if receiver is zero address", async function () {
+            const { router, user, amlSigner, amount } = await loadFixture(deployRouterFixture);
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const signature = await signAML(
+                amlSigner,
+                await router.getAddress(),
+                user.address,
+                amount,
+                ethers.ZeroAddress,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await expect(
+                router
+                    .connect(user)
+                    .depositWithPermit(
+                        amount,
+                        ethers.ZeroAddress,
+                        0n,
+                        0n,
+                        0n,
+                        signature,
+                        deadline,
+                        0,
+                        0,
+                        ethers.ZeroHash,
+                        ethers.ZeroHash,
+                    ),
+            ).to.be.revertedWithCustomError(router, "InvalidAddress");
+        });
+
+        it("Should revert requestRedeem if amount is zero", async function () {
+            const { router, user, amlSigner } = await loadFixture(deployRouterFixture);
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const signature = await signRedeemAML(
+                amlSigner,
+                await router.getAddress(),
+                user.address,
+                0n,
+                deadline,
+            );
+            await expect(
+                router.connect(user).requestRedeem(0n, signature, deadline),
+            ).to.be.revertedWithCustomError(router, "InvalidAmount");
+        });
+
+        it("Should handle sweepRedemptions with zero proxy address", async function () {
+            const { router, owner } = await loadFixture(deployRouterFixture);
+            const { redemptionProxyImplementation } = await loadFixture(
+                deployRedemptionProxyFixture,
+            );
+            const KEEPER_ROLE = await router.KEEPER_ROLE();
+            await router.grantRole(KEEPER_ROLE, owner.address);
+
+            // Set implementation first
+            await router
+                .connect(owner)
+                .setRedemptionProxyImplementation(
+                    await redemptionProxyImplementation.getAddress(),
+                );
+
+            await expect(router.connect(owner).sweepRedemptions([ethers.ZeroAddress], [100n]))
+                .to.emit(router, "RedemptionsSwept")
+                .withArgs([ethers.ZeroAddress], [100n], 0);
+        });
+
+        it("Should NOT delete mapping in sweepRedemptions if amount is zero", async function () {
+            const {
+                router,
+                owner,
+                user,
+                amlSigner,
+                amount,
+                asset: routerAsset,
+                nuvaVault,
+            } = await loadFixture(deployRouterFixture);
+            const KEEPER_ROLE = await router.KEEPER_ROLE();
+            await router.grantRole(KEEPER_ROLE, owner.address);
+
+            // 1. Setup a redemption proxy
+            const RedemptionProxy = await ethers.getContractFactory("RedemptionProxy");
+            const impl = await RedemptionProxy.deploy();
+            await router.connect(owner).setRedemptionProxyImplementation(await impl.getAddress());
+
+            // 2. Do a deposit to have shares
+            await routerAsset.connect(user).approve(await router.getAddress(), amount);
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const depSig = await signAML(
+                amlSigner,
+                await router.getAddress(),
+                user.address,
+                amount,
+                user.address,
+                0n,
+                0n,
+                0n,
+                deadline,
+            );
+            await router
+                .connect(user)
+                .depositWithPermit(
+                    amount,
+                    user.address,
+                    0n,
+                    0n,
+                    0n,
+                    depSig,
+                    deadline,
+                    0,
+                    0,
+                    ethers.ZeroHash,
+                    ethers.ZeroHash,
+                );
+
+            const nuvaShares = await nuvaVault.balanceOf(user.address);
+            await nuvaVault.connect(user).approve(await router.getAddress(), nuvaShares);
+
+            const redSig = await signRedeemAML(
+                amlSigner,
+                await router.getAddress(),
+                user.address,
+                nuvaShares,
+                deadline,
+            );
+            const tx = await router.connect(user).requestRedeem(nuvaShares, redSig, deadline);
+            const receipt = await tx.wait();
+            const proxyAddress = receipt.logs.find(
+                (l) => l.fragment && l.fragment.name === "RedemptionRequested",
+            ).args[1];
+
+            // 3. Sweep with zero amount
+            await router.connect(owner).sweepRedemptions([proxyAddress], [0n]);
+
+            // 4. Check if mapping is NOT deleted
+            expect(await router.redemptionProxyToUser(proxyAddress)).to.equal(user.address);
         });
     });
 });

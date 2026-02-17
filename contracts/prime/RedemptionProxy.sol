@@ -58,6 +58,7 @@ contract RedemptionProxy is Initializable {
     error FundsStuck();
     error TransferFailed();
     error InsufficientBalance();
+    error InvalidAmount();
 
     // --- Modifiers ---
     modifier onlyRouter() {
@@ -74,8 +75,15 @@ contract RedemptionProxy is Initializable {
      * @param _nuvaVault The address of the Nuva vault.
      * @param _user The address of the user receiving the redeemed assets.
      */
-    function initialize(address _assetVault, address _stakingVault, address _nuvaVault, address _user) external initializer {
-        if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0) || _user == address(0)) {
+    function initialize(
+        address _assetVault,
+        address _stakingVault,
+        address _nuvaVault,
+        address _user
+    ) external initializer {
+        if (
+            _assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0) || _user == address(0)
+        ) {
             revert InvalidConfiguration();
         }
 
@@ -102,6 +110,7 @@ contract RedemptionProxy is Initializable {
         uint256 stakingBalBefore = IERC20(address(stakingVault)).balanceOf(address(this));
         uint256 assetSharesBalBefore = IERC20(address(assetVault)).balanceOf(address(this));
 
+        if (_amountNuvaShares == 0) revert InvalidAmount();
         IERC20(address(nuvaVault)).safeTransferFrom(msg.sender, address(this), _amountNuvaShares);
 
         uint256 amountStakingShares = nuvaVault.redeem(_amountNuvaShares, address(this), address(this));
