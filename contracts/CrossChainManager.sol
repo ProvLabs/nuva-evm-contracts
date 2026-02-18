@@ -12,7 +12,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CustomToken} from "./CustomToken.sol";
 import {CrossChainVault, ExecutorArgs, FeeArgs} from "./CrossChainVault.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICustomToken} from "./modules/utils/ICustomToken.sol";
 
 /*
  * @title Depositor
@@ -26,6 +26,10 @@ error AmlSignatureExpired(); // dev: AML signature has expired
 error AmlSignatureAlreadyUsed(); // dev: AML signature has already been used
 error InvalidAmlSignature(); // dev: The AML signature is invalid
 error InvalidAmlSigner(); // dev: The AML signer is invalid
+error InvalidFunctionName(); // dev: The function name is invalid
+error AmountMustBeGreaterThanZero(); // dev: Amount must be greater than zero
+error InsufficientBalance(); // dev: Contract does not have enough tokens to burn
+error InvalidMintTransactionHash(); // dev: The mint transaction hash is invalid
 
 /**
  * @title Depositor Contract
@@ -42,6 +46,7 @@ contract CrossChainManager is
     ReentrancyGuardUpgradeable 
 {
     using SafeERC20 for CustomToken;
+    using SafeERC20 for ICustomToken;
 
     // --- Constants ---
 
@@ -51,16 +56,32 @@ contract CrossChainManager is
     /// @notice Role for depositing tokens into the contract.
     bytes32 public constant DESTINATION_MANAGER_ROLE = keccak256("DESTINATION_MANAGER_ROLE");
 
+    /// @notice Role for burning locked tokens.
+    bytes32 public constant BURN_ADMIN_ROLE = keccak256("BURN_ADMIN_ROLE");
+
+    /// @notice Role for burning locked tokens.
+    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
+
+    bytes32 private constant DEPOSIT_HASH = keccak256("Deposit");
+    bytes32 private constant WITHDRAW_HASH = keccak256("Withdraw");
+
+    bytes32 private constant DEPOSIT_TYPEHASH = keccak256("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+    bytes32 private constant WITHDRAW_TYPEHASH = keccak256("Withdraw(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+    bytes32 private constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
     // --- State Variables ---
 
     /// @notice The token that can be deposited into this contract.
     CustomToken public depositToken;
 
+    /// @notice The token that can be withdrawn from this contract.
+    CustomToken public withdrawToken;
+
     /// @notice The token that can be deposited into this contract.
     CrossChainVault public crossChainVault;
 
     /// @notice The address of the share token, used for event emissions.
-    address public shareToken;
+    ICustomToken public shareToken;
 
     /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
     address public amlSigner;
@@ -76,16 +97,20 @@ contract CrossChainManager is
     /**
      * @notice Emitted when a depositor is initialized.
      * @param depositTokenAddress The address of the deposit token.
+     * @param withdrawTokenAddress The address of the withdraw token.
      * @param shareTokenAddress The address of the withdrawal token.
      * @param amlSignerAddress The address of the AML signer.
      * @param destinationManagerAddress The address of the destination address manager.
+     * @param burnAdminAddress The address of the burn admin.
      * @param crossChainVaultAddress The address of the cross chain vault.
      */
     event CrossChainManagerInitialized(
         address indexed depositTokenAddress,
+        address withdrawTokenAddress,
         address shareTokenAddress,
         address amlSignerAddress,
         address destinationManagerAddress,
+        address burnAdminAddress,
         address crossChainVaultAddress
     );
 
@@ -115,6 +140,24 @@ contract CrossChainManager is
         uint16 targetChain
     );
 
+    /**
+     * @notice Emitted when a withdrawal is made.
+     * @param user The address of the user making the withdraw.
+     * @param amount The amount of tokens withdrawn.
+     * @param withdrawToken The address of the withdraw token.
+     * @param shareToken The address of the share token.
+     * @param destinationAddress The address where the tokens were sent.
+     * @param targetChain The target chain to withdraw to.
+     */
+    event Withdrawn(
+        address indexed user,
+        uint256 amount,
+        address withdrawToken,
+        address shareToken,
+        address destinationAddress,
+        uint16 targetChain
+    );
+
     /// @notice Emitted when destination addresses are altered.
     /// @param destination The destination address.
     event DestinationAddressAdded(address indexed destination);
@@ -127,6 +170,16 @@ contract CrossChainManager is
     /// @param destination The destination address.
     event DestinationAddressSkipped(address indexed destination);
 
+    /**
+     * @notice Emitted when tokens are burned from the contract.
+     * @param amount The amount of tokens burned.
+     * @param shareToken The shared token address.
+     * @param burner The address that initiated the burn.
+     * @param mintTransactionHash The hash of the mint transaction.
+     */
+    event TokensBurned(uint256 amount, address shareToken, address burner, string indexed mintTransactionHash);
+
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -138,16 +191,20 @@ contract CrossChainManager is
      * @notice Initializes the contract with the provided token addresses and AML signer.
      * @dev Can only be called once during contract deployment.
      * @param _depositTokenAddress The token contract this depositor will accept.
+     * @param _withdrawTokenAddress The token contract this depositor will accept.
      * @param _shareTokenAddress The token address to emit in the log.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _destinationManagerAddress The address of the destination manager.
+     * @param burnAdminAddress The address of the user who can manage the burn role.
      * @param crossChainVaultAddress The address of the cross chain vault.
      */
     function initialize(
         address _depositTokenAddress,
+        address _withdrawTokenAddress,
         address _shareTokenAddress,
         address _amlSignerAddress,
         address _destinationManagerAddress,
+        address burnAdminAddress,
         address crossChainVaultAddress
     ) external initializer {
         __UUPSUpgradeable_init();
@@ -156,24 +213,31 @@ contract CrossChainManager is
         __ReentrancyGuard_init();
 
         if (_depositTokenAddress == address(0)) revert InvalidAddress("deposit token");
+        if (_withdrawTokenAddress == address(0)) revert InvalidAddress("withdraw token");
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
         if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
+        if (burnAdminAddress == address(0)) revert InvalidAddress("burn admin");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
         depositToken = CustomToken(_depositTokenAddress);
-        shareToken = _shareTokenAddress;
+        withdrawToken = CustomToken(_withdrawTokenAddress);
+        shareToken = ICustomToken(_shareTokenAddress);
         amlSigner = _amlSignerAddress;
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
         _setRoleAdmin(DESTINATION_MANAGER_ROLE, DESTINATION_MANAGER_ADMIN_ROLE);
+        _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
         _grantRole(DESTINATION_MANAGER_ADMIN_ROLE, _destinationManagerAddress);
+        _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
 
         emit CrossChainManagerInitialized(
             _depositTokenAddress,
+            _withdrawTokenAddress,
             _shareTokenAddress,
             _amlSignerAddress,
             _destinationManagerAddress,
+            burnAdminAddress,
             crossChainVaultAddress
         );
     }
@@ -217,10 +281,40 @@ contract CrossChainManager is
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
     ) external payable nonReentrant {
-        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
-        _verifyAML(messageHash, _amlSignature, _amlDeadline);
+        bytes32 messageHash = _getMessageHash("Deposit", _amount, _destinationAddress, _amlDeadline);
+        _verifyAML("Depositor", messageHash, _amlSignature, _amlDeadline);
 
         _doDeposit(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
+    }
+
+    /**
+     * @notice Allows a user to withdraw tokens after passing an AML check.
+     * @dev The function verifies the AML signature and deadline before processing the withdrawal.
+     * @param _amount The amount of tokens to withdraw.
+     * @param _destinationAddress The address to send the tokens to.
+     * @param _amlSignature The signature from the AML signer.
+     * @param _amlDeadline The expiration timestamp for the AML signature.
+     * @param targetChain The target chain to deposit to.
+     * @param targetDomain Circle's domain ID of the target blockchain
+     * @param executorArgs The executor arguments
+     * @param feeArgs The fee arguments
+     */
+    function withdraw(
+        uint256 _amount, 
+        address _destinationAddress,
+        bytes calldata _amlSignature, 
+        uint256 _amlDeadline,
+        uint16 targetChain,
+        uint32 targetDomain,
+        ExecutorArgs calldata executorArgs,
+        FeeArgs calldata feeArgs
+    ) external payable nonReentrant {
+        if (_amount == 0) revert AmountMustBeGreaterThanZero();
+
+        bytes32 messageHash = _getMessageHash("Withdraw", _amount, _destinationAddress, _amlDeadline);
+        _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
+
+        _doWithdraw(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
     }
 
     /**
@@ -252,9 +346,9 @@ contract CrossChainManager is
         uint32 targetDomain,
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
-    ) external payable {
-        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
-        _verifyAML(messageHash, _amlSignature, _amlDeadline);
+    ) external payable nonReentrant {
+        bytes32 messageHash = _getMessageHash("Deposit", _amount, _destinationAddress, _amlDeadline);
+        _verifyAML("Depositor", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
         IERC20Permit(address(depositToken)).permit(
@@ -268,6 +362,53 @@ contract CrossChainManager is
         );
 
         _doDeposit(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
+    }
+
+    /**
+     * @notice Withdraws tokens using an off-chain 'permit' signature.
+     * @dev This allows for a single-transaction approve+withdraw.
+     * @param _amount The amount of tokens to withdraw.
+     * @param _destinationAddress The address to send the tokens to.
+     * @param _amlSignature The address to send the tokens to.
+     * @param _amlDeadline The time at which the AML signature expires.
+     * @param _permitDeadline The time at which the permit signature expires.
+     * @param _v The recovery byte of the EIP-712 permit signature.
+     * @param _r First 32 bytes of the EIP-712 permit signature.
+     * @param _s Second 32 bytes of the EIP-712 permit signature.
+     * @param targetChain The target chain to deposit to.
+     * @param targetDomain Circle's domain ID of the target blockchain
+     * @param executorArgs The executor arguments
+     * @param feeArgs The fee arguments
+     */
+    function withdrawWithPermit(
+        uint256 _amount,
+        address _destinationAddress,
+        bytes calldata _amlSignature,
+        uint256 _amlDeadline,
+        uint256 _permitDeadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s,
+        uint16 targetChain,
+        uint32 targetDomain,
+        ExecutorArgs calldata executorArgs,
+        FeeArgs calldata feeArgs
+    ) external payable nonReentrant {
+        bytes32 messageHash = _getMessageHash("Withdraw", _amount, _destinationAddress, _amlDeadline);
+        _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
+
+        // This call will fail if the signature is invalid or deadline passed.
+        IERC20Permit(address(withdrawToken)).permit(
+            msg.sender, // The user (owner)
+            address(this), // The spender (this contract)
+            _amount, // The amount
+            _permitDeadline, // Expiration
+            _v,
+            _r,
+            _s // The user's signature
+        );
+
+        _doWithdraw(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
     }
 
     /**
@@ -345,6 +486,33 @@ contract CrossChainManager is
         emit DestinationAddressSkipped(_destination);
     }
 
+    /**
+     * @notice Burns a specified amount of tokens held by this contract.
+     * @dev Only callable by addresses with the BURN_ROLE. This function is part of the
+     * manual burn/mint model to maintain token supply across different chains.
+     * @param amount The amount of tokens to burn. Must be greater than zero and not exceed
+     * the contract's token balance.
+     * @param mintTransactionHash The hash of the mint transaction.
+     * @custom:requirements
+     * - Caller must have BURN_ROLE
+     * - `amount` must be greater than zero
+     * - `mintTransactionHash` must not be empty
+     * - Contract must have sufficient token balance
+     */
+    function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (bytes(mintTransactionHash).length == 0) revert InvalidMintTransactionHash();
+
+        // Ensure the contract has enough tokens to burn
+        uint256 contractBalance = shareToken.balanceOf(address(this));
+        if (amount > contractBalance) revert InsufficientBalance();
+
+        // Burn the tokens using the CustomToken's burnAuthorized function
+        shareToken.burn(amount);
+
+        emit TokensBurned(amount, address(shareToken), msg.sender, mintTransactionHash);
+    }
+
     // --- Private Helper Functions ---
 
     /**
@@ -386,21 +554,63 @@ contract CrossChainManager is
             feeArgs
         );
 
-        emit Deposited(msg.sender, _amount, address(depositToken), shareToken, _destinationAddress, targetChain);
+        emit Deposited(msg.sender, _amount, address(depositToken), address(shareToken), _destinationAddress, targetChain);
+    }
+
+    /**
+     * @notice Handles the withdrawal logic by transferring tokens from the sender to this contract.
+     * @param _amount The amount of tokens to withdraw.
+     * @param _destinationAddress The address where tokens will be sent.
+     * @param targetChain The target chain to withdraw to.
+     * @param targetDomain Circle's domain ID of the target blockchain
+     * @param executorArgs The executor arguments
+     * @param feeArgs The fee arguments
+     */
+    function _doWithdraw(
+        uint256 _amount, 
+        address _destinationAddress,
+        uint16 targetChain,
+        uint32 targetDomain,
+        ExecutorArgs calldata executorArgs,
+        FeeArgs calldata feeArgs
+    ) private {
+        if (_amount == 0) revert InvalidAmount();
+        if (_destinationAddress == address(0)) revert InvalidAddress("destination");
+        if (!isDestination(_destinationAddress)) revert InvalidAddress("destination");
+
+        // Pull tokens from the user to this contract
+        withdrawToken.safeTransferFrom(msg.sender, address(this), _amount);
+
+        // Approve the Vault to spend the tokens just pulled
+        withdrawToken.forceApprove(address(crossChainVault), _amount);
+
+        // Calling the vault
+        crossChainVault.sendTokens{value: msg.value}(
+            address(withdrawToken), 
+            _amount, 
+            targetChain, 
+            targetDomain, 
+            bytes32(uint256(uint160(_destinationAddress))),
+            executorArgs,
+            feeArgs
+        );
+
+        emit Withdrawn(msg.sender, _amount, address(withdrawToken), address(shareToken), _destinationAddress, targetChain);
     }
 
     /**
      * @notice Internal function to verify the AML signature.
      * @dev This function is called by the public deposit and depositWithPermit functions.
+     * @param _name The name of the function.
      * @param messageHash The hash of the message to verify.
      * @param _signature The signature to verify.
      * @param _deadline The expiration timestamp for the signature.
      */
-    function _verifyAML(bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
+    function _verifyAML(string memory _name, bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
         if (block.timestamp > _deadline) revert AmlSignatureExpired();
         if (usedSignatures[messageHash]) revert AmlSignatureAlreadyUsed();
 
-        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(), messageHash);
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(_name), messageHash);
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
         if (recoveredSigner == address(0)) revert InvalidAmlSignature();
@@ -411,14 +621,15 @@ contract CrossChainManager is
 
     /**
      * @notice Returns the domain separator for the current chain.
+     * @param _name The name of the function.
      * @return The domain separator for the current chain.
      */
-    function _getDomainSeparator() private view returns (bytes32) {
+    function _getDomainSeparator(string memory _name) private view returns (bytes32) {
         return
             keccak256(
                 abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Depositor"),
+                    DOMAIN_TYPEHASH,
+                    keccak256(bytes(_name)),
                     keccak256("1"),
                     block.chainid,
                     address(this)
@@ -428,26 +639,27 @@ contract CrossChainManager is
 
     /**
      * @notice Calculates the hash of the struct using abi.encode (standard EIP-712).
+     * @param _name The name of the function.
      * @param _amount The amount of tokens to deposit.
      * @param _destinationAddress The address to send the tokens to.
      * @param _deadline The expiration timestamp for the signature.
      * @return The hash of the struct.
      */
     function _getMessageHash(
+        string memory _name,
         uint256 _amount,
         address _destinationAddress,
         uint256 _deadline
     ) private view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)"),
-                    msg.sender,
-                    _amount,
-                    _destinationAddress,
-                    _deadline
-                )
-            );
+        bytes32 nameHash = keccak256(bytes(_name));
+
+        if (nameHash == DEPOSIT_HASH) {
+            return keccak256(abi.encode(DEPOSIT_TYPEHASH, msg.sender, _amount, _destinationAddress, _deadline));
+        } else if (nameHash == WITHDRAW_HASH) {
+            return keccak256(abi.encode(WITHDRAW_TYPEHASH, msg.sender, _amount, _destinationAddress, _deadline));
+        }
+
+        revert InvalidFunctionName();
     }
 
      // --- Upgrade Safety ---
@@ -456,7 +668,8 @@ contract CrossChainManager is
     uint256[40] private __gap;
 
     /**
-     * @dev Authorizes a contract upgrade. Only callable by the owner.
+     * @notice Authorizes a contract upgrade.
+     * @dev Only callable by the owner.
      * @param newImplementation Address of the new implementation.
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {

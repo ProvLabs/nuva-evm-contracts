@@ -19,8 +19,10 @@ async function main() {
     // 1. Define the addresses for the initializer arguments
     // Replace these with your actual deployed token and manager addresses
     const DEPOSIT_TOKEN = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
+    const WITHDRAW_TOKEN = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
     const [user] = await ethers.getSigners();
     const DESTINATION_MANAGER = user.address;
+    const burnerAddress = user.address;
 
     console.log("Deploying CrossChainManager...");
 
@@ -30,7 +32,15 @@ async function main() {
     // 3. Deploy the proxy and call the initialize function
     const proxy = await upgrades.deployProxy(
         CrossChainManager,
-        [DEPOSIT_TOKEN, SHARE_TOKEN_ADDRESS, AML_SIGNER, DESTINATION_MANAGER, CROSS_CHAIN_VAULT],
+        [
+            DEPOSIT_TOKEN,
+            WITHDRAW_TOKEN,
+            SHARE_TOKEN_ADDRESS,
+            AML_SIGNER,
+            DESTINATION_MANAGER,
+            burnerAddress,
+            CROSS_CHAIN_VAULT,
+        ],
         {
             initializer: "initialize", // Explicitly naming the initializer function
             kind: "uups", // Or 'transparent', depending on your inheritance
