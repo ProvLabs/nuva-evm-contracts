@@ -206,37 +206,6 @@ async function main() {
         payee: DESTINATION_ADDRESS,
     };
 
-    // Estimate gas for the standard deposit function
-    console.log("3. Estimating gas for deposit...");
-    const estimatedGas = await crossChainManager
-        .connect(user)
-        .depositWithPermit.estimateGas(
-            AMOUNT_TO_DEPOSIT,
-            DESTINATION_ADDRESS,
-            amlSignature,
-            amlDeadline,
-            permitDeadline,
-            v,
-            r,
-            s,
-            targetChain,
-            targetDomain,
-            executorArgs,
-            feeArgs,
-        );
-
-    // Convert to BigInt and add 20% buffer
-    const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
-    console.log(
-        `   ✅ Gas estimation successful: ${estimatedGas.toString()} (with 20% buffer: ${gasLimit.toString()})`,
-    );
-
-    // Get current gas price
-    const feeData = await ethers.provider.getFeeData();
-    if (!feeData.gasPrice) {
-        throw new Error("Failed to get gas price");
-    }
-
     // connect the `user` to the `crossChainManager` contract
     try {
         const depositTx = await crossChainManager
@@ -256,8 +225,7 @@ async function main() {
                 feeArgs,
                 {
                     value: BigInt(estimatedCost) + BigInt(feeArgs.nativeTokenFee),
-                    gasLimit,
-                    gasPrice: feeData.gasPrice,
+                    gasLimit: 500000n,
                 },
             );
         const receipt = await depositTx.wait();
