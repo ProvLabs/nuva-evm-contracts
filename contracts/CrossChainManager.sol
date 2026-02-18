@@ -89,6 +89,9 @@ contract CrossChainManager is
     /// @notice Array of all allowed destination addresses.
     address[] public destinationAddresses;
 
+    /// @notice Mapping to check if an address is a destination.
+    mapping(address => bool) public isDestination;
+
     /// @notice Mapping to track used AML signatures to prevent replay attacks.
     mapping(bytes32 => bool) public usedSignatures;
 
@@ -435,11 +438,9 @@ contract CrossChainManager is
      * @param _destination The address to check.
      * @return True if the address exists in the destination array, false otherwise.
      */
-    function isDestination(address _destination) public view returns (bool) {
-        for (uint i = 0; i < destinationAddresses.length; i++) {
-            if (destinationAddresses[i] == _destination) {
-                return true;
-            }
+    function isDestinationExists(address _destination) public view returns (bool) {
+        if (isDestination[_destination]) {
+            return true;
         }
         return false;
     }
@@ -452,15 +453,14 @@ contract CrossChainManager is
     function addDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
         if (_destination == address(0)) revert InvalidAddress("destination address");
 
-        // Check if the address already exists by iterating (efficient for small arrays < 5)
-        for (uint i = 0; i < destinationAddresses.length; i++) {
-            if (destinationAddresses[i] == _destination) {
-                emit DestinationAddressSkipped(_destination);
-                return;
-            }
+        if (isDestination[_destination]) {
+            emit DestinationAddressSkipped(_destination);
+            return;
         }
-
+    
+        isDestination[_destination] = true;
         destinationAddresses.push(_destination);
+
         emit DestinationAddressAdded(_destination);
     }
 
@@ -475,6 +475,9 @@ contract CrossChainManager is
             if (destinationAddresses[i] == _destination) {
                 // Move the last element into the place to delete
                 destinationAddresses[i] = destinationAddresses[destinationAddresses.length - 1];
+
+                isDestination[_destination] = false;
+
                 // Remove the last element
                 destinationAddresses.pop();
 
@@ -534,8 +537,8 @@ contract CrossChainManager is
         FeeArgs calldata feeArgs
     ) private {
         if (_amount == 0) revert InvalidAmount();
-        if (_destinationAddress == address(0)) revert InvalidAddress("destination");
-        if (!isDestination(_destinationAddress)) revert InvalidAddress("destination");
+        if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
+        if (!isDestinationExists(_destinationAddress)) revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
         depositToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -554,7 +557,14 @@ contract CrossChainManager is
             feeArgs
         );
 
-        emit Deposited(msg.sender, _amount, address(depositToken), address(shareToken), _destinationAddress, targetChain);
+        emit Deposited(
+            msg.sender, 
+            _amount, 
+            address(depositToken), 
+            address(shareToken), 
+            _destinationAddress, 
+            targetChain
+        );
     }
 
     /**
@@ -575,8 +585,8 @@ contract CrossChainManager is
         FeeArgs calldata feeArgs
     ) private {
         if (_amount == 0) revert InvalidAmount();
-        if (_destinationAddress == address(0)) revert InvalidAddress("destination");
-        if (!isDestination(_destinationAddress)) revert InvalidAddress("destination");
+        if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
+        if (!isDestinationExists(_destinationAddress)) revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
         withdrawToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -595,7 +605,14 @@ contract CrossChainManager is
             feeArgs
         );
 
-        emit Withdrawn(msg.sender, _amount, address(withdrawToken), address(shareToken), _destinationAddress, targetChain);
+        emit Withdrawn(
+            msg.sender, 
+            _amount, 
+            address(withdrawToken), 
+            address(shareToken), 
+            _destinationAddress, 
+            targetChain
+        );
     }
 
     /**
