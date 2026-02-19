@@ -24,6 +24,13 @@ if (!DESTINATION_ADDRESS) {
 
 // NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
 const AMOUNT_TO_WITHDRAW = ethers.parseUnits("0.15", 6);
+
+// Token Address
+const TOKEN_ADDRESS = process.env.USDC_BASE;
+if (!TOKEN_ADDRESS) {
+    throw new Error("USDC_BASE is not set.");
+}
+
 // --- END: Configuration ---
 
 // --- Helper: Load AML Signer ---
@@ -43,7 +50,6 @@ async function main() {
     // 1. Get our "user" (signer 1)
     const [user] = await ethers.getSigners();
     const amlSigner = getAmlSigner();
-    const WITHDRAW_TOKEN_ADDRESS = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
 
     console.log(`Simulating withdraw as user: ${user.address}`);
     console.log(`AML Signer (server): ${amlSigner.address}`);
@@ -62,10 +68,10 @@ async function main() {
     ];
 
     // We need the "IERC20" ABI to talk to the token
-    const withdrawToken = await ethers.getContractAt(PERMIT_ABI, WITHDRAW_TOKEN_ADDRESS);
+    const token = await ethers.getContractAt(PERMIT_ABI, TOKEN_ADDRESS);
 
     // 3. Check if the user has enough tokens
-    const balance = await withdrawToken.balanceOf(user.address);
+    const balance = await token.balanceOf(user.address);
     if (balance < AMOUNT_TO_WITHDRAW) {
         console.error("❌ Error: User does not have enough tokens.");
         console.error(`  User Balance: ${ethers.formatUnits(balance, 6)}`);
@@ -114,12 +120,12 @@ async function main() {
 
     // --- STEP 1: APPROVE ---
     // The user approves the proxy contract to spend their tokens
-    const currentAllowance = await withdrawToken.allowance(user.address, crossChainManager);
+    const currentAllowance = await token.allowance(user.address, crossChainManager);
 
     if (currentAllowance < AMOUNT_TO_WITHDRAW) {
         console.log("Allowance too low. Sending approval transaction...");
         // Approve the Vault to spend your tokens
-        const approveTx = await withdrawToken.connect(user).approve(crossChainManager.target, AMOUNT_TO_WITHDRAW);
+        const approveTx = await token.connect(user).approve(crossChainManager.target, AMOUNT_TO_WITHDRAW);
         await approveTx.wait();
         console.log("Approval confirmed!");
     } else {
@@ -127,16 +133,16 @@ async function main() {
     }
 
     // Get the token's current nonce for the user
-    const permitNonce = await withdrawToken.nonces(user.address);
+    const permitNonce = await token.nonces(user.address);
 
     // This deadline is for the permit signature
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
     domain = {
-        name: await withdrawToken.name(),
+        name: await token.name(),
         version: "2",
         chainId,
-        verifyingContract: WITHDRAW_TOKEN_ADDRESS,
+        verifyingContract: TOKEN_ADDRESS,
     };
 
     types = {

@@ -15,10 +15,15 @@ if (!CROSS_CHAIN_VAULT) {
     throw new Error("VAULT_CROSS_CHAIN_ETH is not set.");
 }
 
+// Token Address
+const TOKEN_ADDRESS = process.env.USDC_ETH;
+if (!TOKEN_ADDRESS) {
+    throw new Error("USDC_ETH is not set.");
+}
+
 async function main() {
     // 1. Define the addresses for the initializer arguments
     // Replace these with your actual deployed token and manager addresses
-    const DEPOSIT_TOKEN = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238";
     const [user] = await ethers.getSigners();
     const DESTINATION_MANAGER = user.address;
 
@@ -30,7 +35,7 @@ async function main() {
     // 3. Deploy the proxy and call the initialize function
     const proxy = await upgrades.deployProxy(
         CrossChainManager,
-        [DEPOSIT_TOKEN, SHARE_TOKEN_ADDRESS, AML_SIGNER, DESTINATION_MANAGER, CROSS_CHAIN_VAULT],
+        [TOKEN_ADDRESS, SHARE_TOKEN_ADDRESS, AML_SIGNER, DESTINATION_MANAGER, CROSS_CHAIN_VAULT],
         {
             initializer: "initialize", // Explicitly naming the initializer function
             kind: "uups", // Or 'transparent', depending on your inheritance

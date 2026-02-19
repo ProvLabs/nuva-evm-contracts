@@ -15,9 +15,9 @@ import {CrossChainVault, ExecutorArgs, FeeArgs} from "./CrossChainVault.sol";
 import {ICustomToken} from "./modules/utils/ICustomToken.sol";
 
 /*
- * @title Depositor
- * @dev This is the LOGIC contract. It will be "cloned" by the factory.
- * It accepts a specified token (depositToken) and sends it to a
+ * @title CrossChainManager
+ * @dev This acts as proxy and implementation contract.
+ * It accepts a specified token and sends it to a
  * user-provided destination address.
  */
 error InvalidAddress(string); // dev: Address cannot be zero
@@ -32,7 +32,7 @@ error InsufficientBalance(); // dev: Contract does not have enough tokens to bur
 error InvalidMintTransactionHash(); // dev: The mint transaction hash is invalid
 
 /**
- * @title Depositor Contract
+ * @title CrossChainManager Contract
  * @notice This contract is used to deposit tokens into the contract.
  * @dev This contract handles token deposits with AML verification and permit functionality.
  * It's designed to be cloned by a factory contract for multiple instances.
@@ -71,11 +71,8 @@ contract CrossChainManager is
 
     // --- State Variables ---
 
-    /// @notice The token that can be deposited into this contract.
-    CustomToken public depositToken;
-
-    /// @notice The token that can be withdrawn from this contract.
-    CustomToken public withdrawToken;
+    /// @notice The token that can be managed into this contract.
+    CustomToken public token;
 
     /// @notice The token that can be deposited into this contract.
     CrossChainVault public crossChainVault;
@@ -99,8 +96,7 @@ contract CrossChainManager is
 
     /**
      * @notice Emitted when a depositor is initialized.
-     * @param depositTokenAddress The address of the deposit token.
-     * @param withdrawTokenAddress The address of the withdraw token.
+     * @param tokenAddress The address of the deposit token.
      * @param shareTokenAddress The address of the withdrawal token.
      * @param amlSignerAddress The address of the AML signer.
      * @param destinationManagerAddress The address of the destination address manager.
@@ -108,8 +104,7 @@ contract CrossChainManager is
      * @param crossChainVaultAddress The address of the cross chain vault.
      */
     event CrossChainManagerInitialized(
-        address indexed depositTokenAddress,
-        address withdrawTokenAddress,
+        address indexed tokenAddress,
         address shareTokenAddress,
         address amlSignerAddress,
         address destinationManagerAddress,
@@ -129,7 +124,7 @@ contract CrossChainManager is
      * @notice Emitted when a deposit is made.
      * @param user The address of the user making the deposit.
      * @param amount The amount of tokens deposited.
-     * @param depositToken The address of the deposit token.
+     * @param token The address of the deposit token.
      * @param shareToken The address of the share token.
      * @param destinationAddress The address where the tokens were sent.
      * @param targetChain The target chain to deposit to.
@@ -137,7 +132,7 @@ contract CrossChainManager is
     event Deposited(
         address indexed user,
         uint256 amount,
-        address depositToken,
+        address token,
         address shareToken,
         address destinationAddress,
         uint16 targetChain
@@ -147,7 +142,7 @@ contract CrossChainManager is
      * @notice Emitted when a withdrawal is made.
      * @param user The address of the user making the withdraw.
      * @param amount The amount of tokens withdrawn.
-     * @param withdrawToken The address of the withdraw token.
+     * @param token The address of the withdraw token.
      * @param shareToken The address of the share token.
      * @param destinationAddress The address where the tokens were sent.
      * @param targetChain The target chain to withdraw to.
@@ -155,7 +150,7 @@ contract CrossChainManager is
     event Withdrawn(
         address indexed user,
         uint256 amount,
-        address withdrawToken,
+        address token,
         address shareToken,
         address destinationAddress,
         uint16 targetChain
@@ -193,8 +188,7 @@ contract CrossChainManager is
     /**
      * @notice Initializes the contract with the provided token addresses and AML signer.
      * @dev Can only be called once during contract deployment.
-     * @param _depositTokenAddress The token contract this depositor will accept.
-     * @param _withdrawTokenAddress The token contract this depositor will accept.
+     * @param _tokenAddress The token contract this depositor will accept.
      * @param _shareTokenAddress The token address to emit in the log.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _destinationManagerAddress The address of the destination manager.
@@ -202,8 +196,7 @@ contract CrossChainManager is
      * @param crossChainVaultAddress The address of the cross chain vault.
      */
     function initialize(
-        address _depositTokenAddress,
-        address _withdrawTokenAddress,
+        address _tokenAddress,
         address _shareTokenAddress,
         address _amlSignerAddress,
         address _destinationManagerAddress,
@@ -215,16 +208,15 @@ contract CrossChainManager is
         __AccessControl_init();
         __ReentrancyGuard_init();
 
-        if (_depositTokenAddress == address(0)) revert InvalidAddress("deposit token");
-        if (_withdrawTokenAddress == address(0)) revert InvalidAddress("withdraw token");
+        if (_tokenAddress == address(0)) revert InvalidAddress("deposit token");
+        if (_tokenAddress == address(0)) revert InvalidAddress("withdraw token");
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
         if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
         if (burnAdminAddress == address(0)) revert InvalidAddress("burn admin");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
-        depositToken = CustomToken(_depositTokenAddress);
-        withdrawToken = CustomToken(_withdrawTokenAddress);
+        token = CustomToken(_tokenAddress);
         shareToken = ICustomToken(_shareTokenAddress);
         amlSigner = _amlSignerAddress;
         crossChainVault = CrossChainVault(crossChainVaultAddress);
@@ -235,8 +227,7 @@ contract CrossChainManager is
         _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
 
         emit CrossChainManagerInitialized(
-            _depositTokenAddress,
-            _withdrawTokenAddress,
+            _tokenAddress,
             _shareTokenAddress,
             _amlSignerAddress,
             _destinationManagerAddress,
@@ -354,7 +345,7 @@ contract CrossChainManager is
         _verifyAML("Depositor", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
-        IERC20Permit(address(depositToken)).permit(
+        IERC20Permit(address(token)).permit(
             msg.sender, // The user (owner)
             address(this), // The spender (this contract)
             _amount, // The amount
@@ -401,7 +392,7 @@ contract CrossChainManager is
         _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
-        IERC20Permit(address(withdrawToken)).permit(
+        IERC20Permit(address(token)).permit(
             msg.sender, // The user (owner)
             address(this), // The spender (this contract)
             _amount, // The amount
@@ -541,14 +532,14 @@ contract CrossChainManager is
         if (!isDestinationExists(_destinationAddress)) revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
-        depositToken.safeTransferFrom(msg.sender, address(this), _amount);
+        token.safeTransferFrom(msg.sender, address(this), _amount);
 
         // Approve the Vault to spend the tokens just pulled
-        depositToken.forceApprove(address(crossChainVault), _amount);
+        token.forceApprove(address(crossChainVault), _amount);
 
         // Calling the vault
         crossChainVault.sendTokens{value: msg.value}(
-            address(depositToken), 
+            address(token), 
             _amount, 
             targetChain, 
             targetDomain, 
@@ -560,7 +551,7 @@ contract CrossChainManager is
         emit Deposited(
             msg.sender, 
             _amount, 
-            address(depositToken), 
+            address(token), 
             address(shareToken), 
             _destinationAddress, 
             targetChain
@@ -589,14 +580,14 @@ contract CrossChainManager is
         if (!isDestinationExists(_destinationAddress)) revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
-        withdrawToken.safeTransferFrom(msg.sender, address(this), _amount);
+        token.safeTransferFrom(msg.sender, address(this), _amount);
 
         // Approve the Vault to spend the tokens just pulled
-        withdrawToken.forceApprove(address(crossChainVault), _amount);
+        token.forceApprove(address(crossChainVault), _amount);
 
         // Calling the vault
         crossChainVault.sendTokens{value: msg.value}(
-            address(withdrawToken), 
+            address(token), 
             _amount, 
             targetChain, 
             targetDomain, 
@@ -608,7 +599,7 @@ contract CrossChainManager is
         emit Withdrawn(
             msg.sender, 
             _amount, 
-            address(withdrawToken), 
+            address(token), 
             address(shareToken), 
             _destinationAddress, 
             targetChain

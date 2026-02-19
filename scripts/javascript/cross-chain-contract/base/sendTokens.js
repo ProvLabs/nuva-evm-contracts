@@ -4,6 +4,12 @@ const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
 const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
 const { default: axios } = require("axios");
 
+// Token Address
+const TOKEN_ADDRESS = process.env.USDC_BASE;
+if (!TOKEN_ADDRESS) {
+    throw new Error("USDC_BASE is not set.");
+}
+
 async function main() {
     const vaultCrossChain = process.env.VAULT_CROSS_CHAIN_BASE;
     if (!vaultCrossChain) {
@@ -16,7 +22,7 @@ async function main() {
     const decimals = 6;
     const amount = hre.ethers.parseUnits("1", decimals);
     // Base USDC Token Address
-    const token = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
+    const token = TOKEN_ADDRESS;
     const erc20ABI = [
         "function approve(address spender, uint256 amount) public returns (bool)",
         "function allowance(address owner, address spender) public view returns (uint256)",
