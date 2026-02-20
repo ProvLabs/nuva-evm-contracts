@@ -1,9 +1,9 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const PROXY_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
+    const PROXY_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
     if (!PROXY_ADDRESS) {
-        throw new Error("CROSS_CHAIN_MANAGER_PROXY_BASE is not set.");
+        throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
     }
 
     // Get contract instance

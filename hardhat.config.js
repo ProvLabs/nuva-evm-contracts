@@ -1,5 +1,4 @@
-require("dotenv").config();
-require("@openzeppelin/hardhat-upgrades");
+require("dotenv").config({ quiet: true });
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
 

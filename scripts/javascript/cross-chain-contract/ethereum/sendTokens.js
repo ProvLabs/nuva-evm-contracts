@@ -21,7 +21,7 @@ async function main() {
 
     const decimals = 6;
     const amount = hre.ethers.parseUnits("1", decimals);
-    // Base USDC Token Address
+    // Ethereum USDC Token Address
     const token = TOKEN_ADDRESS;
     const erc20ABI = [
         "function approve(address spender, uint256 amount) public returns (bool)",

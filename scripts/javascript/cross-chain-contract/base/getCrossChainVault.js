@@ -9,7 +9,7 @@ async function main() {
     // Get contract instance
     const manager = await ethers.getContractAt("CrossChainManager", PROXY_ADDRESS);
 
-    console.log("Fetching destination addresses...");
+    console.log("Fetching cross chain vault address...");
     const vault = await manager.crossChainVault();
 
     console.log("Cross Chain Vault Address:", vault);

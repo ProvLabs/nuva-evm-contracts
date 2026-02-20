@@ -2,14 +2,14 @@
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
+const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
 if (!CROSS_CHAIN_MANAGER_ADDRESS) {
-    throw new Error("CROSS_CHAIN_MANAGER_PROXY_BASE is not set.");
+    throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
 }
 
-const CROSS_CHAIN_VAULT_ADDRESS = process.env.VAULT_CROSS_CHAIN_BASE;
+const CROSS_CHAIN_VAULT_ADDRESS = process.env.VAULT_CROSS_CHAIN_ETH;
 if (!CROSS_CHAIN_VAULT_ADDRESS) {
-    throw new Error("VAULT_CROSS_CHAIN_BASE is not set.");
+    throw new Error("VAULT_CROSS_CHAIN_ETH is not set.");
 }
 // --- END: Configuration ---
 

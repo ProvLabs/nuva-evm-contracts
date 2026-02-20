@@ -11,23 +11,9 @@ async function main() {
         throw new Error("PUBLIC_KEY is not set.");
     }
 
-    const [signer] = await ethers.getSigners();
     const manager = await ethers.getContractAt("CrossChainManager", PROXY_ADDRESS);
 
-    // 1. Define the Role Constants
-    const MANAGER_ROLE = await manager.DESTINATION_MANAGER_ROLE();
-
-    // 2. Check if you already have the role
-    const hasRole = await manager.hasRole(MANAGER_ROLE, signer.address);
-
-    if (!hasRole) {
-        console.log("Manager role not found. Attempting to grant role using Admin powers...");
-        const grantTx = await manager.grantRole(MANAGER_ROLE, signer.address);
-        await grantTx.wait();
-        console.log("Role granted successfully.");
-    }
-
-    // 3. Now add the destination
+    // Now add the destination
     console.log(`Adding ${NEW_DESTINATION} to allowlist...`);
     const tx = await manager.addDestinationAddress(NEW_DESTINATION);
     await tx.wait();

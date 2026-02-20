@@ -9,10 +9,10 @@ async function main() {
     // Get contract instance
     const manager = await ethers.getContractAt("CrossChainManager", PROXY_ADDRESS);
 
-    const address = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
-    const isExists = await manager.isDestination(address);
+    console.log("Fetching aml signer address...");
+    const vault = await manager.amlSigner();
 
-    console.log(`Is ${address} exist in destination list: ${isExists}`);
+    console.log("Aml Signer Address:", vault);
 }
 
 main().catch((error) => {

@@ -37,8 +37,8 @@ async function main() {
         CrossChainManager,
         [TOKEN_ADDRESS, SHARE_TOKEN_ADDRESS, AML_SIGNER, DESTINATION_MANAGER, CROSS_CHAIN_VAULT],
         {
-            initializer: "initialize", // Explicitly naming the initializer function
-            kind: "uups", // Or 'transparent', depending on your inheritance
+            initializer: "initialize",
+            kind: "uups",
         },
     );
 
