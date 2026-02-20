@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -42,31 +41,25 @@ contract CrossChainManager is
     Initializable, 
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
-    AccessControlUpgradeable,
     ReentrancyGuardUpgradeable 
 {
     using SafeERC20 for CustomToken;
     using SafeERC20 for ICustomToken;
 
     // --- Constants ---
-
-    /// @notice Role for managing the destination address allow list.
-    bytes32 public constant DESTINATION_MANAGER_ADMIN_ROLE = keccak256("DESTINATION_MANAGER_ADMIN_ROLE");
-    
-    /// @notice Role for depositing tokens into the contract.
-    bytes32 public constant DESTINATION_MANAGER_ROLE = keccak256("DESTINATION_MANAGER_ROLE");
-
-    /// @notice Role for burning locked tokens.
-    bytes32 public constant BURN_ADMIN_ROLE = keccak256("BURN_ADMIN_ROLE");
-
-    /// @notice Role for burning locked tokens.
-    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
-
+    /// @dev Internal identifier for Deposit operations to route signature verification.
     bytes32 private constant DEPOSIT_HASH = keccak256("Deposit");
+
+    /// @dev Internal identifier for Withdraw operations to route signature verification.
     bytes32 private constant WITHDRAW_HASH = keccak256("Withdraw");
 
+    /// @dev EIP-712 Typehash for the Deposit struct. Defines field names and types.
     bytes32 private constant DEPOSIT_TYPEHASH = keccak256("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+
+    /// @dev EIP-712 Typehash for the Withdraw struct. Defines field names and types.
     bytes32 private constant WITHDRAW_TYPEHASH = keccak256("Withdraw(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+
+    /// @dev EIP-712 Typehash for the Domain Separator. Used to prevent cross-contract/cross-chain replays.
     bytes32 private constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     // --- State Variables ---
@@ -100,7 +93,6 @@ contract CrossChainManager is
      * @param shareTokenAddress The address of the withdrawal token.
      * @param amlSignerAddress The address of the AML signer.
      * @param destinationManagerAddress The address of the destination address manager.
-     * @param burnAdminAddress The address of the burn admin.
      * @param crossChainVaultAddress The address of the cross chain vault.
      */
     event CrossChainManagerInitialized(
@@ -108,16 +100,27 @@ contract CrossChainManager is
         address shareTokenAddress,
         address amlSignerAddress,
         address destinationManagerAddress,
-        address burnAdminAddress,
         address crossChainVaultAddress
     );
 
     /**
      * @notice Emitted when cross chain config is updated.
-     * @param crossChainVaultAddress The address of the cross chain vault.
+     * @param from The address of the old cross chain vault.
+     * @param to The address of the new cross chain vault.
      */
     event CrossChainConfigUpdated(
-        address indexed crossChainVaultAddress
+        address indexed from,
+        address indexed to
+    );
+
+    /**
+     * @notice Emitted when aml signer address is updated.
+     * @param from The address of the old aml signer.
+     * @param to The address of the new aml signer.
+     */
+    event AmlSignerUpdated(
+        address indexed from,
+        address indexed to
     );
 
     /**
@@ -192,7 +195,6 @@ contract CrossChainManager is
      * @param _shareTokenAddress The token address to emit in the log.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _destinationManagerAddress The address of the destination manager.
-     * @param burnAdminAddress The address of the user who can manage the burn role.
      * @param crossChainVaultAddress The address of the cross chain vault.
      */
     function initialize(
@@ -200,12 +202,10 @@ contract CrossChainManager is
         address _shareTokenAddress,
         address _amlSignerAddress,
         address _destinationManagerAddress,
-        address burnAdminAddress,
         address crossChainVaultAddress
     ) external initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(msg.sender); // Ownable2Step uses this internal call
-        __AccessControl_init();
         __ReentrancyGuard_init();
 
         if (_tokenAddress == address(0)) revert InvalidAddress("deposit token");
@@ -213,7 +213,6 @@ contract CrossChainManager is
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
         if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
-        if (burnAdminAddress == address(0)) revert InvalidAddress("burn admin");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
         token = CustomToken(_tokenAddress);
@@ -221,17 +220,11 @@ contract CrossChainManager is
         amlSigner = _amlSignerAddress;
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
-        _setRoleAdmin(DESTINATION_MANAGER_ROLE, DESTINATION_MANAGER_ADMIN_ROLE);
-        _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
-        _grantRole(DESTINATION_MANAGER_ADMIN_ROLE, _destinationManagerAddress);
-        _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
-
         emit CrossChainManagerInitialized(
             _tokenAddress,
             _shareTokenAddress,
             _amlSignerAddress,
             _destinationManagerAddress,
-            burnAdminAddress,
             crossChainVaultAddress
         );
     }
@@ -245,12 +238,29 @@ contract CrossChainManager is
      */
     function updateCrossChainConfig(
         address crossChainVaultAddress
-    ) external onlyRole(DESTINATION_MANAGER_ROLE) {
+    ) external onlyOwner {
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
+        address oldcrossChainVaultAddress = address(crossChainVaultAddress);
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
-        emit CrossChainConfigUpdated(crossChainVaultAddress);
+        emit CrossChainConfigUpdated(oldcrossChainVaultAddress, crossChainVaultAddress);
+    }
+
+    /**
+     * @notice Updates the aml signer address.
+     * @dev Can only be called by the destination manager.
+     * @param amlSignerAddress The aml signer address.
+     */
+    function updateAmlSigner(
+        address amlSignerAddress
+    ) external onlyOwner {
+        if (amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
+
+        address oldAmlSigner = amlSigner;
+        amlSigner = amlSignerAddress;
+
+        emit AmlSignerUpdated(oldAmlSigner, amlSignerAddress);
     }
 
     /**
@@ -406,15 +416,6 @@ contract CrossChainManager is
     }
 
     /**
-     * @notice Get the cross chain vault address
-     * @dev Helper function to get the full list of addresses.
-     * @return The address of the cross chain vault
-     */
-    function getCrossChainContractAddress() public view returns (address) {
-        return address(crossChainVault);
-    }
-
-    /**
      * @notice Get the list of destination addresses
      * @dev Helper function to get the full list of addresses.
      * @return The list of destination addresses
@@ -424,24 +425,11 @@ contract CrossChainManager is
     }
 
     /**
-     * @notice Checks if an address exists in the destination array.
-     * @dev Checks if an address exists in the destination array.
-     * @param _destination The address to check.
-     * @return True if the address exists in the destination array, false otherwise.
-     */
-    function isDestinationExists(address _destination) public view returns (bool) {
-        if (isDestination[_destination]) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
      * @notice Adds a destination address to the array only if it doesn't already exist.
      * @dev Adds a destination address to the array only if it doesn't already exist.
      * @param _destination The address to attempt to add.
      */
-    function addDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
+    function addDestinationAddress(address _destination) external onlyOwner {
         if (_destination == address(0)) revert InvalidAddress("destination address");
 
         if (isDestination[_destination]) {
@@ -461,7 +449,7 @@ contract CrossChainManager is
      * Note: This changes the order of the array (swap and pop) for gas efficiency.
      * @param _destination The address to remove.
      */
-    function removeDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
+    function removeDestinationAddress(address _destination) external onlyOwner() {
         for (uint i = 0; i < destinationAddresses.length; i++) {
             if (destinationAddresses[i] == _destination) {
                 // Move the last element into the place to delete
@@ -482,18 +470,18 @@ contract CrossChainManager is
 
     /**
      * @notice Burns a specified amount of tokens held by this contract.
-     * @dev Only callable by addresses with the BURN_ROLE. This function is part of the
+     * @dev Only callable by addresses with the admin. This function is part of the
      * manual burn/mint model to maintain token supply across different chains.
      * @param amount The amount of tokens to burn. Must be greater than zero and not exceed
      * the contract's token balance.
      * @param mintTransactionHash The hash of the mint transaction.
      * @custom:requirements
-     * - Caller must have BURN_ROLE
+     * - Caller must have admin
      * - `amount` must be greater than zero
      * - `mintTransactionHash` must not be empty
      * - Contract must have sufficient token balance
      */
-    function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
+    function burn(uint256 amount, string calldata mintTransactionHash) external onlyOwner() {
         if (amount == 0) revert AmountMustBeGreaterThanZero();
         if (bytes(mintTransactionHash).length == 0) revert InvalidMintTransactionHash();
 
@@ -529,7 +517,7 @@ contract CrossChainManager is
     ) private {
         if (_amount == 0) revert InvalidAmount();
         if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
-        if (!isDestinationExists(_destinationAddress)) revert InvalidAddress("destination doesn't exist");
+        if (!isDestination[_destinationAddress]) revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
         token.safeTransferFrom(msg.sender, address(this), _amount);
@@ -577,7 +565,7 @@ contract CrossChainManager is
     ) private {
         if (_amount == 0) revert InvalidAmount();
         if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
-        if (!isDestinationExists(_destinationAddress)) revert InvalidAddress("destination doesn't exist");
+        if (!isDestination[_destinationAddress]) revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
         token.safeTransferFrom(msg.sender, address(this), _amount);
