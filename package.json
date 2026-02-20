@@ -23,10 +23,7 @@
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@nomicfoundation/hardhat-verify": "^2.1.0",
     "@nomicfoundation/ignition-core": "^0.15.13",
-<<<<<<< HEAD
-=======
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
->>>>>>> 286c7e4 (feat: added CrossChainManager contract)
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",

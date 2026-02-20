@@ -21,8 +21,11 @@ module.exports = {
     },
     mainnet: {
       url: process.env.MAINNET_RPC_URL,
-      accounts: [process.env.MAINNET_PRIVATE_KEY],
+      accounts: [
+        process.env.MAINNET_PRIVATE_KEY,
+      ],
       chainId: 1,
+    },
     base: {
       url: process.env.RPC_URL_BASE || "http://localhost:8545",
       accounts: [
@@ -74,4 +77,4 @@ module.exports = {
     artifacts: "./artifacts"
   },
   defaultNetwork: "hardhat",
-};
+}
