@@ -1,4 +1,5 @@
 require("dotenv").config();
+require("@openzeppelin/hardhat-upgrades");
 require("@nomicfoundation/hardhat-toolbox");
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -10,6 +11,18 @@ module.exports = {
         process.env.PRIVATE_KEY,
       ],
       chainId: 11155111,
+    },
+    hoodi: {
+      url: process.env.HOODI_RPC_URL,
+      accounts: [
+        process.env.PRIVATE_KEY,
+      ],
+      chainId: 560048,
+    },
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL,
+      accounts: [process.env.MAINNET_PRIVATE_KEY],
+      chainId: 1,
     },
   },
   etherscan: {
@@ -33,7 +46,7 @@ module.exports = {
           }
         }
       },
-      { 
+      {
         version: "0.8.20",
         settings: {
           viaIR: true,

@@ -4,8 +4,7 @@ notes.txt
 
 # Hardhat files
 /cache
-artifacts/*
-!artifacts/contracts
+/artifacts
 
 # TypeChain files
 /typechain

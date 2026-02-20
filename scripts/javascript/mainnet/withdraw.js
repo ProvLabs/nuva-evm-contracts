@@ -7,18 +7,13 @@ const { ethers } = require("hardhat");
 // This defines the specific addresses and settings for each target.
 const TARGET_CONFIG = {
     nvylds: {
-        clone: "0x282C951E8BA3B0aCFE9F35A5C9b805Cf877A9Ce1",
-        token: "0x0A1c879E67d4a74c23E7A2D415D59F2570eEF4Ec",
+        clone: "0x16D582E0A2E21450C107c7d118c88F0aD318790B",
+        token: "0x82C9E80F0E099bf61E061EE96E23DF605388D902",
         decimals: 12,
     },
     nvheloc: {
-        clone: "0x8b795b7EAf431D132a4444C73cfc8deBB896e256",
-        token: "0xB9725490CD6fee733162B195523F8f764CF0b6Df",
-        decimals: 12,
-    },
-    snuva: {
-        clone: "0xD8Ee690e664de0c7Cd9932eA706786dE7329EDf3",
-        token: "0x681d331C38412E3502ab52EdFe1eF05Fb53810C4",
+        clone: "0xC5b72376dFc4123e1fd481736E68dBA35983cF69",
+        token: "0x4aCB074fF8152de067be3da282DdA6469992B42d",
         decimals: 12,
     },
 };
@@ -66,7 +61,7 @@ const TOKEN_DECIMALS = config.decimals;
 // --- END: Configuration ---
 
 const kmsConfig = {
-    projectId: "provlabs-test",
+    projectId: "provlabs-prod",
     locationId: "us-central1",
     keyRingId: "nuva-key-ring",
     keyId: "nuva-app-ethereum-signing",
@@ -117,9 +112,9 @@ async function main() {
     console.log("-----------------------------------------\n");
 
     // 1. Setup Signers and Contracts
-    const privateKey = process.env.PRIVATE_KEY;
+    const privateKey = process.env.MAINNET_PRIVATE_KEY;
     if (!privateKey) {
-        throw new Error("PRIVATE_KEY is not set.");
+        throw new Error("MAINNET_PRIVATE_KEY is not set.");
     }
 
     const user = new ethers.Wallet(privateKey, ethers.provider);

@@ -3,24 +3,10 @@ const { ethers } = require("hardhat");
 
 // --- START: Configuration & Argument Parsing ---
 
-// 1. Internal Configuration Mapping
-// This defines the specific addresses and settings for each target.
-const TARGET_CONFIG = {
-    nvylds: {
-        clone: "0x282C951E8BA3B0aCFE9F35A5C9b805Cf877A9Ce1",
-        token: "0x0A1c879E67d4a74c23E7A2D415D59F2570eEF4Ec",
-        decimals: 12,
-    },
-    nvheloc: {
-        clone: "0x8b795b7EAf431D132a4444C73cfc8deBB896e256",
-        token: "0xB9725490CD6fee733162B195523F8f764CF0b6Df",
-        decimals: 12,
-    },
-    snuva: {
-        clone: "0xD8Ee690e664de0c7Cd9932eA706786dE7329EDf3",
-        token: "0x681d331C38412E3502ab52EdFe1eF05Fb53810C4",
-        decimals: 12,
-    },
+// 1. Internal Mapping of Targets to Addresses
+const CLONE_MAPPING = {
+    nvylds: "0xe67CFA547E15D18b65510a4de80777BEA3c1550E",
+    nvheloc: "0x1Bb8a4CFe3Ccf91b0A897227DE51e61580D5FCc7",
 };
 
 // Helper to grab arguments from CLI flags OR Environment Variables
@@ -37,36 +23,35 @@ function getArg(flag, envVar) {
     return null;
 }
 
-// 2. Retrieve Arguments
+// 2. Retrieve Arguments (Flag name, Env Var name)
 const TARGET_KEY = getArg("--target", "TARGET");
-const AMOUNT_TO_WITHDRAW_STRING = getArg("--amount", "AMOUNT");
+const AMOUNT_TO_DEPOSIT_STRING = getArg("--amount", "AMOUNT");
 
-// 3. Validate Inputs
-if (!TARGET_KEY || !AMOUNT_TO_WITHDRAW_STRING) {
-    console.error("\n❌ Error: Missing required arguments.");
-    console.error("Usage via Flags:   npx hardhat run script.js -- --target <NAME> --amount <AMOUNT>");
-    console.error("Usage via Env Var: TARGET=<NAME> AMOUNT=<AMOUNT> npx hardhat run script.js");
-    console.error(`\nValid targets: ${Object.keys(TARGET_CONFIG).join(", ")}\n`);
+// 3. Validate Arguments
+if (!TARGET_KEY || !AMOUNT_TO_DEPOSIT_STRING) {
+    console.error("\n❌ Error: Missing required command line arguments.");
+    console.error("Usage: npx hardhat run script.js -- --target <NAME> --amount <AMOUNT>");
+    console.error(`Valid targets: ${Object.keys(CLONE_MAPPING).join(", ")}`);
+    console.error("Example: npx hardhat run script.js -- --target nvylds --amount 0.222\n");
     process.exit(1);
 }
 
-// 4. Resolve Configuration from Map
-const config = TARGET_CONFIG[TARGET_KEY];
+// 4. Resolve Address from Map
+const CLONE_ADDRESS = CLONE_MAPPING[TARGET_KEY];
 
-if (!config) {
+if (!CLONE_ADDRESS) {
     console.error(`\n❌ Error: Unknown target '${TARGET_KEY}'.`);
-    console.error(`Please use one of: ${Object.keys(TARGET_CONFIG).join(", ")}\n`);
+    console.error(`Please use one of the following: ${Object.keys(CLONE_MAPPING).join(", ")}\n`);
     process.exit(1);
 }
 
-const CLONE_ADDRESS = config.clone;
-const SHARE_TOKEN_ADDRESS = config.token;
-const TOKEN_DECIMALS = config.decimals;
-
+const DEPOSIT_TOKEN_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const DESTINATION_ADDRESS = "0xda3cbc5bd18719bd6b9a84602abfee62fc608442";
+const TOKEN_DECIMALS = 6;
 // --- END: Configuration ---
 
 const kmsConfig = {
-    projectId: "provlabs-test",
+    projectId: "provlabs-prod",
     locationId: "us-central1",
     keyRingId: "nuva-key-ring",
     keyId: "nuva-app-ethereum-signing",
@@ -80,16 +65,17 @@ async function getAMLSignature({ contract, user, amount, deadline }) {
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
     const domain = {
-        name: "Withdrawal",
+        name: "Depositor",
         version: "1",
         chainId: chainId,
         verifyingContract: await contract.getAddress(),
     };
 
     const types = {
-        Withdraw: [
+        Deposit: [
             { name: "sender", type: "address" },
             { name: "amount", type: "uint256" },
+            { name: "destinationAddress", type: "address" },
             { name: "deadline", type: "uint256" },
         ],
     };
@@ -97,6 +83,7 @@ async function getAMLSignature({ contract, user, amount, deadline }) {
     const value = {
         sender: user,
         amount: amount,
+        destinationAddress: DESTINATION_ADDRESS,
         deadline: deadline,
     };
 
@@ -109,32 +96,32 @@ async function getAMLSignature({ contract, user, amount, deadline }) {
 async function main() {
     // 0. Configuration Log
     console.log("-----------------------------------------");
-    console.log("🚀 Starting Withdraw Script");
-    console.log(`Target Name:     ${TARGET_KEY}`);
-    console.log(`Clone Address:   ${CLONE_ADDRESS}`);
-    console.log(`Share Token:     ${SHARE_TOKEN_ADDRESS}`);
-    console.log(`Withdraw Amount: ${AMOUNT_TO_WITHDRAW_STRING}`);
+    console.log("🚀 Starting Deposit Script");
+    console.log(`Target Name:    ${TARGET_KEY}`);
+    console.log(`Target Address: ${CLONE_ADDRESS}`);
+    console.log(`Deposit Amount: ${AMOUNT_TO_DEPOSIT_STRING}`);
     console.log("-----------------------------------------\n");
 
     // 1. Setup Signers and Contracts
-    const privateKey = process.env.PRIVATE_KEY;
+    const privateKey = process.env.MAINNET_PRIVATE_KEY;
     if (!privateKey) {
-        throw new Error("PRIVATE_KEY is not set.");
+        throw new Error("MAINNET_PRIVATE_KEY is not set.");
     }
 
     const user = new ethers.Wallet(privateKey, ethers.provider);
 
-    console.log(`User (withdrawer): ${user.address}`);
+    console.log(`User (depositor): ${user.address}`);
     console.log(`AML Signer (server): ${await amlSigner.getAddress()}`);
+    console.log(`Destination: ${DESTINATION_ADDRESS}`);
 
-    const withdrawal = await ethers.getContractAt("Withdrawal", CLONE_ADDRESS);
-    const shareToken = await ethers.getContractAt("IFullERC20", SHARE_TOKEN_ADDRESS);
-    const amountToWithdraw = ethers.parseUnits(AMOUNT_TO_WITHDRAW_STRING, TOKEN_DECIMALS);
+    const depositor = await ethers.getContractAt("Depositor", CLONE_ADDRESS);
+    const depositToken = await ethers.getContractAt("IFullERC20", DEPOSIT_TOKEN_ADDRESS);
+    const amountToDeposit = ethers.parseUnits(AMOUNT_TO_DEPOSIT_STRING, TOKEN_DECIMALS);
 
     // 2. Check User Balance
-    const balance = await shareToken.balanceOf(user.address);
-    if (balance < amountToWithdraw) {
-        console.error(`❌ Error: User does not have enough tokens. Needs ${AMOUNT_TO_WITHDRAW_STRING}.`);
+    const balance = await depositToken.balanceOf(user.address);
+    if (balance < amountToDeposit) {
+        console.error(`❌ Error: User does not have enough tokens. Needs ${AMOUNT_TO_DEPOSIT_STRING}.`);
         console.error(`  User Balance: ${ethers.formatUnits(balance, TOKEN_DECIMALS)}`);
         process.exit(1);
     }
@@ -146,9 +133,9 @@ async function main() {
     const amlDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
     const amlSignature = await getAMLSignature({
-        contract: withdrawal,
+        contract: depositor,
         user: user.address,
-        amount: amountToWithdraw,
+        amount: amountToDeposit,
         deadline: amlDeadline,
     });
     console.log("AML Signature:", amlSignature);
@@ -157,16 +144,17 @@ async function main() {
     // --- STEP 2: Generate EIP-2612 Permit Signature (User-side) ---
     console.log("\n2. Generating Permit Signature (as user)...");
 
-    const permitNonce = await shareToken.nonces(user.address);
+    const permitNonce = await depositToken.nonces(user.address);
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
-    const tokenName = await shareToken.name();
+
+    const tokenName = await depositToken.name();
     const chainId = (await ethers.provider.getNetwork()).chainId;
 
     const domain = {
         name: tokenName,
-        version: "1",
+        version: "2", // USDC
         chainId: chainId,
-        verifyingContract: SHARE_TOKEN_ADDRESS,
+        verifyingContract: DEPOSIT_TOKEN_ADDRESS,
     };
 
     const types = {
@@ -181,8 +169,8 @@ async function main() {
 
     const value = {
         owner: user.address,
-        spender: withdrawal.target,
-        value: amountToWithdraw,
+        spender: depositor.target,
+        value: amountToDeposit,
         nonce: permitNonce,
         deadline: permitDeadline,
     };
@@ -193,14 +181,14 @@ async function main() {
 
     // --- STEP 3: Debug Token Permissions ---
     console.log("\n3. Checking token permissions...");
-    const userBalance = await shareToken.balanceOf(user.address);
+    const userBalance = await depositToken.balanceOf(user.address);
     console.log(`User token balance: ${ethers.formatUnits(userBalance, TOKEN_DECIMALS)}`);
 
-    const currentAllowance = await shareToken.allowance(user.address, withdrawal.target);
-    console.log(`Current allowance for withdrawer: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
+    const currentAllowance = await depositToken.allowance(user.address, depositor.target);
+    console.log(`Current allowance for depositor: ${ethers.formatUnits(currentAllowance, TOKEN_DECIMALS)}`);
 
     // --- STEP 4: Call the Contract ---
-    console.log("\n4. Attempting withdraw...");
+    console.log("\n4. Attempting deposit...");
 
     try {
         const currentBlock = await ethers.provider.getBlock("latest");
@@ -208,10 +196,19 @@ async function main() {
             throw new Error("AML deadline has already passed");
         }
 
-        console.log("\nEstimating gas for withdrawWithPermit...");
-        const estimatedGas = await withdrawal
+        console.log("\nEstimating gas for deposit...");
+        const estimatedGas = await depositor
             .connect(user)
-            .withdrawWithPermit.estimateGas(amountToWithdraw, amlSignature, amlDeadline, permitDeadline, v, r, s);
+            .depositWithPermit.estimateGas(
+                amountToDeposit,
+                DESTINATION_ADDRESS,
+                amlSignature,
+                amlDeadline,
+                permitDeadline,
+                v,
+                r,
+                s,
+            );
 
         const gasLimit = (BigInt(estimatedGas) * 12n) / 10n;
         console.log(
@@ -220,17 +217,26 @@ async function main() {
 
         const feeData = await ethers.provider.getFeeData();
 
-        console.log("\nSending withdrawWithPermit transaction...");
-        const tx = await withdrawal
+        const tx = await depositor
             .connect(user)
-            .withdrawWithPermit(amountToWithdraw, amlSignature, amlDeadline, permitDeadline, v, r, s, {
-                gasLimit: gasLimit,
-                gasPrice: feeData.gasPrice,
-            });
+            .depositWithPermit(
+                amountToDeposit,
+                DESTINATION_ADDRESS,
+                amlSignature,
+                amlDeadline,
+                permitDeadline,
+                v,
+                r,
+                s,
+                {
+                    gasLimit: gasLimit,
+                    gasPrice: feeData.gasPrice,
+                },
+            );
 
-        console.log("Transaction sent, waiting for confirmation...");
-        const receipt = await tx.wait(); // Default 1 confirmation
-        console.log(`✅ Withdraw successful! Transaction hash: ${receipt.hash}`);
+        console.log("Transaction sent. Waiting for confirmation...");
+        const receipt = await tx.wait();
+        console.log("✅ Deposit successful! Transaction hash:", receipt.hash);
     } catch (error) {
         console.error("\n❌ Transaction failed:");
         console.error("Error name:", error.name);
@@ -238,7 +244,6 @@ async function main() {
 
         if (error.data) {
             console.error("Error data:", error.data);
-            // Basic check for common InsufficientAllowance
             if (error.data.data && error.data.data.includes("d1cc7385")) {
                 console.error("\n⚠️  InsufficientAllowance error detected!");
             }
@@ -246,11 +251,11 @@ async function main() {
         throw error;
     }
 
-    // Final Verification
-    const finalBalance = await shareToken.balanceOf(CLONE_ADDRESS);
+    // 4. Final Verification
+    const finalBalance = await depositToken.balanceOf(DESTINATION_ADDRESS);
     console.log("-----------------------------------------");
     console.log("🎉 Verification Complete 🎉");
-    console.log(`Clone contract balance (shares): ${ethers.formatUnits(finalBalance, TOKEN_DECIMALS)}`);
+    console.log(`Destination wallet balance: ${ethers.formatUnits(finalBalance, TOKEN_DECIMALS)} tokens.`);
 }
 
 main()

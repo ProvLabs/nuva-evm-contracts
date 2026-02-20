@@ -105,14 +105,12 @@ describe("Depositor", function () {
         const depositorAddr = await depositorFactory.depositors(shareToken, await token.getAddress());
         const depositor = await ethers.getContractAt("Depositor", depositorAddr);
         const DESTINATION_MANAGER_ROLE = await depositor.DESTINATION_MANAGER_ROLE();
-        await expect(depositor.connect(deployer).grantRole(DESTINATION_MANAGER_ROLE, await destinationManager.getAddress())).to.emit(
-            depositor,
-            "RoleGranted",
-        );
-        await expect(depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress())).to.emit(
-            depositor,
-            "DestinationAddressAdded",
-        );
+        await expect(
+            depositor.connect(deployer).grantRole(DESTINATION_MANAGER_ROLE, await destinationManager.getAddress()),
+        ).to.emit(depositor, "RoleGranted");
+        await expect(
+            depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress()),
+        ).to.emit(depositor, "DestinationAddressAdded");
 
         return { deployer, user, amlSigner, destination, token, decimals, depositor, shareToken, destinationManager };
     }
@@ -217,24 +215,23 @@ describe("Depositor", function () {
     it("validates destination manager can manage destination addresses", async function () {
         const { deployer, user, destination, depositor, destinationManager } = await deployFixture();
 
-        await expect(depositor.connect(destinationManager).removeDestinationAddress(await destination.getAddress())).to.emit(
-            depositor,
-            "DestinationAddressRemoved",
-        );
-        await expect(depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress())).to.emit(
-            depositor,
-            "DestinationAddressAdded",
-        );
-        await expect(depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress())).to.emit(
-            depositor,
-            "DestinationAddressSkipped",
-        );
+        await expect(
+            depositor.connect(destinationManager).removeDestinationAddress(await destination.getAddress()),
+        ).to.emit(depositor, "DestinationAddressRemoved");
+        await expect(
+            depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress()),
+        ).to.emit(depositor, "DestinationAddressAdded");
+        await expect(
+            depositor.connect(destinationManager).addDestinationAddress(await destination.getAddress()),
+        ).to.emit(depositor, "DestinationAddressSkipped");
 
         // user cannot manage
-        await expect(depositor.connect(user).removeDestinationAddress(await destination.getAddress()))
-            .to.be.revertedWithCustomError(depositor, "AccessControlUnauthorizedAccount");
-        await expect(depositor.connect(user).addDestinationAddress(await destination.getAddress()))
-            .to.be.revertedWithCustomError(depositor, "AccessControlUnauthorizedAccount");
+        await expect(
+            depositor.connect(user).removeDestinationAddress(await destination.getAddress()),
+        ).to.be.revertedWithCustomError(depositor, "AccessControlUnauthorizedAccount");
+        await expect(
+            depositor.connect(user).addDestinationAddress(await destination.getAddress()),
+        ).to.be.revertedWithCustomError(depositor, "AccessControlUnauthorizedAccount");
 
         // user can manage after role addition
         const DESTINATION_MANAGER_ROLE = await depositor.DESTINATION_MANAGER_ROLE();
@@ -242,10 +239,9 @@ describe("Depositor", function () {
             depositor,
             "RoleGranted",
         );
-        await expect(depositor.connect(deployer).revokeRole(DESTINATION_MANAGER_ROLE, await destinationManager.getAddress())).to.emit(
-            depositor,
-            "RoleRevoked",
-        );
+        await expect(
+            depositor.connect(deployer).revokeRole(DESTINATION_MANAGER_ROLE, await destinationManager.getAddress()),
+        ).to.emit(depositor, "RoleRevoked");
         await expect(depositor.connect(user).removeDestinationAddress(await destination.getAddress())).to.emit(
             depositor,
             "DestinationAddressRemoved",
@@ -258,7 +254,7 @@ describe("Depositor", function () {
             depositor,
             "DestinationAddressSkipped",
         );
-    })
+    });
 
     it("validates amount and destination", async function () {
         const { user, destination, token, depositor, amlSigner, destinationManager } = await deployFixture();
@@ -306,14 +302,12 @@ describe("Depositor", function () {
 
         // Test destination removed from allow list
         {
-            await expect(depositor.connect(destinationManager).removeDestinationAddress(await destination.getAddress())).to.emit(
-                depositor,
-                "DestinationAddressRemoved",
-            );
+            await expect(
+                depositor.connect(destinationManager).removeDestinationAddress(await destination.getAddress()),
+            ).to.emit(depositor, "DestinationAddressRemoved");
             const signature = await build(1n, await destination.getAddress());
             // This is a contract-level error, not from AMLUtils
-            await expect(
-                depositor.connect(user).deposit(1n, await destination.getAddress(), signature, deadline))
+            await expect(depositor.connect(user).deposit(1n, await destination.getAddress(), signature, deadline))
                 .to.be.revertedWithCustomError(depositor, "InvalidAddress")
                 .withArgs("destination");
         }
