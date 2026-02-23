@@ -50,10 +50,10 @@ contract CrossChainManager is
 
     // --- Constants ---
     /// @notice Role for burning locked tokens.
-    bytes32 public constant BURN_ADMIN_ROLE = keccak256("BURN_ADMIN_ROLE");
+    bytes32 private constant BURN_ADMIN_ROLE = keccak256("BURN_ADMIN_ROLE");
 
     /// @notice Role for burning locked tokens.
-    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
+    bytes32 private constant BURN_ROLE = keccak256("BURN_ROLE");
 
     /// @dev Internal identifier for Deposit operations to route signature verification.
     bytes32 private constant DEPOSIT_HASH = keccak256("Deposit");
@@ -102,13 +102,15 @@ contract CrossChainManager is
      * @param amlSignerAddress The address of the AML signer.
      * @param destinationManagerAddress The address of the destination address manager.
      * @param crossChainVaultAddress The address of the cross chain vault.
+     * @param burnAdminAddress The address of the admin account maintaining burner.
      */
     event CrossChainManagerInitialized(
         address indexed tokenAddress,
         address shareTokenAddress,
         address amlSignerAddress,
         address destinationManagerAddress,
-        address crossChainVaultAddress
+        address crossChainVaultAddress,
+        address burnAdminAddress
     );
 
     /**
@@ -204,7 +206,7 @@ contract CrossChainManager is
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _destinationManagerAddress The address of the destination manager.
      * @param crossChainVaultAddress The address of the cross chain vault.
-     * @param burnerAddress The address of the user who can manage the burn role.
+     * @param burnAdminAddress The address of the user who can manage the burn role.
      */
     function initialize(
         address _tokenAddress,
@@ -212,20 +214,19 @@ contract CrossChainManager is
         address _amlSignerAddress,
         address _destinationManagerAddress,
         address crossChainVaultAddress,
-        address burnerAddress
+        address burnAdminAddress
     ) external initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(msg.sender); // Ownable2Step uses this internal call
         __AccessControl_init();
         __ReentrancyGuard_init();
 
-        if (_tokenAddress == address(0)) revert InvalidAddress("deposit token");
-        if (_tokenAddress == address(0)) revert InvalidAddress("withdraw token");
+        if (_tokenAddress == address(0)) revert InvalidAddress("token");
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
         if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
-        if (burnerAddress == address(0)) revert InvalidAddress("burner");
+        if (burnAdminAddress == address(0)) revert InvalidAddress("burner");
 
         token = CustomToken(_tokenAddress);
         shareToken = ICustomToken(_shareTokenAddress);
@@ -233,14 +234,15 @@ contract CrossChainManager is
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
         _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
-        _grantRole(BURN_ADMIN_ROLE, burnerAddress);
+        _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
 
         emit CrossChainManagerInitialized(
             _tokenAddress,
             _shareTokenAddress,
             _amlSignerAddress,
             _destinationManagerAddress,
-            crossChainVaultAddress
+            crossChainVaultAddress,
+            burnAdminAddress
         );
     }
 
@@ -256,7 +258,7 @@ contract CrossChainManager is
     ) external onlyOwner {
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
 
-        address oldcrossChainVaultAddress = address(crossChainVaultAddress);
+        address oldcrossChainVaultAddress = address(crossChainVault);
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
         emit CrossChainConfigUpdated(oldcrossChainVaultAddress, crossChainVaultAddress);
