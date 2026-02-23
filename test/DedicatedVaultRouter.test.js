@@ -1153,16 +1153,12 @@ describe("DedicatedVaultRouter", function () {
 
         it("Should handle sweeping of non-existent or already swept redemptions", async function () {
             const { router, owner } = await loadFixture(deployRouterFixture);
-            const { redemptionProxyImplementation } = await loadFixture(
-                deployRedemptionProxyFixture,
-            );
+            const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
 
             // Set the redemption proxy implementation
             await router
                 .connect(owner)
-                .setRedemptionProxyImplementation(
-                    await redemptionProxyImplementation.getAddress(),
-                );
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
 
             // Attempt to sweep a non-existent user address - should not revert, just emit 0 swept
             const nonExistentUser = (await ethers.getSigners())[5].address;
@@ -1557,32 +1553,23 @@ describe("DedicatedVaultRouter", function () {
         it("Should revert requestRedeem if amount is zero", async function () {
             const { router, user, amlSigner } = await loadFixture(deployRouterFixture);
             const deadline = Math.floor(Date.now() / 1000) + 3600;
-            const signature = await signRedeemAML(
-                amlSigner,
-                await router.getAddress(),
-                user.address,
-                0n,
-                deadline,
+            const signature = await signRedeemAML(amlSigner, await router.getAddress(), user.address, 0n, deadline);
+            await expect(router.connect(user).requestRedeem(0n, signature, deadline)).to.be.revertedWithCustomError(
+                router,
+                "InvalidAmount",
             );
-            await expect(
-                router.connect(user).requestRedeem(0n, signature, deadline),
-            ).to.be.revertedWithCustomError(router, "InvalidAmount");
         });
 
         it("Should handle sweepRedemptions with zero proxy address", async function () {
             const { router, owner } = await loadFixture(deployRouterFixture);
-            const { redemptionProxyImplementation } = await loadFixture(
-                deployRedemptionProxyFixture,
-            );
+            const { redemptionProxyImplementation } = await loadFixture(deployRedemptionProxyFixture);
             const KEEPER_ROLE = await router.KEEPER_ROLE();
             await router.grantRole(KEEPER_ROLE, owner.address);
 
             // Set implementation first
             await router
                 .connect(owner)
-                .setRedemptionProxyImplementation(
-                    await redemptionProxyImplementation.getAddress(),
-                );
+                .setRedemptionProxyImplementation(await redemptionProxyImplementation.getAddress());
 
             await expect(router.connect(owner).sweepRedemptions([ethers.ZeroAddress], [100n]))
                 .to.emit(router, "RedemptionsSwept")
@@ -1649,9 +1636,8 @@ describe("DedicatedVaultRouter", function () {
             );
             const tx = await router.connect(user).requestRedeem(nuvaShares, redSig, deadline);
             const receipt = await tx.wait();
-            const proxyAddress = receipt.logs.find(
-                (l) => l.fragment && l.fragment.name === "RedemptionRequested",
-            ).args[1];
+            const proxyAddress = receipt.logs.find((l) => l.fragment && l.fragment.name === "RedemptionRequested")
+                .args[1];
 
             // 3. Sweep with zero amount
             await router.connect(owner).sweepRedemptions([proxyAddress], [0n]);

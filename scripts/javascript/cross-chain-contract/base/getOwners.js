@@ -9,12 +9,9 @@ if (!CROSS_CHAIN_MANAGER_ADDRESS) {
 // --- END: Configuration ---
 
 async function main() {
-    // Get our "user" (signer 1)
-    const [user] = await ethers.getSigners();
-
     // Get contract instances
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
-    
+
     const owner = await crossChainManager.owner();
     console.log(`Current Owner Address: ${owner}`);
 

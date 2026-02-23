@@ -17,6 +17,7 @@ error InsufficientValue(); // dev: insufficient value
 error EmitterNotRegisteredForChain(); // dev: emitter not registered for chain
 error TokenNotAttested(); // dev: token not attested
 error InvalidEvmAddress(); // dev: invalid EVM address
+error AmountMismatch(); // dev: amount mismatch
 
 /**
  * @title A Cross-Chain Token Application
@@ -37,7 +38,7 @@ contract CrossChainVault is ReentrancyGuard {
      */
     constructor(address executor_) {
         // sanity check input values
-        require(executor_ != address(0), InvalidExecutorAddress());
+        if (executor_ == address(0)) revert InvalidExecutorAddress();
 
         // set constructor state variables
         executor = ICCTPv1WithExecutor(executor_);
@@ -76,25 +77,25 @@ contract CrossChainVault is ReentrancyGuard {
         FeeArgs calldata feeArgs
     ) public payable nonReentrant {
         // sanity check function arguments
-        require(token != address(0), InvalidTokenAddress());
-        require(amount > 0, AmountMustBeGreaterThanZero());
-        require(
-            targetRecipient != bytes32(0),
-            TargetRecipientCannotBeBytes32Zero()
-        );
+        if (token == address(0)) revert InvalidTokenAddress();
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (targetRecipient == bytes32(0)) revert TargetRecipientCannotBeBytes32Zero();
 
         /**
          * Compute the normalized amount to verify that it's nonzero.
          * The token bridge peforms the same operation before encoding
          * the amount in the `depositForBurn` message.
          */
-        require(
-            normalizeAmount(amount, getDecimals(token)) > 0,
-            NormalizedAmountMustBeGreaterThanZero()
-        );
+        if (normalizeAmount(amount, getDecimals(token)) == 0) revert NormalizedAmountMustBeGreaterThanZero();
+
+        uint256 balanceBefore = getBalance(token);
 
         // transfer tokens from user to the this contract
         uint256 amountReceived = custodyTokens(token, amount);
+
+        uint256 balanceAfter = getBalance(token);
+
+        if (balanceAfter != balanceBefore + amount) revert AmountMismatch();
 
         // approve the token bridge to spend the specified tokens
         SafeERC20.forceApprove(

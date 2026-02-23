@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -41,12 +42,19 @@ contract CrossChainManager is
     Initializable, 
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
+    AccessControlUpgradeable,
     ReentrancyGuardUpgradeable 
 {
     using SafeERC20 for CustomToken;
     using SafeERC20 for ICustomToken;
 
     // --- Constants ---
+    /// @notice Role for burning locked tokens.
+    bytes32 public constant BURN_ADMIN_ROLE = keccak256("BURN_ADMIN_ROLE");
+
+    /// @notice Role for burning locked tokens.
+    bytes32 public constant BURN_ROLE = keccak256("BURN_ROLE");
+
     /// @dev Internal identifier for Deposit operations to route signature verification.
     bytes32 private constant DEPOSIT_HASH = keccak256("Deposit");
 
@@ -122,12 +130,12 @@ contract CrossChainManager is
         address indexed from,
         address indexed to
     );
-
+    
     /**
      * @notice Emitted when a deposit is made.
      * @param user The address of the user making the deposit.
      * @param amount The amount of tokens deposited.
-     * @param token The address of the deposit token.
+     * @param depositToken The address of the deposit token.
      * @param shareToken The address of the share token.
      * @param destinationAddress The address where the tokens were sent.
      * @param targetChain The target chain to deposit to.
@@ -135,7 +143,7 @@ contract CrossChainManager is
     event Deposited(
         address indexed user,
         uint256 amount,
-        address token,
+        address depositToken,
         address shareToken,
         address destinationAddress,
         uint16 targetChain
@@ -143,18 +151,18 @@ contract CrossChainManager is
 
     /**
      * @notice Emitted when a withdrawal is made.
-     * @param user The address of the user making the withdraw.
+     * @param user The address of the user who initiated the withdrawal.
      * @param amount The amount of tokens withdrawn.
-     * @param token The address of the withdraw token.
-     * @param shareToken The address of the share token.
+     * @param shareToken The address of the shared token associated with the withdrawal.
+     * @param paymentToken The address of the payment token associated with the withdrawal.
      * @param destinationAddress The address where the tokens were sent.
      * @param targetChain The target chain to withdraw to.
      */
     event Withdrawn(
         address indexed user,
         uint256 amount,
-        address token,
         address shareToken,
+        address paymentToken,
         address destinationAddress,
         uint16 targetChain
     );
@@ -196,16 +204,19 @@ contract CrossChainManager is
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param _destinationManagerAddress The address of the destination manager.
      * @param crossChainVaultAddress The address of the cross chain vault.
+     * @param burnerAddress The address of the user who can manage the burn role.
      */
     function initialize(
         address _tokenAddress,
         address _shareTokenAddress,
         address _amlSignerAddress,
         address _destinationManagerAddress,
-        address crossChainVaultAddress
+        address crossChainVaultAddress,
+        address burnerAddress
     ) external initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(msg.sender); // Ownable2Step uses this internal call
+        __AccessControl_init();
         __ReentrancyGuard_init();
 
         if (_tokenAddress == address(0)) revert InvalidAddress("deposit token");
@@ -214,11 +225,15 @@ contract CrossChainManager is
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
         if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
+        if (burnerAddress == address(0)) revert InvalidAddress("burner");
 
         token = CustomToken(_tokenAddress);
         shareToken = ICustomToken(_shareTokenAddress);
         amlSigner = _amlSignerAddress;
         crossChainVault = CrossChainVault(crossChainVaultAddress);
+
+        _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
+        _grantRole(BURN_ADMIN_ROLE, burnerAddress);
 
         emit CrossChainManagerInitialized(
             _tokenAddress,
@@ -481,7 +496,7 @@ contract CrossChainManager is
      * - `mintTransactionHash` must not be empty
      * - Contract must have sufficient token balance
      */
-    function burn(uint256 amount, string calldata mintTransactionHash) external onlyOwner() {
+    function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
         if (amount == 0) revert AmountMustBeGreaterThanZero();
         if (bytes(mintTransactionHash).length == 0) revert InvalidMintTransactionHash();
 
@@ -567,6 +582,9 @@ contract CrossChainManager is
         if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
         if (!isDestination[_destinationAddress]) revert InvalidAddress("destination doesn't exist");
 
+        // transfer share tokens to the contract address
+        shareToken.safeTransferFrom(msg.sender, address(this), _amount);
+
         // Pull tokens from the user to this contract
         token.safeTransferFrom(msg.sender, address(this), _amount);
 
@@ -587,8 +605,8 @@ contract CrossChainManager is
         emit Withdrawn(
             msg.sender, 
             _amount, 
-            address(token), 
             address(shareToken), 
+            address(token), 
             _destinationAddress, 
             targetChain
         );
@@ -659,9 +677,9 @@ contract CrossChainManager is
     }
 
      // --- Upgrade Safety ---
-    // 10 slots: assetVault, asset, stakingVault, stakingAsset, nuvaVault, nuvaAsset, amlSigner, redemptionProxyImplementation, redemptionProxyToUser, usedSignatures
+    // 7 slots: token, crossChainVault, shareToken, amlSigner, destinationAddresses, isDestination, usedSignatures
     // reentrancyStatus slot is namespaced
-    uint256[40] private __gap;
+    uint256[43] private __gap;
 
     /**
      * @notice Authorizes a contract upgrade.

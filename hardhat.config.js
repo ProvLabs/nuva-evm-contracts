@@ -6,7 +6,7 @@ require("@openzeppelin/hardhat-upgrades");
 module.exports = {
   networks: {
     eth: {
-      url: process.env.RPC_URL || "http://localhost:8545",
+      url: process.env.RPC_URL_ETH || "http://localhost:8545",
       accounts: [
         process.env.PRIVATE_KEY,
       ],
