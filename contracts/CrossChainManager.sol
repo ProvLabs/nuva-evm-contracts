@@ -100,7 +100,6 @@ contract CrossChainManager is
      * @param tokenAddress The address of the deposit token.
      * @param shareTokenAddress The address of the withdrawal token.
      * @param amlSignerAddress The address of the AML signer.
-     * @param destinationManagerAddress The address of the destination address manager.
      * @param crossChainVaultAddress The address of the cross chain vault.
      * @param burnAdminAddress The address of the admin account maintaining burner.
      */
@@ -108,7 +107,6 @@ contract CrossChainManager is
         address indexed tokenAddress,
         address shareTokenAddress,
         address amlSignerAddress,
-        address destinationManagerAddress,
         address crossChainVaultAddress,
         address burnAdminAddress
     );
@@ -204,7 +202,6 @@ contract CrossChainManager is
      * @param _tokenAddress The token contract this depositor will accept.
      * @param _shareTokenAddress The token address to emit in the log.
      * @param _amlSignerAddress The address of the trusted AML signer.
-     * @param _destinationManagerAddress The address of the destination manager.
      * @param crossChainVaultAddress The address of the cross chain vault.
      * @param burnAdminAddress The address of the user who can manage the burn role.
      */
@@ -212,7 +209,6 @@ contract CrossChainManager is
         address _tokenAddress,
         address _shareTokenAddress,
         address _amlSignerAddress,
-        address _destinationManagerAddress,
         address crossChainVaultAddress,
         address burnAdminAddress
     ) external initializer {
@@ -224,7 +220,6 @@ contract CrossChainManager is
         if (_tokenAddress == address(0)) revert InvalidAddress("token");
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
-        if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
         if (burnAdminAddress == address(0)) revert InvalidAddress("burner");
 
@@ -240,7 +235,6 @@ contract CrossChainManager is
             _tokenAddress,
             _shareTokenAddress,
             _amlSignerAddress,
-            _destinationManagerAddress,
             crossChainVaultAddress,
             burnAdminAddress
         );

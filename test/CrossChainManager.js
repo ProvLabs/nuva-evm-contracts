@@ -179,7 +179,6 @@ describe("CrossChainManager", function () {
                 await customToken.getAddress(),
                 await shareToken.getAddress(),
                 amlSigner.address,
-                destinationAddress.address,
                 await crossChainVault.getAddress(),
                 burnAdmin.address,
             ],
@@ -222,12 +221,11 @@ describe("CrossChainManager", function () {
             // Resolve all addresses first to catch the 'null' variable
             const customTokenAddr = await customToken.getAddress();
             const shareTokenAddr = await shareToken.getAddress();
-            const amlAddr = await amlSigner.getAddress(); // Use getAddress() for safety
-            const destAddr = await destinationAddress.getAddress();
+            const amlAddr = await amlSigner.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
             const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, destAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
 
             // Deploy and capture the instance
             const proxy = await upgrades.deployProxy(CrossChainManager, initArgs, {
@@ -247,12 +245,11 @@ describe("CrossChainManager", function () {
             // Resolve all addresses first to catch the 'null' variable
             const customTokenAddr = ZeroAddress;
             const shareTokenAddr = await shareToken.getAddress();
-            const amlAddr = await amlSigner.getAddress(); // Use getAddress() for safety
-            const destAddr = await destinationAddress.getAddress();
+            const amlAddr = await amlSigner.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
             const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, destAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -272,11 +269,10 @@ describe("CrossChainManager", function () {
             const customTokenAddr = await customToken.getAddress();
             const shareTokenAddr = ZeroAddress;
             const amlAddr = await amlSigner.getAddress();
-            const destAddr = await destinationAddress.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
             const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, destAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -296,11 +292,10 @@ describe("CrossChainManager", function () {
             const customTokenAddr = await customToken.getAddress();
             const shareTokenAddr = await shareToken.getAddress();
             const amlAddr = ZeroAddress;
-            const destAddr = await destinationAddress.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
             const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, destAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -320,11 +315,10 @@ describe("CrossChainManager", function () {
             const customTokenAddr = await customToken.getAddress();
             const shareTokenAddr = await shareToken.getAddress();
             const amlAddr = await amlSigner.getAddress();
-            const destAddr = await destinationAddress.getAddress();
             const vaultAddr = ZeroAddress;
             const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, destAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
 
             // Deploy and capture the instance
             await expect(
