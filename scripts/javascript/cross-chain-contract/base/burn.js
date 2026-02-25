@@ -13,24 +13,21 @@ if (!SHARE_TOKEN_ADDRESS) {
 }
 
 // NOTE: Change '18' if your token has different decimals
-const AMOUNT_TO_BURN = ethers.parseUnits("1", 4);
+const AMOUNT_TO_BURN = ethers.parseUnits("0.0000000000001", 18);
 // --- END: Configuration ---
 
 async function main() {
-    const userPrivateKey = process.env.PRIVATE_KEY;
-    if (!userPrivateKey) {
-        throw new Error("PRIVATE_KEY is not set.");
-    }
-    const burner = new ethers.Wallet(userPrivateKey, ethers.provider);
+    const [user] = await ethers.getSigners();
 
-    console.log(`Simulating burn as admin: ${burner.address}`);
+    console.log(`Simulating burn as admin: ${user.address}`);
     console.log(`Targeting contract: ${CROSS_CHAIN_MANAGER_ADDRESS}`);
 
-    // 2. Get contract instances
+    // Get contract instances
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
     const shareToken = await ethers.getContractAt("CustomToken", SHARE_TOKEN_ADDRESS);
+    const burnRole = ethers.id("BURN_ROLE");
 
-    // 3. Check the contract's current balance
+    // Check the contract's current balance
     const initialBalance = await shareToken.balanceOf(CROSS_CHAIN_MANAGER_ADDRESS);
     console.log(`Contract's initial balance: ${ethers.formatUnits(initialBalance, 6)} tokens.`);
 
@@ -45,17 +42,15 @@ async function main() {
     // --- BURN ---
     console.log(`\n1. Calling burn() on the clone contract to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 6)} tokens...`);
 
-    // Note: We connect the 'burner' to the 'crossChainManager' contract
-    // In burn.js, update the burn transaction part:
+    // Note: We connect the 'user' to the 'crossChainManager' contract
     try {
         const mintTransactionHash = "0x12345678912212234235435465675765"; // Replace with a valid hash
-        console.log(`Attempting to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 6)} tokens...`);
+        console.log(`Attempting to burn ${ethers.formatUnits(AMOUNT_TO_BURN, 18)} tokens...`);
 
-        console.log("burner.address", burner.address);
-        const hasBurnRole = await crossChainManager.hasRole(crossChainManager.BURN_ROLE(), burner.address);
-        console.log(`Does ${burner.address} have BURN_ROLE? ${hasBurnRole ? "✅ Yes" : "❌ No"}`);
+        const hasBurnRole = await crossChainManager.hasRole(burnRole, user.address);
+        console.log(`Does ${user.address} have BURN_ROLE? ${hasBurnRole ? "✅ Yes" : "❌ No"}`);
 
-        const burnTx = await crossChainManager.connect(burner).burn(AMOUNT_TO_BURN, mintTransactionHash);
+        const burnTx = await crossChainManager.connect(user).burn(AMOUNT_TO_BURN, mintTransactionHash);
         const receipt = await burnTx.wait();
         console.log("✅ Burn successful! Transaction hash:", receipt.hash);
     } catch (error) {

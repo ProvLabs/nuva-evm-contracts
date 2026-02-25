@@ -4,6 +4,7 @@ const { hexlify } = require("ethers");
 const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
 const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
 const { default: axios } = require("axios");
+const { getAmlSigner, getAmlSignature } = require("../utils/helper");
 
 // --- START: Configuration ---
 const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
@@ -31,19 +32,6 @@ if (!TOKEN_ADDRESS) {
 // NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
 const AMOUNT_TO_DEPOSIT = ethers.parseUnits("0.15", 6);
 // --- END: Configuration ---
-
-// --- Helper: Load AML Signer ---
-function getAmlSigner() {
-    const amlPrivateKey = process.env.AML_PRIVATE_KEY;
-    if (!amlPrivateKey || amlPrivateKey.length !== 66) {
-        // 0x + 64 hex chars
-        throw new Error(
-            "Invalid or missing AML_PRIVATE_KEY in .env file. " +
-                "It should be a 66-character hex string (starting with 0x).",
-        );
-    }
-    return new ethers.Wallet(amlPrivateKey, ethers.provider);
-}
 
 async function main() {
     // 1. Get our "user" (signer 1)
@@ -77,34 +65,16 @@ async function main() {
 
     const amlDeadline = Math.floor(Date.now() / 1000) + 60 * 60;
 
-    // Define the EIP-712 Domain
-    const domain = {
+    // Sign using signTypedData (No manual hashing required!)
+    const amlSignature = await getAmlSignature({
         name: "Depositor",
-        version: "1",
-        chainId: (await ethers.provider.getNetwork()).chainId,
-        verifyingContract: CROSS_CHAIN_MANAGER_ADDRESS,
-    };
-
-    // Define the Types (matches your Solidity struct exactly)
-    const types = {
-        Deposit: [
-            { name: "sender", type: "address" },
-            { name: "amount", type: "uint256" },
-            { name: "destinationAddress", type: "address" },
-            { name: "deadline", type: "uint256" },
-        ],
-    };
-
-    // Define the Values
-    const value = {
+        amlSigner,
         sender: user.address,
         amount: AMOUNT_TO_DEPOSIT,
-        destinationAddress: DESTINATION_ADDRESS,
         deadline: amlDeadline,
-    };
-
-    // Sign using signTypedData (No manual hashing required!)
-    const amlSignature = await amlSigner.signTypedData(domain, types, value);
+        destinationAddress: DESTINATION_ADDRESS,
+        verifyingContract: CROSS_CHAIN_MANAGER_ADDRESS,
+    });
     console.log("   ✅ AML Signature created successfully.");
 
     // --- STEP 1: APPROVE ---

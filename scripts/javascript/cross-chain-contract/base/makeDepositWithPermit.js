@@ -4,6 +4,7 @@ const { hexlify } = require("ethers");
 const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
 const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
 const { default: axios } = require("axios");
+const { buildPermit, getAmlSigner, getAmlSignature } = require("../utils/helper");
 
 // --- START: Configuration ---
 const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
@@ -32,19 +33,6 @@ if (!TOKEN_ADDRESS) {
 }
 
 // --- END: Configuration ---
-
-// --- Helper: Load AML Signer ---
-function getAmlSigner() {
-    const amlPrivateKey = process.env.AML_PRIVATE_KEY;
-    if (!amlPrivateKey || amlPrivateKey.length !== 66) {
-        // 0x + 64 hex chars
-        throw new Error(
-            "Invalid or missing AML_PRIVATE_KEY in .env file. " +
-                "It should be a 66-character hex string (starting with 0x).",
-        );
-    }
-    return new ethers.Wallet(amlPrivateKey, ethers.provider);
-}
 
 async function main() {
     // 1. Get our "user" (signer 1)
@@ -86,36 +74,16 @@ async function main() {
 
     const amlDeadline = Math.floor(Date.now() / 1000) + 60 * 60;
 
-    const chainId = (await ethers.provider.getNetwork()).chainId;
-
-    // Define the EIP-712 Domain
-    var domain = {
+    // Sign using signTypedData (No manual hashing required!)
+    const amlSignature = await getAmlSignature({
         name: "Depositor",
-        version: "1",
-        chainId,
-        verifyingContract: CROSS_CHAIN_MANAGER_ADDRESS,
-    };
-
-    // Define the Types (matches your Solidity struct exactly)
-    var types = {
-        Deposit: [
-            { name: "sender", type: "address" },
-            { name: "amount", type: "uint256" },
-            { name: "destinationAddress", type: "address" },
-            { name: "deadline", type: "uint256" },
-        ],
-    };
-
-    // Define the Values
-    var value = {
+        amlSigner,
         sender: user.address,
         amount: AMOUNT_TO_DEPOSIT,
-        destinationAddress: DESTINATION_ADDRESS,
         deadline: amlDeadline,
-    };
-
-    // Sign using signTypedData (No manual hashing required!)
-    const amlSignature = await amlSigner.signTypedData(domain, types, value);
+        destinationAddress: DESTINATION_ADDRESS,
+        verifyingContract: CROSS_CHAIN_MANAGER_ADDRESS,
+    });
     console.log("   ✅ AML Signature created successfully.");
 
     // --- STEP 1: APPROVE ---
@@ -138,33 +106,16 @@ async function main() {
     // This deadline is for the permit signature
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
-    domain = {
-        name: await token.name(),
-        version: "2",
-        chainId,
-        verifyingContract: TOKEN_ADDRESS,
-    };
-
-    types = {
-        Permit: [
-            { name: "owner", type: "address" },
-            { name: "spender", type: "address" },
-            { name: "value", type: "uint256" },
-            { name: "nonce", type: "uint256" },
-            { name: "deadline", type: "uint256" },
-        ],
-    };
-
-    value = {
-        owner: user.address,
-        spender: crossChainManager.target,
-        value: AMOUNT_TO_DEPOSIT,
-        nonce: permitNonce,
-        deadline: permitDeadline,
-    };
-
     // Sign the typed data
-    const permitSignature = await user.signTypedData(domain, types, value);
+    const permitSignature = await buildPermit({
+        tokenName: await token.name(),
+        user,
+        amount: AMOUNT_TO_DEPOSIT,
+        permitNonce,
+        permitDeadline,
+        destinationAddress: crossChainManager.target,
+        verifyingContract: TOKEN_ADDRESS,
+    });
     const { v, r, s } = ethers.Signature.from(permitSignature);
     console.log("   ✅ Permit Signature created.");
 

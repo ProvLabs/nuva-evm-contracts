@@ -8,17 +8,13 @@ async function main() {
     console.log("Using token:", tokenAddr);
 
     const token = await hre.ethers.getContractAt("CustomToken", tokenAddr);
-    const decimals = await token.decimals();
-    console.log("decimals:", decimals);
-
+    const MINTER_ROLE = await token.MINTER_ROLE();
     const to = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
-    const amount = hre.ethers.parseUnits("1000000", decimals);
 
-    // Call mint(to, amount)
-    const tx = await token.mint(to, amount);
+    const tx = await token.grantRole(MINTER_ROLE, to);
     const receipt = await tx.wait();
 
-    console.log("mint tx:", receipt.hash);
+    console.log("grant tx:", receipt.hash);
 }
 
 main()
