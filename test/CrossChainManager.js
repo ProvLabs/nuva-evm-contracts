@@ -626,24 +626,13 @@ describe("CrossChainManager", function () {
                 deadline,
                 destinationAddress: destinationAddress.address,
             });
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await shareToken.mint(user1.address, WITHDRAW_AMOUNT);
 
             await expect(
                 crossChainManager
                     .connect(user1)
-                    .withdraw(
-                        WITHDRAW_AMOUNT,
-                        destinationAddress.address,
-                        amlSignature,
-                        deadline,
-                        TARGET_CHAIN,
-                        TARGET_DOMAIN,
-                        executorArgs,
-                        feeArgs,
-                    ),
+                    .withdraw(WITHDRAW_AMOUNT, destinationAddress.address, amlSignature, deadline),
             )
                 .to.emit(crossChainManager, "Withdrawn")
                 .withArgs(
@@ -651,8 +640,6 @@ describe("CrossChainManager", function () {
                     WITHDRAW_AMOUNT,
                     await shareToken.getAddress(),
                     await customToken.getAddress(),
-                    destinationAddress.address,
-                    TARGET_CHAIN,
                 );
         });
 
@@ -670,15 +657,12 @@ describe("CrossChainManager", function () {
             const permitDeadline = (await latestTimestamp()) + 7200n;
             const permitSignature = await buildPermit(
                 user1,
-                customToken,
+                shareToken,
                 crossChainManager,
                 DEPOSIT_AMOUNT,
                 permitDeadline,
             );
             const { v, r, s } = ethers.Signature.from(permitSignature);
-
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await shareToken.mint(user1.address, WITHDRAW_AMOUNT);
 
@@ -694,10 +678,6 @@ describe("CrossChainManager", function () {
                         v,
                         r,
                         s,
-                        TARGET_CHAIN,
-                        TARGET_DOMAIN,
-                        executorArgs,
-                        feeArgs,
                     ),
             )
                 .to.emit(crossChainManager, "Withdrawn")
@@ -706,8 +686,6 @@ describe("CrossChainManager", function () {
                     WITHDRAW_AMOUNT,
                     await shareToken.getAddress(),
                     await customToken.getAddress(),
-                    destinationAddress.address,
-                    TARGET_CHAIN,
                 );
         });
 
@@ -722,26 +700,13 @@ describe("CrossChainManager", function () {
                 deadline,
                 destinationAddress: destinationAddress.address,
             });
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await expect(
-                crossChainManager
-                    .connect(user1)
-                    .withdraw(
-                        amount,
-                        destinationAddress.address,
-                        amlSignature,
-                        deadline,
-                        TARGET_CHAIN,
-                        TARGET_DOMAIN,
-                        executorArgs,
-                        feeArgs,
-                    ),
+                crossChainManager.connect(user1).withdraw(amount, destinationAddress.address, amlSignature, deadline),
             ).to.be.revertedWithCustomError(crossChainManager, "AmountMustBeGreaterThanZero");
         });
 
-        it("Should reject withdraw with invalid destination", async function () {
+        it("Should reject withdraw with insufficient shareToken balance", async function () {
             const deadline = (await latestTimestamp()) + 3600n;
             const amlSignature = await getWithdrawAMLSignature({
                 contract: crossChainManager,
@@ -751,23 +716,12 @@ describe("CrossChainManager", function () {
                 deadline,
                 destinationAddress: user2.address,
             });
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await expect(
-                crossChainManager
-                    .connect(user1)
-                    .withdraw(
-                        WITHDRAW_AMOUNT,
-                        user2.address,
-                        amlSignature,
-                        deadline,
-                        TARGET_CHAIN,
-                        TARGET_DOMAIN,
-                        executorArgs,
-                        feeArgs,
-                    ),
-            ).to.be.revertedWithCustomError(crossChainManager, "InvalidAddress");
+                crossChainManager.connect(user1).withdraw(WITHDRAW_AMOUNT, user2.address, amlSignature, deadline),
+            )
+                .to.be.revertedWithCustomError(shareToken, "ERC20InsufficientBalance")
+                .withArgs(user1.address, 0, WITHDRAW_AMOUNT);
         });
 
         it("Should reject withdraw with expired deadline", async function () {
@@ -780,22 +734,11 @@ describe("CrossChainManager", function () {
                 deadline,
                 destinationAddress: destinationAddress.address,
             });
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await expect(
                 crossChainManager
                     .connect(user1)
-                    .withdraw(
-                        WITHDRAW_AMOUNT,
-                        destinationAddress.address,
-                        amlSignature,
-                        deadline,
-                        TARGET_CHAIN,
-                        TARGET_DOMAIN,
-                        executorArgs,
-                        feeArgs,
-                    ),
+                    .withdraw(WITHDRAW_AMOUNT, destinationAddress.address, amlSignature, deadline),
             ).to.be.revertedWithCustomError(crossChainManager, "AmlSignatureExpired");
         });
 
@@ -809,22 +752,11 @@ describe("CrossChainManager", function () {
                 deadline,
                 destinationAddress: destinationAddress.address,
             });
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await expect(
                 crossChainManager
                     .connect(user1)
-                    .withdraw(
-                        WITHDRAW_AMOUNT,
-                        destinationAddress.address,
-                        invalidSignature,
-                        deadline,
-                        TARGET_CHAIN,
-                        TARGET_DOMAIN,
-                        executorArgs,
-                        feeArgs,
-                    ),
+                    .withdraw(WITHDRAW_AMOUNT, destinationAddress.address, invalidSignature, deadline),
             ).to.be.revertedWithCustomError(crossChainManager, "InvalidAmlSigner");
         });
     });
@@ -955,23 +887,12 @@ describe("CrossChainManager", function () {
                 deadline,
                 destinationAddress: destinationAddress.address,
             });
-            const executorArgs = createExecutorArgs();
-            const feeArgs = createFeeArgs();
 
             await shareToken.mint(user1.address, WITHDRAW_AMOUNT);
 
             await crossChainManager
                 .connect(user1)
-                .withdraw(
-                    WITHDRAW_AMOUNT,
-                    destinationAddress.address,
-                    amlSignature,
-                    deadline,
-                    TARGET_CHAIN,
-                    TARGET_DOMAIN,
-                    executorArgs,
-                    feeArgs,
-                );
+                .withdraw(WITHDRAW_AMOUNT, destinationAddress.address, amlSignature, deadline);
 
             // Define the role
             const BURN_ROLE = ethers.id("BURN_ROLE");

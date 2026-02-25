@@ -155,16 +155,12 @@ contract CrossChainManager is
      * @param amount The amount of tokens withdrawn.
      * @param shareToken The address of the shared token associated with the withdrawal.
      * @param paymentToken The address of the payment token associated with the withdrawal.
-     * @param destinationAddress The address where the tokens were sent.
-     * @param targetChain The target chain to withdraw to.
      */
     event Withdrawn(
         address indexed user,
         uint256 amount,
         address shareToken,
-        address paymentToken,
-        address destinationAddress,
-        uint16 targetChain
+        address paymentToken
     );
 
     /// @notice Emitted when destination addresses are altered.
@@ -309,27 +305,19 @@ contract CrossChainManager is
      * @param _destinationAddress The address to send the tokens to.
      * @param _amlSignature The signature from the AML signer.
      * @param _amlDeadline The expiration timestamp for the AML signature.
-     * @param targetChain The target chain to deposit to.
-     * @param targetDomain Circle's domain ID of the target blockchain
-     * @param executorArgs The executor arguments
-     * @param feeArgs The fee arguments
      */
     function withdraw(
         uint256 _amount, 
         address _destinationAddress,
         bytes calldata _amlSignature, 
-        uint256 _amlDeadline,
-        uint16 targetChain,
-        uint32 targetDomain,
-        ExecutorArgs calldata executorArgs,
-        FeeArgs calldata feeArgs
-    ) external payable nonReentrant {
+        uint256 _amlDeadline
+    ) external nonReentrant {
         if (_amount == 0) revert AmountMustBeGreaterThanZero();
 
         bytes32 messageHash = _getMessageHash("Withdraw", _amount, _destinationAddress, _amlDeadline);
         _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
 
-        _doWithdraw(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
+        _doWithdraw(_amount);
     }
 
     /**
@@ -366,7 +354,7 @@ contract CrossChainManager is
         _verifyAML("Depositor", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
-        IERC20Permit(address(token)).permit(
+        token.permit(
             msg.sender, // The user (owner)
             address(this), // The spender (this contract)
             _amount, // The amount
@@ -390,10 +378,6 @@ contract CrossChainManager is
      * @param _v The recovery byte of the EIP-712 permit signature.
      * @param _r First 32 bytes of the EIP-712 permit signature.
      * @param _s Second 32 bytes of the EIP-712 permit signature.
-     * @param targetChain The target chain to deposit to.
-     * @param targetDomain Circle's domain ID of the target blockchain
-     * @param executorArgs The executor arguments
-     * @param feeArgs The fee arguments
      */
     function withdrawWithPermit(
         uint256 _amount,
@@ -403,17 +387,13 @@ contract CrossChainManager is
         uint256 _permitDeadline,
         uint8 _v,
         bytes32 _r,
-        bytes32 _s,
-        uint16 targetChain,
-        uint32 targetDomain,
-        ExecutorArgs calldata executorArgs,
-        FeeArgs calldata feeArgs
-    ) external payable nonReentrant {
+        bytes32 _s
+    ) external nonReentrant {
         bytes32 messageHash = _getMessageHash("Withdraw", _amount, _destinationAddress, _amlDeadline);
         _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
-        IERC20Permit(address(token)).permit(
+        shareToken.permit(
             msg.sender, // The user (owner)
             address(this), // The spender (this contract)
             _amount, // The amount
@@ -423,7 +403,7 @@ contract CrossChainManager is
             _s // The user's signature
         );
 
-        _doWithdraw(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
+        _doWithdraw(_amount);
     }
 
     /**
@@ -560,51 +540,18 @@ contract CrossChainManager is
     /**
      * @notice Handles the withdrawal logic by transferring tokens from the sender to this contract.
      * @param _amount The amount of tokens to withdraw.
-     * @param _destinationAddress The address where tokens will be sent.
-     * @param targetChain The target chain to withdraw to.
-     * @param targetDomain Circle's domain ID of the target blockchain
-     * @param executorArgs The executor arguments
-     * @param feeArgs The fee arguments
      */
-    function _doWithdraw(
-        uint256 _amount, 
-        address _destinationAddress,
-        uint16 targetChain,
-        uint32 targetDomain,
-        ExecutorArgs calldata executorArgs,
-        FeeArgs calldata feeArgs
-    ) private {
+    function _doWithdraw(uint256 _amount) private {
         if (_amount == 0) revert InvalidAmount();
-        if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
-        if (!isDestination[_destinationAddress]) revert InvalidAddress("destination doesn't exist");
 
         // transfer share tokens to the contract address
         shareToken.safeTransferFrom(msg.sender, address(this), _amount);
-
-        // Pull tokens from the user to this contract
-        token.safeTransferFrom(msg.sender, address(this), _amount);
-
-        // Approve the Vault to spend the tokens just pulled
-        token.forceApprove(address(crossChainVault), _amount);
-
-        // Calling the vault
-        crossChainVault.sendTokens{value: msg.value}(
-            address(token), 
-            _amount, 
-            targetChain, 
-            targetDomain, 
-            bytes32(uint256(uint160(_destinationAddress))),
-            executorArgs,
-            feeArgs
-        );
 
         emit Withdrawn(
             msg.sender, 
             _amount, 
             address(shareToken), 
-            address(token), 
-            _destinationAddress, 
-            targetChain
+            address(token) 
         );
     }
 

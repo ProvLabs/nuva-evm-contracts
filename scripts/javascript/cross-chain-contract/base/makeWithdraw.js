@@ -1,9 +1,5 @@
 // scripts/makeWithdraw.js
 const { ethers } = require("hardhat");
-const { hexlify } = require("ethers");
-const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
-const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
-const { default: axios } = require("axios");
 const { getAmlSigner, getAmlSignature } = require("../utils/helper");
 
 // --- START: Configuration ---
@@ -48,11 +44,10 @@ async function main() {
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
 
     // We need the "IERC20" ABI to talk to the token
-    const token = await ethers.getContractAt("IERC20", TOKEN_ADDRESS);
     const shareToken = await ethers.getContractAt("IERC20", SHARE_TOKEN_ADDRESS);
 
     // 3. Check if the user has enough tokens
-    const balance = await token.balanceOf(user.address);
+    const balance = await shareToken.balanceOf(user.address);
     if (balance < AMOUNT_TO_WITHDRAW) {
         console.error("❌ Error: User does not have enough tokens.");
         console.error(`  User Balance: ${ethers.formatUnits(balance, 6)}`);
@@ -80,21 +75,8 @@ async function main() {
 
     // --- STEP 1: APPROVE ---
     // The user approves the proxy contract to spend their tokens
-    console.log(`Checking allowance for ${TOKEN_ADDRESS}...`);
-    let currentAllowance = await token.allowance(user.address, crossChainManager);
-
-    if (currentAllowance < AMOUNT_TO_WITHDRAW) {
-        console.log("Allowance too low. Sending approval transaction...");
-        // Approve the Vault to spend your tokens
-        const approveTx = await token.connect(user).approve(crossChainManager.target, AMOUNT_TO_WITHDRAW);
-        await approveTx.wait();
-        console.log("Approval confirmed!");
-    } else {
-        console.log("Sufficient allowance already exists.");
-    }
-
     console.log(`Checking allowance for ${SHARE_TOKEN_ADDRESS}...`);
-    currentAllowance = await shareToken.allowance(user.address, crossChainManager);
+    const currentAllowance = await shareToken.allowance(user.address, crossChainManager);
 
     if (currentAllowance < AMOUNT_TO_WITHDRAW) {
         console.log("Allowance too low. Sending approval transaction...");
@@ -110,64 +92,11 @@ async function main() {
     // The user calls the withdraw function on the proxy
     console.log("2. Calling withdraw() on the proxy contract...");
 
-    const srcChain = 10004;
-    const targetChain = 10002;
-    const targetDomain = 0;
-
-    const relayInstructions = serializeLayout(relayInstructionsLayout, {
-        requests: [
-            {
-                request: {
-                    type: "GasInstruction",
-                    gasLimit: 250000n,
-                    msgValue: 0n,
-                },
-            },
-        ],
-    });
-
-    // Convert the Uint8Array to a 0x-prefixed hex string
-    const relayInstructionsHex = hexlify(relayInstructions);
-
-    const EXECUTOR_URL = "https://executor-testnet.labsapis.com";
-    const { signedQuote, estimatedCost } = (
-        await axios.post(`${EXECUTOR_URL}/v0/quote`, {
-            srcChain,
-            dstChain: targetChain,
-            relayInstructions: relayInstructionsHex,
-        })
-    ).data;
-
-    const executorArgs = {
-        refundAddress: user.address,
-        signedQuote,
-        instructions: relayInstructionsHex,
-    };
-
-    const feeArgs = {
-        transferTokenFee: 0,
-        nativeTokenFee: 0,
-        payee: DESTINATION_ADDRESS,
-    };
-
     // connect the `user` to the `crossChainManager` contract
     try {
         const withdrawTx = await crossChainManager
             .connect(user)
-            .withdraw(
-                AMOUNT_TO_WITHDRAW,
-                DESTINATION_ADDRESS,
-                amlSignature,
-                amlDeadline,
-                targetChain,
-                targetDomain,
-                executorArgs,
-                feeArgs,
-                {
-                    value: BigInt(estimatedCost) + BigInt(feeArgs.nativeTokenFee),
-                    gasLimit: 500000n,
-                },
-            );
+            .withdraw(AMOUNT_TO_WITHDRAW, DESTINATION_ADDRESS, amlSignature, amlDeadline);
         const receipt = await withdrawTx.wait();
 
         console.log("   ✅ Withdraw successful! Transaction hash:", receipt.hash);
