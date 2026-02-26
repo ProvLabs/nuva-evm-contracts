@@ -1,9 +1,9 @@
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---
-const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
+const CROSS_CHAIN_MANAGER_ADDRESS = process.env.VAULT_CROSS_CHAIN_PROXY_BASE;
 if (!CROSS_CHAIN_MANAGER_ADDRESS) {
-    throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
+    throw new Error("VAULT_CROSS_CHAIN_PROXY_BASE is not set.");
 }
 // --- END: Configuration ---
 
@@ -12,15 +12,15 @@ async function main() {
     const [user] = await ethers.getSigners();
 
     // Get contract instances
-    const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
-    const oldOwner = await crossChainManager.owner();
+    const vault = await ethers.getContractAt("CrossChainVault", CROSS_CHAIN_MANAGER_ADDRESS);
+    const oldOwner = await vault.owner();
 
     console.log(`Simulating update as user: ${user.address}`);
     console.log(`Current Owner Address: ${oldOwner}`);
 
-    // connect the `user` to the `crossChainManager` contract
+    // connect the `user` to the `vault` contract
     try {
-        const acceptTx = await crossChainManager.connect(user).acceptOwnership();
+        const acceptTx = await vault.connect(user).acceptOwnership();
         const receipt = await acceptTx.wait();
 
         console.log("   ✅ Update successful! Transaction hash:", receipt.hash);
@@ -29,7 +29,7 @@ async function main() {
         console.log("Actual Revert Reason:", error);
     }
 
-    const newOwner = await crossChainManager.owner();
+    const newOwner = await vault.owner();
     console.log(`New Owner Address: ${newOwner}`);
 }
 

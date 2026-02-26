@@ -1,4 +1,3 @@
-// scripts/makeDeposit.js
 const { ethers } = require("hardhat");
 
 // --- START: Configuration ---

@@ -1,4 +1,3 @@
-// scripts/makeDeposit.js
 const { ethers } = require("hardhat");
 const { hexlify } = require("ethers");
 const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
