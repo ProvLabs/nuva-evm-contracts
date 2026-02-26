@@ -84,7 +84,7 @@ contract CrossChainManager is
     /// @notice The address of the trusted signer for AML (Anti-Money Laundering) checks.
     address public amlSigner;
 
-    /// @notice Array of all allowed destination addresses.
+    /// @notice List of all allowed destination addresses.
     address[] public destinationAddresses;
 
     /// @notice Mapping to check if an address is a destination.
@@ -92,6 +92,9 @@ contract CrossChainManager is
 
     /// @notice Mapping to track used AML signatures to prevent replay attacks.
     mapping(bytes32 => bool) public usedSignatures;
+
+    /// @notice Mapping from address to (index in whitelist array + 1)
+    mapping(address => uint256) private addressToIndex;
 
     // --- Events ---
 
@@ -186,6 +189,7 @@ contract CrossChainManager is
 
 
     /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @notice constructor
     constructor() {
         _disableInitializers();
     }
@@ -421,15 +425,18 @@ contract CrossChainManager is
      * @param _destination The address to attempt to add.
      */
     function addDestinationAddress(address _destination) external onlyOwner {
-        if (_destination == address(0)) revert InvalidAddress("destination address");
+        if (_destination == address(0)) revert InvalidAddress("zero destination address");
 
         if (isDestination[_destination]) {
             emit DestinationAddressSkipped(_destination);
             return;
         }
-    
+
         isDestination[_destination] = true;
         destinationAddresses.push(_destination);
+
+        // Store the index + 1 (so index 0 is at 1)
+        addressToIndex[_destination] = destinationAddresses.length; 
 
         emit DestinationAddressAdded(_destination);
     }
@@ -441,22 +448,31 @@ contract CrossChainManager is
      * @param _destination The address to remove.
      */
     function removeDestinationAddress(address _destination) external onlyOwner() {
-        for (uint i = 0; i < destinationAddresses.length; i++) {
-            if (destinationAddresses[i] == _destination) {
-                // Move the last element into the place to delete
-                destinationAddresses[i] = destinationAddresses[destinationAddresses.length - 1];
-
-                isDestination[_destination] = false;
-
-                // Remove the last element
-                destinationAddresses.pop();
-
-                emit DestinationAddressRemoved(_destination);
-                return;
-            }
+        if (!isDestination[_destination]) {
+            emit DestinationAddressSkipped(_destination);
+            return;
         }
 
-        emit DestinationAddressSkipped(_destination);
+        uint256 indexPlusOne = addressToIndex[_destination];
+        uint256 indexToRemove = indexPlusOne - 1;
+        uint256 lastIndex = destinationAddresses.length - 1;
+
+        if (indexToRemove != lastIndex) {
+            address lastAddr = destinationAddresses[lastIndex];
+            
+            // Move the last element into the gap
+            destinationAddresses[indexToRemove] = lastAddr;
+            
+            // Update the index of the moved element
+            addressToIndex[lastAddr] = indexPlusOne;
+        }
+
+        // Clean up
+        destinationAddresses.pop();
+        delete addressToIndex[_destination];
+        delete isDestination[_destination];
+
+        emit DestinationAddressRemoved(_destination);
     }
 
     /**
@@ -619,10 +635,10 @@ contract CrossChainManager is
         revert InvalidFunctionName();
     }
 
-     // --- Upgrade Safety ---
-    // 7 slots: token, crossChainVault, shareToken, amlSigner, destinationAddresses, isDestination, usedSignatures
+    // --- Upgrade Safety ---
+    // 8 slots: token, crossChainVault, shareToken, amlSigner, destinationAddresses, isDestination, usedSignatures, addressToIndex
     // reentrancyStatus slot is namespaced
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     /**
      * @notice Authorizes a contract upgrade.

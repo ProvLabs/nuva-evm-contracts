@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {BytesLib} from "./modules/utils/BytesLib.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ICCTPv1WithExecutor, ExecutorArgs, FeeArgs} from "./modules/wormhole/ICCTPv1WithExecutor.sol";
@@ -12,12 +15,10 @@ error InvalidTokenAddress(); // dev: invalid token address
 error AmountMustBeGreaterThanZero(); // dev: amount must be greater than zero
 error TargetRecipientCannotBeBytes32Zero(); // dev: target recipient cannot be bytes32(0)
 error NormalizedAmountMustBeGreaterThanZero(); // dev: normalized amount must be greater than zero
-error EmitterNotRegistered(); // dev: emitter not registered
 error InsufficientValue(); // dev: insufficient value
-error EmitterNotRegisteredForChain(); // dev: emitter not registered for chain
-error TokenNotAttested(); // dev: token not attested
-error InvalidEvmAddress(); // dev: invalid EVM address
 error AmountMismatch(); // dev: amount mismatch
+error InvalidAddress(string); // dev: Address cannot be zero
+error AddressNotWhitelisted(); // dev: Address not whitelisted
 
 /**
  * @title A Cross-Chain Token Application
@@ -25,18 +26,77 @@ error AmountMismatch(); // dev: amount mismatch
  * cross chain with an aribtrary message payload.
  * @author NU Blockchain Technologies
  */
-contract CrossChainVault is ReentrancyGuard {
+contract CrossChainVault is 
+    Initializable, 
+    UUPSUpgradeable,
+    Ownable2StepUpgradeable,
+    ReentrancyGuardUpgradeable  {
     using BytesLib for bytes;
+
+    // --- State Variables ---
 
     /// @notice The executor contract
     ICCTPv1WithExecutor public executor;
+
+    /// @notice List of all allowed addresses.
+    address[] public whitelist;
+
+    /// @notice Mapping to check if an address is whitelisted.
+    mapping(address => bool) public isWhitelisted;
+
+    /// @notice Mapping from address to (index in whitelist array + 1)
+    mapping(address => uint256) private addressToIndex;
+
+    // --- Events ---
+
+    /**
+     * @notice Emitted when a depositor is initialized.
+     * @param token Address of `token` to be transferred
+     * @param amount Amount of `token` to be transferred
+     * @param targetChain Wormhole chain ID of the target blockchain
+     * @param targetDomain Circle's domain ID of the target blockchain
+     * @param targetRecipient Address in bytes32 format (zero-left-padded if
+     * less than 20 bytes) of the recipient's wallet on the target blockchain.
+     * @param nonce The nonce of wormhole message
+     */
+    event TokensSent(
+        address indexed token,
+        uint256 amount,
+        uint16 targetChain,
+        uint32 targetDomain,
+        bytes32 targetRecipient,
+        uint64 nonce
+    );
+
+    /// @notice Emitted when addresses are added to the whitelist.
+    /// @param addr The address to be added.
+    event Whitelisted(address indexed addr);
+    
+    /// @notice Emitted when addresses are removed from the whitelist.
+    /// @param addr The address to be removed.
+    event WhitelistRevoked(address indexed addr);
+    
+    /// @notice Emitted when addresses are skipped from the whitelist.
+    /// @param addr The address to be skipped.
+    event WhitelistingSkipped(address indexed addr);
+
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @notice constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
      * @notice Deploys the smart contract and sanity checks initial deployment values
      * @dev Sets the executor state variable.
      * @param executor_ The address of the executor contract
      */
-    constructor(address executor_) {
+    function initialize(address executor_) external initializer {
+        __UUPSUpgradeable_init();
+        __Ownable_init(msg.sender); // Ownable2Step uses this internal call
+        __ReentrancyGuard_init();
+
         // sanity check input values
         if (executor_ == address(0)) revert InvalidExecutorAddress();
 
@@ -75,11 +135,12 @@ contract CrossChainVault is ReentrancyGuard {
         bytes32 targetRecipient,
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
-    ) public payable nonReentrant {
+    ) external payable nonReentrant {
         // sanity check function arguments
         if (token == address(0)) revert InvalidTokenAddress();
         if (amount == 0) revert AmountMustBeGreaterThanZero();
         if (targetRecipient == bytes32(0)) revert TargetRecipientCannotBeBytes32Zero();
+        if (!isWhitelisted[msg.sender]) revert AddressNotWhitelisted();
 
         /**
          * Compute the normalized amount to verify that it's nonzero.
@@ -107,7 +168,7 @@ contract CrossChainVault is ReentrancyGuard {
         // removed fees from the token amount
         uint256 amountTransferred = amountReceived - feeArgs.transferTokenFee;
 
-        executor.depositForBurn{value: msg.value}(
+        uint64 nonce = executor.depositForBurn{value: msg.value}(
             amountTransferred, 
             targetChain, 
             targetDomain, 
@@ -116,6 +177,72 @@ contract CrossChainVault is ReentrancyGuard {
             executorArgs, 
             feeArgs
         );
+
+        emit TokensSent(token, amount, targetChain, targetDomain, targetRecipient, nonce);
+    }
+
+    /**
+     * @notice Adds an address to the whitelist only if it doesn't already exist.
+     * @dev Adds an address to the whitelist only if it doesn't already exist.
+     * @param _addr The address to attempt to add.
+     */
+    function addToWhitelist(address _addr) external onlyOwner {
+        if (_addr == address(0)) revert InvalidAddress("zero address");
+        
+        if (isWhitelisted[_addr]) {
+            emit WhitelistingSkipped(_addr);
+            return;
+        }
+
+        isWhitelisted[_addr] = true;
+        whitelist.push(_addr);
+
+        // Store the index + 1 (so index 0 is at 1)
+        addressToIndex[_addr] = whitelist.length; 
+
+        emit Whitelisted(_addr);
+    }
+
+    /**
+     * @notice Removes an address from the whitelist only if it exists.
+     * @dev Removes an address from the whitelist only if it exists.
+     * @param _addr The address to attempt to remove.
+     */
+    function removeFromWhitelist(address _addr) external onlyOwner {
+        if (!isWhitelisted[_addr]) {
+            emit WhitelistingSkipped(_addr);
+            return;
+        }
+
+        uint256 indexPlusOne = addressToIndex[_addr];
+        uint256 indexToRemove = indexPlusOne - 1;
+        uint256 lastIndex = whitelist.length - 1;
+
+        if (indexToRemove != lastIndex) {
+            address lastAddr = whitelist[lastIndex];
+            
+            // Move the last element into the gap
+            whitelist[indexToRemove] = lastAddr;
+            
+            // Update the index of the moved element
+            addressToIndex[lastAddr] = indexPlusOne;
+        }
+
+        // Clean up
+        whitelist.pop();
+        delete addressToIndex[_addr];
+        delete isWhitelisted[_addr];
+
+        emit WhitelistRevoked(_addr);
+    }
+
+    /**
+     * @notice Get the list of whitelisted addresses
+     * @dev Helper function to get the full list of addresses.
+     * @return The list of whitelisted addresses
+     */
+    function getWhitelist() public view returns (address[] memory) {
+        return whitelist;
     }
 
     /**
@@ -185,5 +312,18 @@ contract CrossChainVault is ReentrancyGuard {
             amount /= 10 ** (decimals - 8);
         }
         return amount;
+    }
+
+    // --- Upgrade Safety ---
+    // 4 slots: executor, whitelist, isWhitelisted, addressToIndex
+    uint256[46] private __gap;
+
+    /**
+     * @notice Authorizes a contract upgrade.
+     * @dev Only callable by the owner.
+     * @param newImplementation Address of the new implementation.
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        // Upgrade authorized
     }
 }
