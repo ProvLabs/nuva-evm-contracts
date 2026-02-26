@@ -115,7 +115,7 @@ async function main() {
         permitDeadline,
         destinationAddress: crossChainManager.target,
         verifyingContract: TOKEN_ADDRESS,
-        version: "2"
+        version: "2",
     });
     const { v, r, s } = ethers.Signature.from(permitSignature);
     console.log("   ✅ Permit Signature created.");

@@ -167,7 +167,16 @@ describe("CrossChainManager", function () {
 
         // Deploy CrossChainVault (mock)
         const CrossChainVault = await ethers.getContractFactory("CrossChainVault");
-        crossChainVault = await CrossChainVault.deploy(await mockExecutor.getAddress());
+
+        // Deploy proxy and initialize
+        const vaultProxy = await upgrades.deployProxy(CrossChainVault, [await mockExecutor.getAddress()], {
+            initializer: "initialize",
+            kind: "uups",
+        });
+        await vaultProxy.waitForDeployment();
+
+        const vaultProxyAddress = await vaultProxy.getAddress();
+        crossChainVault = await ethers.getContractAt("CrossChainVault", vaultProxyAddress);
 
         // Deploy CrossChainManager implementation
         const CrossChainManager = await ethers.getContractFactory("CrossChainManager");
@@ -204,6 +213,9 @@ describe("CrossChainManager", function () {
         await customToken.connect(user2).approve(await crossChainManager.getAddress(), ethers.parseEther("10000"));
         await shareToken.connect(user1).approve(await crossChainManager.getAddress(), ethers.parseEther("10000"));
         await shareToken.connect(user2).approve(await crossChainManager.getAddress(), ethers.parseEther("10000"));
+
+        // Whitelist the CrossChainMananger contract address
+        await crossChainVault.connect(owner).addToWhitelist(await crossChainManager.getAddress());
     });
 
     describe("Initialization", function () {
