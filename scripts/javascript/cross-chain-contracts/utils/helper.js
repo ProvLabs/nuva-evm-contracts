@@ -68,10 +68,11 @@ async function buildPermit({
     permitDeadline,
     destinationAddress,
     verifyingContract,
+    version,
 }) {
     const domain = {
         name: tokenName,
-        version: "2",
+        version,
         chainId: (await ethers.provider.getNetwork()).chainId,
         verifyingContract,
     };

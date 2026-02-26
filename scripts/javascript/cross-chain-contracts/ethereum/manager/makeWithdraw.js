@@ -1,6 +1,6 @@
 // scripts/makeWithdraw.js
 const { ethers } = require("hardhat");
-const { buildPermit, getAmlSigner, getAmlSignature } = require("../utils/helper");
+const { getAmlSigner, getAmlSignature } = require("../../utils/helper");
 
 // --- START: Configuration ---
 const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
@@ -43,14 +43,6 @@ async function main() {
     // We need the "Withdrawal" ABI to talk to the proxy
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
 
-    const PERMIT_ABI = [
-        "function name() view returns (string)",
-        "function nonces(address owner) view returns (uint256)",
-        "function balanceOf(address account) view returns (uint256)",
-        "function allowance(address owner, address spender) view returns (uint256)",
-        "function approve(address spender, uint256 amount) returns (bool)",
-    ];
-
     // We need the "IERC20" ABI to talk to the token
     const shareToken = await ethers.getContractAt("IERC20", SHARE_TOKEN_ADDRESS);
 
@@ -84,7 +76,6 @@ async function main() {
 
     // --- STEP 1: APPROVE ---
     // The user approves the proxy contract to spend their tokens
-    console.log(`Checking allowance for ${TOKEN_ADDRESS}...`);
     const currentAllowance = await shareToken.allowance(user.address, crossChainManager);
 
     if (currentAllowance < AMOUNT_TO_WITHDRAW) {
@@ -97,25 +88,6 @@ async function main() {
         console.log("Sufficient allowance already exists.");
     }
 
-    // Get the token's current nonce for the user
-    const permitNonce = await shareToken.nonces(user.address);
-
-    // This deadline is for the permit signature
-    const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
-
-    // Sign the typed data
-    const permitSignature = await buildPermit({
-        tokenName: await shareToken.name(),
-        user,
-        amount: AMOUNT_TO_WITHDRAW,
-        permitNonce,
-        permitDeadline,
-        destinationAddress: crossChainManager.target,
-        verifyingContract: TOKEN_ADDRESS,
-    });
-    const { v, r, s } = ethers.Signature.from(permitSignature);
-    console.log("   ✅ Permit Signature created.");
-
     // --- STEP 2: WITHDRAW ---
     // The user calls the withdraw function on the proxy
     console.log("2. Calling withdraw() on the proxy contract...");
@@ -124,16 +96,7 @@ async function main() {
     try {
         const withdrawTx = await crossChainManager
             .connect(user)
-            .withdrawWithPermit(
-                AMOUNT_TO_WITHDRAW,
-                DESTINATION_ADDRESS,
-                amlSignature,
-                amlDeadline,
-                permitDeadline,
-                v,
-                r,
-                s,
-            );
+            .withdraw(AMOUNT_TO_WITHDRAW, DESTINATION_ADDRESS, amlSignature, amlDeadline);
         const receipt = await withdrawTx.wait();
 
         console.log("   ✅ Withdraw successful! Transaction hash:", receipt.hash);

@@ -4,12 +4,12 @@ const { hexlify } = require("ethers");
 const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
 const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
 const { default: axios } = require("axios");
-const { getAmlSigner, getAmlSignature } = require("../utils/helper");
+const { getAmlSigner, getAmlSignature } = require("../../utils/helper");
 
 // --- START: Configuration ---
-const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
+const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
 if (!CROSS_CHAIN_MANAGER_ADDRESS) {
-    throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
+    throw new Error("CROSS_CHAIN_MANAGER_PROXY_BASE is not set.");
 }
 
 const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
@@ -24,9 +24,9 @@ if (!DESTINATION_ADDRESS) {
 }
 
 // Token Address
-const TOKEN_ADDRESS = process.env.USDC_ETH;
+const TOKEN_ADDRESS = process.env.USDC_BASE;
 if (!TOKEN_ADDRESS) {
-    throw new Error("USDC_ETH is not set.");
+    throw new Error("USDC_BASE is not set.");
 }
 
 // NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
@@ -95,9 +95,9 @@ async function main() {
     // The user calls the deposit function on the proxy
     console.log("2. Calling deposit() on the proxy contract...");
 
-    const srcChain = 10002;
-    const targetChain = 10004;
-    const targetDomain = 6;
+    const srcChain = 10004;
+    const targetChain = 10002;
+    const targetDomain = 0;
 
     const relayInstructions = serializeLayout(relayInstructionsLayout, {
         requests: [

@@ -1,11 +1,15 @@
-// scripts/makeWithdraw.js
+// scripts/makeDeposit.js
 const { ethers } = require("hardhat");
-const { buildPermit, getAmlSigner, getAmlSignature } = require("../utils/helper");
+const { hexlify } = require("ethers");
+const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
+const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
+const { default: axios } = require("axios");
+const { buildPermit, getAmlSigner, getAmlSignature } = require("../../utils/helper");
 
 // --- START: Configuration ---
-const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
+const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
 if (!CROSS_CHAIN_MANAGER_ADDRESS) {
-    throw new Error("CROSS_CHAIN_MANAGER_PROXY_BASE is not set.");
+    throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
 }
 
 const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
@@ -20,12 +24,12 @@ if (!DESTINATION_ADDRESS) {
 }
 
 // NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
-const AMOUNT_TO_WITHDRAW = ethers.parseUnits("0.15", 6);
+const AMOUNT_TO_DEPOSIT = ethers.parseUnits("0.15", 6);
 
 // Token Address
-const TOKEN_ADDRESS = process.env.USDC_BASE;
+const TOKEN_ADDRESS = process.env.USDC_ETH;
 if (!TOKEN_ADDRESS) {
-    throw new Error("USDC_BASE is not set.");
+    throw new Error("USDC_ETH is not set.");
 }
 
 // --- END: Configuration ---
@@ -35,12 +39,12 @@ async function main() {
     const [user] = await ethers.getSigners();
     const amlSigner = getAmlSigner();
 
-    console.log(`Simulating withdraw as user: ${user.address}`);
+    console.log(`Simulating deposit as user: ${user.address}`);
     console.log(`AML Signer (server): ${amlSigner.address}`);
     console.log(`Sending tokens to destination: ${DESTINATION_ADDRESS}`);
 
     // 2. Get contract instances
-    // We need the "Withdrawal" ABI to talk to the proxy
+    // We need the "Depositor" ABI to talk to the proxy
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
 
     const PERMIT_ABI = [
@@ -52,14 +56,14 @@ async function main() {
     ];
 
     // We need the "IERC20" ABI to talk to the token
-    const shareToken = await ethers.getContractAt("IERC20", SHARE_TOKEN_ADDRESS);
+    const token = await ethers.getContractAt(PERMIT_ABI, TOKEN_ADDRESS);
 
     // 3. Check if the user has enough tokens
-    const balance = await shareToken.balanceOf(user.address);
-    if (balance < AMOUNT_TO_WITHDRAW) {
+    const balance = await token.balanceOf(user.address);
+    if (balance < AMOUNT_TO_DEPOSIT) {
         console.error("❌ Error: User does not have enough tokens.");
         console.error(`  User Balance: ${ethers.formatUnits(balance, 6)}`);
-        console.error(`  Amount to Withdraw: ${ethers.formatUnits(AMOUNT_TO_WITHDRAW, 6)}`);
+        console.error(`  Amount to Deposit: ${ethers.formatUnits(AMOUNT_TO_DEPOSIT, 6)}`);
         console.log("Please get tokens from a faucet before running again.");
         return;
     }
@@ -72,10 +76,10 @@ async function main() {
 
     // Sign using signTypedData (No manual hashing required!)
     const amlSignature = await getAmlSignature({
-        name: "Withdrawal",
+        name: "Depositor",
         amlSigner,
         sender: user.address,
-        amount: AMOUNT_TO_WITHDRAW,
+        amount: AMOUNT_TO_DEPOSIT,
         deadline: amlDeadline,
         destinationAddress: DESTINATION_ADDRESS,
         verifyingContract: CROSS_CHAIN_MANAGER_ADDRESS,
@@ -84,12 +88,12 @@ async function main() {
 
     // --- STEP 1: APPROVE ---
     // The user approves the proxy contract to spend their tokens
-    const currentAllowance = await shareToken.allowance(user.address, crossChainManager);
+    const currentAllowance = await token.allowance(user.address, crossChainManager);
 
-    if (currentAllowance < AMOUNT_TO_WITHDRAW) {
+    if (currentAllowance < AMOUNT_TO_DEPOSIT) {
         console.log("Allowance too low. Sending approval transaction...");
         // Approve the Vault to spend your tokens
-        const approveTx = await shareToken.connect(user).approve(crossChainManager.target, AMOUNT_TO_WITHDRAW);
+        const approveTx = await token.connect(user).approve(crossChainManager.target, AMOUNT_TO_DEPOSIT);
         await approveTx.wait();
         console.log("Approval confirmed!");
     } else {
@@ -97,34 +101,75 @@ async function main() {
     }
 
     // Get the token's current nonce for the user
-    const permitNonce = await shareToken.nonces(user.address);
+    const permitNonce = await token.nonces(user.address);
 
     // This deadline is for the permit signature
     const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
 
     // Sign the typed data
     const permitSignature = await buildPermit({
-        tokenName: await shareToken.name(),
+        tokenName: await token.name(),
         user,
-        amount: AMOUNT_TO_WITHDRAW,
+        amount: AMOUNT_TO_DEPOSIT,
         permitNonce,
         permitDeadline,
         destinationAddress: crossChainManager.target,
         verifyingContract: TOKEN_ADDRESS,
+        version: "2"
     });
     const { v, r, s } = ethers.Signature.from(permitSignature);
     console.log("   ✅ Permit Signature created.");
 
-    // --- STEP 2: WITHDRAW ---
-    // The user calls the withdraw function on the proxy
-    console.log("2. Calling withdraw() on the proxy contract...");
+    // --- STEP 2: DEPOSIT ---
+    // The user calls the deposit function on the proxy
+    console.log("2. Calling deposit() on the proxy contract...");
+
+    const srcChain = 10002;
+    const targetChain = 10004;
+    const targetDomain = 6;
+
+    const relayInstructions = serializeLayout(relayInstructionsLayout, {
+        requests: [
+            {
+                request: {
+                    type: "GasInstruction",
+                    gasLimit: 250000n,
+                    msgValue: 0n,
+                },
+            },
+        ],
+    });
+
+    // Convert the Uint8Array to a 0x-prefixed hex string
+    const relayInstructionsHex = hexlify(relayInstructions);
+
+    const EXECUTOR_URL = "https://executor-testnet.labsapis.com";
+    const { signedQuote, estimatedCost } = (
+        await axios.post(`${EXECUTOR_URL}/v0/quote`, {
+            srcChain,
+            dstChain: targetChain,
+            relayInstructions: relayInstructionsHex,
+        })
+    ).data;
+
+    const executorArgs = {
+        refundAddress: user.address,
+        signedQuote,
+        instructions: relayInstructionsHex,
+    };
+
+    const feeArgs = {
+        transferTokenFee: 0,
+        nativeTokenFee: 0,
+        payee: DESTINATION_ADDRESS,
+    };
 
     // connect the `user` to the `crossChainManager` contract
     try {
-        const withdrawTx = await crossChainManager
+        const depositTx = await crossChainManager
             .connect(user)
-            .withdrawWithPermit(
-                AMOUNT_TO_WITHDRAW,
+            .depositWithPermit(
+                AMOUNT_TO_DEPOSIT,
                 DESTINATION_ADDRESS,
                 amlSignature,
                 amlDeadline,
@@ -132,10 +177,18 @@ async function main() {
                 v,
                 r,
                 s,
+                targetChain,
+                targetDomain,
+                executorArgs,
+                feeArgs,
+                {
+                    value: BigInt(estimatedCost) + BigInt(feeArgs.nativeTokenFee),
+                    gasLimit: 500000n,
+                },
             );
-        const receipt = await withdrawTx.wait();
+        const receipt = await depositTx.wait();
 
-        console.log("   ✅ Withdraw successful! Transaction hash:", receipt.hash);
+        console.log("   ✅ Deposit successful! Transaction hash:", receipt.hash);
     } catch (error) {
         console.log("Actual Revert Reason:", error);
     }

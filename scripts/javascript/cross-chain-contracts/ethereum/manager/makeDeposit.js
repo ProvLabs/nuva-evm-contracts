@@ -4,12 +4,12 @@ const { hexlify } = require("ethers");
 const { serializeLayout } = require("@wormhole-foundation/sdk-connect");
 const { relayInstructionsLayout } = require("@wormhole-foundation/sdk-definitions");
 const { default: axios } = require("axios");
-const { buildPermit, getAmlSigner, getAmlSignature } = require("../utils/helper");
+const { getAmlSigner, getAmlSignature } = require("../../utils/helper");
 
 // --- START: Configuration ---
-const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_BASE;
+const CROSS_CHAIN_MANAGER_ADDRESS = process.env.CROSS_CHAIN_MANAGER_PROXY_ETH;
 if (!CROSS_CHAIN_MANAGER_ADDRESS) {
-    throw new Error("CROSS_CHAIN_MANAGER_PROXY_BASE is not set.");
+    throw new Error("CROSS_CHAIN_MANAGER_PROXY_ETH is not set.");
 }
 
 const SHARE_TOKEN_ADDRESS = process.env.SHARE_TOKEN_ADDRESS;
@@ -23,15 +23,14 @@ if (!DESTINATION_ADDRESS) {
     throw new Error("PUBLIC_KEY is not set.");
 }
 
-// NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
-const AMOUNT_TO_DEPOSIT = ethers.parseUnits("0.15", 6);
-
 // Token Address
-const TOKEN_ADDRESS = process.env.USDC_BASE;
+const TOKEN_ADDRESS = process.env.USDC_ETH;
 if (!TOKEN_ADDRESS) {
-    throw new Error("USDC_BASE is not set.");
+    throw new Error("USDC_ETH is not set.");
 }
 
+// NOTE: Change '6' if your token has different decimals (e.g., 6 for USDC)
+const AMOUNT_TO_DEPOSIT = ethers.parseUnits("0.15", 6);
 // --- END: Configuration ---
 
 async function main() {
@@ -47,16 +46,8 @@ async function main() {
     // We need the "Depositor" ABI to talk to the proxy
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
 
-    const PERMIT_ABI = [
-        "function name() view returns (string)",
-        "function nonces(address owner) view returns (uint256)",
-        "function balanceOf(address account) view returns (uint256)",
-        "function allowance(address owner, address spender) view returns (uint256)",
-        "function approve(address spender, uint256 amount) returns (bool)",
-    ];
-
     // We need the "IERC20" ABI to talk to the token
-    const token = await ethers.getContractAt(PERMIT_ABI, TOKEN_ADDRESS);
+    const token = await ethers.getContractAt("IERC20", TOKEN_ADDRESS);
 
     // 3. Check if the user has enough tokens
     const balance = await token.balanceOf(user.address);
@@ -100,32 +91,13 @@ async function main() {
         console.log("Sufficient allowance already exists.");
     }
 
-    // Get the token's current nonce for the user
-    const permitNonce = await token.nonces(user.address);
-
-    // This deadline is for the permit signature
-    const permitDeadline = Math.floor(Date.now() / 1000) + 20 * 60; // 20 minutes
-
-    // Sign the typed data
-    const permitSignature = await buildPermit({
-        tokenName: await token.name(),
-        user,
-        amount: AMOUNT_TO_DEPOSIT,
-        permitNonce,
-        permitDeadline,
-        destinationAddress: crossChainManager.target,
-        verifyingContract: TOKEN_ADDRESS,
-    });
-    const { v, r, s } = ethers.Signature.from(permitSignature);
-    console.log("   ✅ Permit Signature created.");
-
     // --- STEP 2: DEPOSIT ---
     // The user calls the deposit function on the proxy
     console.log("2. Calling deposit() on the proxy contract...");
 
-    const srcChain = 10004;
-    const targetChain = 10002;
-    const targetDomain = 0;
+    const srcChain = 10002;
+    const targetChain = 10004;
+    const targetDomain = 6;
 
     const relayInstructions = serializeLayout(relayInstructionsLayout, {
         requests: [
@@ -167,15 +139,11 @@ async function main() {
     try {
         const depositTx = await crossChainManager
             .connect(user)
-            .depositWithPermit(
+            .deposit(
                 AMOUNT_TO_DEPOSIT,
                 DESTINATION_ADDRESS,
                 amlSignature,
                 amlDeadline,
-                permitDeadline,
-                v,
-                r,
-                s,
                 targetChain,
                 targetDomain,
                 executorArgs,
