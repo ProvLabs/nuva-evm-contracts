@@ -96,8 +96,8 @@ contract DedicatedVaultRouter is
      */
     event Deposited(
         address indexed user,
-        uint256 indexed assets,
-        uint256 indexed shares,
+        uint256 assets,
+        uint256 shares,
         uint256 stakingShares,
         uint256 nuvaShares
     );
@@ -106,25 +106,27 @@ contract DedicatedVaultRouter is
      * @param oldSigner The previous AML signer address.
      * @param newSigner The new AML signer address.
      */
-    event AmlSignerUpdated(address indexed oldSigner, address indexed newSigner);
+    event AmlSignerUpdated(address oldSigner, address newSigner);
     /**
      * @notice Emitted when the RedemptionProxy implementation is updated.
      * @param oldImplementation The previous implementation address.
      * @param newImplementation The new implementation address.
      */
-    event RedemptionProxyImplementationUpdated(address indexed oldImplementation, address indexed newImplementation);
+    event RedemptionProxyImplementationUpdated(address oldImplementation, address newImplementation);
     /**
      * @notice Emitted when a new redemption is requested.
      * @param user The address of the user requesting redemption.
      * @param redemptionProxy The address of the deployed proxy clone.
+     * @param amount The Nuva token amount that is being redeemed.
      */
-    event RedemptionRequested(address indexed user, address indexed redemptionProxy);
+    event RedemptionRequested(address indexed user, address redemptionProxy, uint256 amount);
     /**
      * @notice Emitted when redemptions are swept back to users.
+     * @param redemptionProxies The addresses of the deployed proxy clones.
      * @param users The array of user addresses (from proxy addresses).
      * @param totalSweptAmount The total amount of assets swept.
      */
-    event RedemptionsSwept(address[] users, uint256[] amounts, uint256 totalSweptAmount);
+    event RedemptionsSwept(address[] redemptionProxies, address[] users, uint256[] amounts, uint256 totalSweptAmount);
 
     // --- Custom Errors ---
     error InvalidVault();
@@ -415,7 +417,7 @@ contract DedicatedVaultRouter is
         if (nuvaVault.balanceOf(address(this)) > balBefore) revert FundsStuck(1);
 
         redemptionProxyToUser[redemptionProxyAddress] = msg.sender;
-        emit RedemptionRequested(msg.sender, redemptionProxyAddress);
+        emit RedemptionRequested(msg.sender, redemptionProxyAddress, _amountNuvaShares);
     }
 
     /**
@@ -432,10 +434,13 @@ contract DedicatedVaultRouter is
 
         uint256 totalSwept = 0;
         uint256 length = _proxyAddresses.length;
+        address[] memory users = new address[](length);
+
         for (uint256 i = 0; i < length; ++i) {
             address proxyAddress = _proxyAddresses[i];
             uint256 amountToSweep = _amounts[i];
             address user = redemptionProxyToUser[proxyAddress];
+            users[i] = user;
 
             if (user != address(0) && amountToSweep > 0) {
                 IRedemptionProxy redemptionProxy = IRedemptionProxy(proxyAddress);
@@ -444,7 +449,7 @@ contract DedicatedVaultRouter is
                 delete redemptionProxyToUser[proxyAddress];
             }
         }
-        emit RedemptionsSwept(_proxyAddresses, _amounts, totalSwept);
+        emit RedemptionsSwept(_proxyAddresses, users, _amounts, totalSwept);
     }
 
     // --- Admin Functions ---
