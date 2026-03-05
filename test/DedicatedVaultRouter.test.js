@@ -878,7 +878,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(requestRedeemTx)
                 .to.emit(router, "RedemptionRequested")
-                .withArgs(user.address, redemptionProxyCloneAddress);
+                .withArgs(user.address, redemptionProxyCloneAddress, amountToRedeem);
             expect(redemptionProxyCloneAddress).to.not.equal(ethers.ZeroAddress);
 
             // Verify the clone's state variables (initialized correctly)
@@ -1138,7 +1138,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(router.connect(owner).sweepRedemptions(proxies, amounts))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs(proxies, amounts, amount * 2n);
+                .withArgs(proxies, [user.address, user2.address], amounts, amount * 2n);
 
             // 5. Verify funds reached users
             expect(await routerAsset.balanceOf(user.address)).to.equal(balanceBefore + amount);
@@ -1148,7 +1148,7 @@ describe("DedicatedVaultRouter", function () {
             // Attempting to sweep again should yield 0 swept
             await expect(router.connect(owner).sweepRedemptions(proxies, amounts))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs(proxies, amounts, 0);
+                .withArgs(proxies, [ethers.ZeroAddress, ethers.ZeroAddress], amounts, 0);
         });
 
         it("Should handle sweeping of non-existent or already swept redemptions", async function () {
@@ -1168,7 +1168,7 @@ describe("DedicatedVaultRouter", function () {
             const nonExistentUser = (await ethers.getSigners())[5].address;
             await expect(router.connect(owner).sweepRedemptions([nonExistentUser], [0n]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([nonExistentUser], [0n], 0);
+                .withArgs([nonExistentUser], [ethers.ZeroAddress], [0n], 0);
         });
 
         it("Should allow partial sweeps (installments)", async function () {
@@ -1252,7 +1252,7 @@ describe("DedicatedVaultRouter", function () {
             // Second Sweep - Should not revert, just emit 0 swept because mapping was cleared
             await expect(router.connect(owner).sweepRedemptions([proxyAddress], [secondHalf]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([proxyAddress], [secondHalf], 0);
+                .withArgs([proxyAddress], [ethers.ZeroAddress], [secondHalf], 0);
         });
 
         it("Should allow a designated keeper to sweep redemptions", async function () {
@@ -1325,7 +1325,7 @@ describe("DedicatedVaultRouter", function () {
             // 2. Keeper Sweep
             await expect(router.connect(keeper).sweepRedemptions([proxyAddress], [amount]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([proxyAddress], [amount], amount);
+                .withArgs([proxyAddress], [user.address], [amount], amount);
 
             expect(await routerAsset.balanceOf(user.address)).to.be.at.least(amount);
         });
@@ -1586,7 +1586,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(router.connect(owner).sweepRedemptions([ethers.ZeroAddress], [100n]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([ethers.ZeroAddress], [100n], 0);
+                .withArgs([ethers.ZeroAddress], [ethers.ZeroAddress], [100n], 0);
         });
 
         it("Should NOT delete mapping in sweepRedemptions if amount is zero", async function () {
