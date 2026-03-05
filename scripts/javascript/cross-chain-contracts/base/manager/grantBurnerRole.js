@@ -14,22 +14,22 @@ if (!SHARE_TOKEN_ADDRESS) {
 // --- END: Configuration ---
 
 async function main() {
-    const [burnAdmin] = await ethers.getSigners();
+    const [owner] = await ethers.getSigners();
     const address = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
     const burnRole = ethers.id("BURN_ROLE");
 
-    console.log(`Simulating burn as admin: ${burnAdmin.address}`);
+    console.log(`Simulating burn as admin: ${owner.address}`);
     console.log(`Targeting contract: ${CROSS_CHAIN_MANAGER_ADDRESS}`);
 
     // Get contract instances
     const crossChainManager = await ethers.getContractAt("CrossChainManager", CROSS_CHAIN_MANAGER_ADDRESS);
 
-    // Note: We connect the 'burnAdmin' to the 'crossChainManager' contract
+    // Note: We connect the 'owner' to the 'crossChainManager' contract
     try {
         const hasBurnRole = await crossChainManager.hasRole(burnRole, address);
         if (!hasBurnRole) {
             console.log(`Granting burner role to address: ${address}...`);
-            const revokeTx = await crossChainManager.connect(burnAdmin).grantRole(burnRole, address);
+            const revokeTx = await crossChainManager.connect(owner).grantRole(burnRole, address);
             const receipt = await revokeTx.wait();
             console.log("✅ Burn role granted successfully! Transaction hash:", receipt.hash);
         } else {

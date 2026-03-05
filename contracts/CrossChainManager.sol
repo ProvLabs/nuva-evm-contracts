@@ -104,14 +104,12 @@ contract CrossChainManager is
      * @param shareTokenAddress The address of the withdrawal token.
      * @param amlSignerAddress The address of the AML signer.
      * @param crossChainVaultAddress The address of the cross chain vault.
-     * @param burnAdminAddress The address of the admin account maintaining burner.
      */
     event CrossChainManagerInitialized(
         address indexed tokenAddress,
         address shareTokenAddress,
         address amlSignerAddress,
-        address crossChainVaultAddress,
-        address burnAdminAddress
+        address crossChainVaultAddress
     );
 
     /**
@@ -203,14 +201,12 @@ contract CrossChainManager is
      * @param _shareTokenAddress The token address to emit in the log.
      * @param _amlSignerAddress The address of the trusted AML signer.
      * @param crossChainVaultAddress The address of the cross chain vault.
-     * @param burnAdminAddress The address of the user who can manage the burn role.
      */
     function initialize(
         address _tokenAddress,
         address _shareTokenAddress,
         address _amlSignerAddress,
-        address crossChainVaultAddress,
-        address burnAdminAddress
+        address crossChainVaultAddress
     ) external initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(msg.sender); // Ownable2Step uses this internal call
@@ -221,7 +217,6 @@ contract CrossChainManager is
         if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
         if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
         if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
-        if (burnAdminAddress == address(0)) revert InvalidAddress("burner");
 
         token = CustomToken(_tokenAddress);
         shareToken = ICustomToken(_shareTokenAddress);
@@ -229,14 +224,13 @@ contract CrossChainManager is
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
         _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
-        _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
+        _grantRole(BURN_ADMIN_ROLE, msg.sender);
 
         emit CrossChainManagerInitialized(
             _tokenAddress,
             _shareTokenAddress,
             _amlSignerAddress,
-            crossChainVaultAddress,
-            burnAdminAddress
+            crossChainVaultAddress
         );
     }
 

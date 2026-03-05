@@ -142,7 +142,7 @@ describe("CrossChainManager", function () {
     const TARGET_DOMAIN = 0; // Ethereum sepolia
 
     beforeEach(async function () {
-        [owner, amlSigner, user1, user2, burnAdmin, destinationAddress] = await ethers.getSigners();
+        [owner, amlSigner, user1, user2, destinationAddress] = await ethers.getSigners();
 
         // Deploy CustomToken
         const CustomToken = await ethers.getContractFactory("CustomToken");
@@ -189,7 +189,6 @@ describe("CrossChainManager", function () {
                 await shareToken.getAddress(),
                 amlSigner.address,
                 await crossChainVault.getAddress(),
-                burnAdmin.address,
             ],
             {
                 initializer: "initialize",
@@ -236,9 +235,8 @@ describe("CrossChainManager", function () {
             const shareTokenAddr = await shareToken.getAddress();
             const amlAddr = await amlSigner.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
-            const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr];
 
             // Deploy and capture the instance
             const proxy = await upgrades.deployProxy(CrossChainManager, initArgs, {
@@ -260,9 +258,8 @@ describe("CrossChainManager", function () {
             const shareTokenAddr = await shareToken.getAddress();
             const amlAddr = await amlSigner.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
-            const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -283,9 +280,8 @@ describe("CrossChainManager", function () {
             const shareTokenAddr = ZeroAddress;
             const amlAddr = await amlSigner.getAddress();
             const vaultAddr = await crossChainVault.getAddress();
-            const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -306,9 +302,8 @@ describe("CrossChainManager", function () {
             const shareTokenAddr = await shareToken.getAddress();
             const amlAddr = ZeroAddress;
             const vaultAddr = await crossChainVault.getAddress();
-            const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -329,9 +324,8 @@ describe("CrossChainManager", function () {
             const shareTokenAddr = await shareToken.getAddress();
             const amlAddr = await amlSigner.getAddress();
             const vaultAddr = ZeroAddress;
-            const burnAdminAddr = await burnAdmin.getAddress();
 
-            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr, burnAdminAddr];
+            const initArgs = [customTokenAddr, shareTokenAddr, amlAddr, vaultAddr];
 
             // Deploy and capture the instance
             await expect(
@@ -837,12 +831,12 @@ describe("CrossChainManager", function () {
             ).to.be.revertedWithCustomError(crossChainManager, "OwnableUnauthorizedAccount");
         });
 
-        it("Should grant the burn role to a user by burnAdmin", async function () {
+        it("Should grant the burn role to a user by owner", async function () {
             // Define the role
             const BURN_ROLE = ethers.id("BURN_ROLE");
 
             // Grant role
-            await crossChainManager.connect(burnAdmin).grantRole(BURN_ROLE, user1.address);
+            await crossChainManager.connect(owner).grantRole(BURN_ROLE, user1.address);
 
             // Verify the role was granted
             const hasRole = await crossChainManager.hasRole(BURN_ROLE, user1.address);
@@ -859,19 +853,19 @@ describe("CrossChainManager", function () {
             ).to.be.revertedWithCustomError(crossChainManager, "AccessControlUnauthorizedAccount");
         });
 
-        it("Should revoke the burn role to a user by burnAdmin", async function () {
+        it("Should revoke the burn role to a user by owner", async function () {
             // Define the role
             const BURN_ROLE = ethers.id("BURN_ROLE");
 
             // Grant role
-            await crossChainManager.connect(burnAdmin).grantRole(BURN_ROLE, user1.address);
+            await crossChainManager.connect(owner).grantRole(BURN_ROLE, user1.address);
 
             // Verify the role was granted
             let hasRole = await crossChainManager.hasRole(BURN_ROLE, user1.address);
             expect(hasRole).to.be.true;
 
             // Revoke role
-            await crossChainManager.connect(burnAdmin).revokeRole(BURN_ROLE, user1.address);
+            await crossChainManager.connect(owner).revokeRole(BURN_ROLE, user1.address);
 
             // Verify the role was revoked
             hasRole = await crossChainManager.hasRole(BURN_ROLE, user1.address);
@@ -911,7 +905,7 @@ describe("CrossChainManager", function () {
             const BURN_ROLE = ethers.id("BURN_ROLE");
 
             // Grant role
-            await crossChainManager.connect(burnAdmin).grantRole(BURN_ROLE, user1.address);
+            await crossChainManager.connect(owner).grantRole(BURN_ROLE, user1.address);
 
             await expect(crossChainManager.connect(user1).burn(burnAmount, mintTxHash)).to.emit(
                 crossChainManager,
