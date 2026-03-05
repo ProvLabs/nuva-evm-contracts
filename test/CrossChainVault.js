@@ -1,6 +1,24 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
 
+// Helper function to create ExecutorArgs
+function createExecutorArgs(refundAddress = ethers.Wallet.createRandom().address) {
+    return {
+        refundAddress,
+        signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+        instructions: ethers.hexlify(ethers.randomBytes(200)),
+    };
+}
+
+// Helper function to create FeeArgs
+function createFeeArgs(transferTokenFee = 0) {
+    return {
+        transferTokenFee,
+        nativeTokenFee: 0,
+        payee: ethers.Wallet.createRandom().address,
+    };
+}
+
 describe("CrossChainVault", function () {
     let crossChainVault;
     let owner, user1, user2, user3;
@@ -134,17 +152,8 @@ describe("CrossChainVault", function () {
             const targetDomain = 1;
             const targetRecipient = ethers.zeroPadValue(user2.address, 32);
 
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             await expect(
                 crossChainVault
@@ -163,17 +172,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should reject zero token address", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             await expect(
                 crossChainVault
@@ -191,17 +191,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should reject zero amount", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             await expect(
                 crossChainVault
@@ -219,17 +210,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should reject zero target recipient", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             await expect(
                 crossChainVault
@@ -247,17 +229,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should reject non-whitelisted caller", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             await crossChainVault.connect(owner).revokeRole(WHITELISTED_ROLE, user1.address);
 
@@ -279,17 +252,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should reject with insufficient allowance when contract doesn't have the allowance", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             const amount = ethers.parseEther("100");
             await expect(
@@ -309,17 +273,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should pass with 0 ETH for fees as Executor is mocked", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             const amount = ethers.parseEther("100");
             const vaultAddress = await crossChainVault.getAddress();
@@ -345,17 +300,8 @@ describe("CrossChainVault", function () {
         });
 
         it("Should reject normalized amount of zero", async function () {
-            const executorArgs = {
-                refundAddress: user1.address,
-                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
-                instructions: ethers.hexlify(ethers.randomBytes(200)),
-            };
-
-            const feeArgs = {
-                transferTokenFee: ethers.parseEther("1"),
-                nativeTokenFee: ethers.parseEther("0.1"),
-                payee: user3.address,
-            };
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
 
             const MockToken6Decimals = await ethers.getContractFactory("MockERC20");
             const mockToken6 = await MockToken6Decimals.deploy("Mock6", "MOCK6");

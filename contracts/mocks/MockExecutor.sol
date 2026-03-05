@@ -43,7 +43,7 @@ contract MockExecutor {
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
     ) external payable returns (uint64 nonce) {
-    
+
         emit MockDepositForBurn(amount, targetChain, targetDomain, targetRecipient, token, executorArgs, feeArgs);
         return 1;
     }

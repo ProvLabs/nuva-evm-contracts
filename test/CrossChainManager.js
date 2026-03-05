@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 const { ZeroAddress } = require("ethers");
 
 // Helper function to get current timestamp
@@ -336,6 +336,75 @@ describe("CrossChainManager", function () {
             )
                 .to.be.revertedWithCustomError(CrossChainManager, "InvalidAddress")
                 .withArgs("cross chain vault");
+        });
+    });
+
+    describe("CrossChainManager Upgradeability", function () {
+        it("Should upgrade CrossChainManager and preserve state", async function () {
+            const deadline = (await latestTimestamp()) + 3600n;
+            const amlSignature = await getDepositAMLSignature({
+                contract: crossChainManager,
+                amlSigner,
+                user: user1,
+                amount: DEPOSIT_AMOUNT,
+                deadline,
+                destinationAddress: destinationAddress.address,
+            });
+
+            const executorArgs = createExecutorArgs();
+            const feeArgs = createFeeArgs();
+
+            await expect(
+                crossChainManager
+                    .connect(user1)
+                    .deposit(
+                        DEPOSIT_AMOUNT,
+                        destinationAddress.address,
+                        amlSignature,
+                        deadline,
+                        TARGET_CHAIN,
+                        TARGET_DOMAIN,
+                        executorArgs,
+                        feeArgs,
+                    ),
+            )
+                .to.emit(crossChainManager, "Deposited")
+                .withArgs(
+                    user1.address,
+                    DEPOSIT_AMOUNT,
+                    await customToken.getAddress(),
+                    await shareToken.getAddress(),
+                    destinationAddress.address,
+                    TARGET_CHAIN,
+                );
+
+            const depositTokenBefore = await crossChainManager.token();
+            const crossChainVaultBefore = await crossChainManager.crossChainVault();
+            const shareTokenBefore = await crossChainManager.shareToken();
+            const amlSignerBefore = await crossChainManager.amlSigner();
+
+            // 2. Upgrade to V2
+            const CrossChainManagerV2 = await ethers.getContractFactory("CrossChainManagerV2");
+            const upgraded = await upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2);
+
+            // 3. Verify state is preserved
+            expect(await crossChainManager.token()).to.equal(depositTokenBefore);
+            expect(await upgraded.crossChainVault()).to.equal(crossChainVaultBefore);
+            expect(await upgraded.shareToken()).to.equal(shareTokenBefore);
+            expect(await upgraded.amlSigner()).to.equal(amlSignerBefore);
+
+            // 4. Verify new logic works
+            expect(await upgraded.version()).to.equal("V2");
+            expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
+            await upgraded.enableVersion2Functionality();
+            expect(await upgraded.version2FunctionalityEnabled()).to.be.true;
+        });
+
+        it("Should prevent non-owners from upgrading CrossChainManager", async function () {
+            const CrossChainManagerV2 = await ethers.getContractFactory("CrossChainManagerV2");
+            await expect(upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2.connect(user1)))
+                .to.be.revertedWithCustomError(crossChainManager, "OwnableUnauthorizedAccount")
+                .withArgs(user1.address);
         });
     });
 

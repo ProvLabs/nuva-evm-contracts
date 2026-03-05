@@ -249,8 +249,8 @@ contract CrossChainVault is
     }
 
     // --- Upgrade Safety ---
-    // 4 slots: executor, whitelist, isWhitelisted, addressToIndex
-    uint256[46] private __gap;
+    // 1 slot used: executor (address)
+    uint256[49] private __gap;
 
     /**
      * @notice Authorizes a contract upgrade.
