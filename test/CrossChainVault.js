@@ -6,6 +6,8 @@ describe("CrossChainVault", function () {
     let owner, user1, user2, user3;
     let mockExecutor;
 
+    const WHITELISTED_ROLE = ethers.id("WHITELISTED_ROLE");
+
     beforeEach(async function () {
         [owner, user1, user2, user3] = await ethers.getSigners();
 
@@ -29,110 +31,38 @@ describe("CrossChainVault", function () {
     });
 
     describe("Whitelist Management", function () {
-        it("Should add address to whitelist", async function () {
-            await expect(crossChainVault.connect(owner).addToWhitelist(user1.address))
-                .to.emit(crossChainVault, "Whitelisted")
-                .withArgs(user1.address);
+        it("Should grant address as whitelist", async function () {
+            await crossChainVault.connect(owner).grantRole(WHITELISTED_ROLE, user1.address);
 
-            expect(await crossChainVault.isWhitelisted(user1.address)).to.be.true;
-            const whitelist = await crossChainVault.getWhitelist();
-            expect(whitelist).to.include(user1.address);
+            // Verify the role was granted
+            const hasRole = await crossChainVault.hasRole(WHITELISTED_ROLE, user1.address);
+            expect(hasRole).to.be.true;
         });
 
-        it("Should skip adding duplicate address", async function () {
-            await crossChainVault.connect(owner).addToWhitelist(user1.address);
+        it("Should revoke address as whitelist", async function () {
+            await crossChainVault.connect(owner).grantRole(WHITELISTED_ROLE, user1.address);
 
-            await expect(crossChainVault.connect(owner).addToWhitelist(user1.address))
-                .to.emit(crossChainVault, "WhitelistingSkipped")
-                .withArgs(user1.address);
+            // Verify the role was granted
+            let hasRole = await crossChainVault.hasRole(WHITELISTED_ROLE, user1.address);
+            expect(hasRole).to.be.true;
+
+            await crossChainVault.connect(owner).revokeRole(WHITELISTED_ROLE, user1.address);
+
+            // Verify the role was revoked
+            hasRole = await crossChainVault.hasRole(WHITELISTED_ROLE, user1.address);
+            expect(hasRole).to.be.false;
         });
 
-        it("Should reject adding zero address", async function () {
-            await expect(
-                crossChainVault.connect(owner).addToWhitelist(ethers.ZeroAddress),
-            ).to.be.revertedWithCustomError(crossChainVault, "InvalidAddress");
+        it("Should revert when grant with random account", async function () {
+            await expect(crossChainVault.connect(user1).grantRole(WHITELISTED_ROLE, user2.address))
+                .to.be.revertedWithCustomError(crossChainVault, "AccessControlUnauthorizedAccount")
+                .withArgs(user1.address, ethers.zeroPadValue(ethers.ZeroAddress, 32));
         });
 
-        it("Should remove address from whitelist", async function () {
-            // Add multiple addresses first
-            await crossChainVault.connect(owner).addToWhitelist(user1.address);
-            await crossChainVault.connect(owner).addToWhitelist(user2.address);
-            await crossChainVault.connect(owner).addToWhitelist(user3.address);
-
-            // Remove middle address
-            await expect(crossChainVault.connect(owner).removeFromWhitelist(user2.address))
-                .to.emit(crossChainVault, "WhitelistRevoked")
-                .withArgs(user2.address);
-
-            expect(await crossChainVault.isWhitelisted(user2.address)).to.be.false;
-
-            const whitelist = await crossChainVault.getWhitelist();
-            expect(whitelist).to.include(user1.address);
-            expect(whitelist).to.include(user3.address);
-            expect(whitelist).to.not.include(user2.address);
-        });
-
-        it("Should skip removing non-existent address", async function () {
-            await expect(crossChainVault.connect(owner).removeFromWhitelist(user1.address))
-                .to.emit(crossChainVault, "WhitelistingSkipped")
-                .withArgs(user1.address);
-        });
-
-        it("Should handle multiple add/remove operations efficiently", async function () {
-            const addresses = [user1.address, user2.address, user3.address];
-
-            // Add all addresses
-            for (const addr of addresses) {
-                await crossChainVault.connect(owner).addToWhitelist(addr);
-            }
-
-            // Remove all addresses
-            for (const addr of addresses) {
-                await crossChainVault.connect(owner).removeFromWhitelist(addr);
-            }
-
-            // Verify all are removed
-            for (const addr of addresses) {
-                expect(await crossChainVault.isWhitelisted(addr)).to.be.false;
-            }
-
-            const whitelist = await crossChainVault.getWhitelist();
-            expect(whitelist.length).to.equal(0);
-        });
-
-        it("Should maintain correct order after removals", async function () {
-            // Add addresses in order
-            await crossChainVault.connect(owner).addToWhitelist(user1.address);
-            await crossChainVault.connect(owner).addToWhitelist(user2.address);
-            await crossChainVault.connect(owner).addToWhitelist(user3.address);
-
-            let whitelist = await crossChainVault.getWhitelist();
-            expect(whitelist).to.deep.equal([user1.address, user2.address, user3.address]);
-
-            // Remove middle address
-            await crossChainVault.connect(owner).removeFromWhitelist(user2.address);
-
-            whitelist = await crossChainVault.getWhitelist();
-            // Should be [user1, user3] after removal
-            expect(whitelist).to.deep.equal([user1.address, user3.address]);
-
-            // Remove first address
-            await crossChainVault.connect(owner).removeFromWhitelist(user1.address);
-
-            whitelist = await crossChainVault.getWhitelist();
-            // Should be [user3] after removal
-            expect(whitelist).to.deep.equal([user3.address]);
-        });
-
-        it("Should reject unauthorized access", async function () {
-            await expect(crossChainVault.connect(user1).addToWhitelist(user1.address)).to.be.revertedWithCustomError(
-                crossChainVault,
-                "OwnableUnauthorizedAccount",
-            );
-
-            await expect(
-                crossChainVault.connect(user1).removeFromWhitelist(user1.address),
-            ).to.be.revertedWithCustomError(crossChainVault, "OwnableUnauthorizedAccount");
+        it("Should revert when revoke with random account", async function () {
+            await expect(crossChainVault.connect(user1).revokeRole(WHITELISTED_ROLE, user2.address))
+                .to.be.revertedWithCustomError(crossChainVault, "AccessControlUnauthorizedAccount")
+                .withArgs(user1.address, ethers.zeroPadValue(ethers.ZeroAddress, 32));
         });
     });
 
@@ -174,6 +104,276 @@ describe("CrossChainVault", function () {
 
             // Test with 6 decimals
             expect(await harness.exposeNormalizeAmount(amount6, 6)).to.equal(amount6);
+        });
+    });
+
+    describe("sendTokens Function", function () {
+        let mockToken;
+
+        beforeEach(async function () {
+            const MockToken = await ethers.getContractFactory("MockERC20");
+            mockToken = await MockToken.deploy("Mock Token", "MOCK");
+            await mockToken.waitForDeployment();
+
+            await mockToken.mint(await crossChainVault.getAddress(), ethers.parseEther("1000"));
+
+            await crossChainVault.connect(owner).grantRole(WHITELISTED_ROLE, user1.address);
+        });
+
+        it("Should send tokens successfully", async function () {
+            const amount = ethers.parseEther("100");
+            const vaultAddress = await crossChainVault.getAddress();
+
+            // Ensure user1 has tokens
+            await mockToken.mint(user1.address, amount);
+
+            // APPROVE the vault to spend user1's tokens
+            await mockToken.connect(user1).approve(vaultAddress, amount);
+
+            const targetChain = 2;
+            const targetDomain = 1;
+            const targetRecipient = ethers.zeroPadValue(user2.address, 32);
+
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            await expect(
+                crossChainVault
+                    .connect(user1)
+                    .sendTokens(
+                        await mockToken.getAddress(),
+                        amount,
+                        targetChain,
+                        targetDomain,
+                        targetRecipient,
+                        executorArgs,
+                        feeArgs,
+                        { value: ethers.parseEther("0.5") },
+                    ),
+            ).to.emit(crossChainVault, "TokensSent");
+        });
+
+        it("Should reject zero token address", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            await expect(
+                crossChainVault
+                    .connect(user1)
+                    .sendTokens(
+                        ethers.ZeroAddress,
+                        ethers.parseEther("100"),
+                        2,
+                        1,
+                        ethers.zeroPadValue(user2.address, 32),
+                        executorArgs,
+                        feeArgs,
+                    ),
+            ).to.be.revertedWithCustomError(crossChainVault, "InvalidTokenAddress");
+        });
+
+        it("Should reject zero amount", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            await expect(
+                crossChainVault
+                    .connect(user1)
+                    .sendTokens(
+                        await mockToken.getAddress(),
+                        0,
+                        2,
+                        1,
+                        ethers.zeroPadValue(user2.address, 32),
+                        executorArgs,
+                        feeArgs,
+                    ),
+            ).to.be.revertedWithCustomError(crossChainVault, "AmountMustBeGreaterThanZero");
+        });
+
+        it("Should reject zero target recipient", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            await expect(
+                crossChainVault
+                    .connect(user1)
+                    .sendTokens(
+                        await mockToken.getAddress(),
+                        ethers.parseEther("100"),
+                        2,
+                        1,
+                        ethers.ZeroHash,
+                        executorArgs,
+                        feeArgs,
+                    ),
+            ).to.be.revertedWithCustomError(crossChainVault, "TargetRecipientCannotBeBytes32Zero");
+        });
+
+        it("Should reject non-whitelisted caller", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            await crossChainVault.connect(owner).revokeRole(WHITELISTED_ROLE, user1.address);
+
+            await expect(
+                crossChainVault
+                    .connect(user1)
+                    .sendTokens(
+                        await mockToken.getAddress(),
+                        ethers.parseEther("100"),
+                        2,
+                        1,
+                        ethers.zeroPadValue(user2.address, 32),
+                        executorArgs,
+                        feeArgs,
+                    ),
+            )
+                .to.be.revertedWithCustomError(crossChainVault, "AccessControlUnauthorizedAccount")
+                .withArgs(user1.address, WHITELISTED_ROLE);
+        });
+
+        it("Should reject with insufficient allowance when contract doesn't have the allowance", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            const amount = ethers.parseEther("100");
+            await expect(
+                crossChainVault.connect(user1).sendTokens(
+                    await mockToken.getAddress(),
+                    amount,
+                    2,
+                    1,
+                    ethers.zeroPadValue(user2.address, 32),
+                    executorArgs,
+                    feeArgs,
+                    { value: 0 }, // No ETH sent
+                ),
+            )
+                .to.be.revertedWithCustomError(mockToken, "ERC20InsufficientAllowance")
+                .withArgs(await crossChainVault.getAddress(), 0, amount);
+        });
+
+        it("Should pass with 0 ETH for fees as Executor is mocked", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            const amount = ethers.parseEther("100");
+            const vaultAddress = await crossChainVault.getAddress();
+
+            // Ensure user1 has tokens
+            await mockToken.mint(user1.address, amount);
+
+            // APPROVE the vault to spend user1's tokens
+            await mockToken.connect(user1).approve(vaultAddress, amount);
+
+            await expect(
+                crossChainVault.connect(user1).sendTokens(
+                    await mockToken.getAddress(),
+                    amount,
+                    2,
+                    1,
+                    ethers.zeroPadValue(user2.address, 32),
+                    executorArgs,
+                    feeArgs,
+                    { value: 0 }, // No ETH sent
+                ),
+            ).to.emit(crossChainVault, "TokensSent");
+        });
+
+        it("Should reject normalized amount of zero", async function () {
+            const executorArgs = {
+                refundAddress: user1.address,
+                signedQuote: ethers.hexlify(ethers.randomBytes(100)),
+                instructions: ethers.hexlify(ethers.randomBytes(200)),
+            };
+
+            const feeArgs = {
+                transferTokenFee: ethers.parseEther("1"),
+                nativeTokenFee: ethers.parseEther("0.1"),
+                payee: user3.address,
+            };
+
+            const MockToken6Decimals = await ethers.getContractFactory("MockERC20");
+            const mockToken6 = await MockToken6Decimals.deploy("Mock6", "MOCK6");
+            await mockToken6.waitForDeployment();
+
+            await mockToken6.mint(await crossChainVault.getAddress(), ethers.parseUnits("100", 6));
+
+            await expect(
+                crossChainVault.connect(user1).sendTokens(
+                    await mockToken6.getAddress(),
+                    ethers.parseUnits("0.000001", 6), // This will normalize to 0
+                    2,
+                    1,
+                    ethers.zeroPadValue(user2.address, 32),
+                    executorArgs,
+                    feeArgs,
+                ),
+            ).to.be.revertedWithCustomError(crossChainVault, "NormalizedAmountMustBeGreaterThanZero");
         });
     });
 

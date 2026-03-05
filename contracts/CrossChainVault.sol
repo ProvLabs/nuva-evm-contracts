@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {BytesLib} from "./modules/utils/BytesLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -30,6 +31,7 @@ contract CrossChainVault is
     Initializable, 
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
+    AccessControlEnumerableUpgradeable,
     ReentrancyGuardUpgradeable  {
     using BytesLib for bytes;
 
@@ -38,15 +40,9 @@ contract CrossChainVault is
     /// @notice The executor contract
     ICCTPv1WithExecutor public executor;
 
-    /// @notice List of all allowed addresses.
-    address[] public whitelist;
-
-    /// @notice Mapping to check if an address is whitelisted.
-    mapping(address => bool) public isWhitelisted;
-
-    /// @notice Mapping from address to (index in whitelist array + 1)
-    mapping(address => uint256) private addressToIndex;
-
+    /// @notice The role of whitelisted addresses
+    bytes32 public constant WHITELISTED_ROLE = keccak256("WHITELISTED_ROLE");
+    
     // --- Events ---
 
     /**
@@ -68,19 +64,6 @@ contract CrossChainVault is
         uint64 nonce
     );
 
-    /// @notice Emitted when addresses are added to the whitelist.
-    /// @param addr The address to be added.
-    event Whitelisted(address indexed addr);
-    
-    /// @notice Emitted when addresses are removed from the whitelist.
-    /// @param addr The address to be removed.
-    event WhitelistRevoked(address indexed addr);
-    
-    /// @notice Emitted when addresses are skipped from the whitelist.
-    /// @param addr The address to be skipped.
-    event WhitelistingSkipped(address indexed addr);
-
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     /// @notice constructor
     constructor() {
@@ -96,6 +79,8 @@ contract CrossChainVault is
         __UUPSUpgradeable_init();
         __Ownable_init(msg.sender); // Ownable2Step uses this internal call
         __ReentrancyGuard_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         // sanity check input values
         if (executor_ == address(0)) revert InvalidExecutorAddress();
@@ -135,12 +120,11 @@ contract CrossChainVault is
         bytes32 targetRecipient,
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
-    ) external payable nonReentrant {
+    ) external payable nonReentrant onlyRole(WHITELISTED_ROLE) {
         // sanity check function arguments
         if (token == address(0)) revert InvalidTokenAddress();
         if (amount == 0) revert AmountMustBeGreaterThanZero();
         if (targetRecipient == bytes32(0)) revert TargetRecipientCannotBeBytes32Zero();
-        if (!isWhitelisted[msg.sender]) revert AddressNotWhitelisted();
 
         /**
          * Compute the normalized amount to verify that it's nonzero.
@@ -182,67 +166,17 @@ contract CrossChainVault is
     }
 
     /**
-     * @notice Adds an address to the whitelist only if it doesn't already exist.
-     * @dev Adds an address to the whitelist only if it doesn't already exist.
-     * @param _addr The address to attempt to add.
-     */
-    function addToWhitelist(address _addr) external onlyOwner {
-        if (_addr == address(0)) revert InvalidAddress("zero address");
-        
-        if (isWhitelisted[_addr]) {
-            emit WhitelistingSkipped(_addr);
-            return;
-        }
-
-        isWhitelisted[_addr] = true;
-        whitelist.push(_addr);
-
-        // Store the index + 1 (so index 0 is at 1)
-        addressToIndex[_addr] = whitelist.length; 
-
-        emit Whitelisted(_addr);
-    }
-
-    /**
-     * @notice Removes an address from the whitelist only if it exists.
-     * @dev Removes an address from the whitelist only if it exists.
-     * @param _addr The address to attempt to remove.
-     */
-    function removeFromWhitelist(address _addr) external onlyOwner {
-        if (!isWhitelisted[_addr]) {
-            emit WhitelistingSkipped(_addr);
-            return;
-        }
-
-        uint256 indexPlusOne = addressToIndex[_addr];
-        uint256 indexToRemove = indexPlusOne - 1;
-        uint256 lastIndex = whitelist.length - 1;
-
-        if (indexToRemove != lastIndex) {
-            address lastAddr = whitelist[lastIndex];
-            
-            // Move the last element into the gap
-            whitelist[indexToRemove] = lastAddr;
-            
-            // Update the index of the moved element
-            addressToIndex[lastAddr] = indexPlusOne;
-        }
-
-        // Clean up
-        whitelist.pop();
-        delete addressToIndex[_addr];
-        delete isWhitelisted[_addr];
-
-        emit WhitelistRevoked(_addr);
-    }
-
-    /**
      * @notice Get the list of whitelisted addresses
      * @dev Helper function to get the full list of addresses.
      * @return The list of whitelisted addresses
      */
     function getWhitelist() public view returns (address[] memory) {
-        return whitelist;
+        uint256 count = getRoleMemberCount(WHITELISTED_ROLE);
+        address[] memory members = new address[](count);
+        for (uint256 i = 0; i < count; i++) {
+            members[i] = getRoleMember(WHITELISTED_ROLE, i);
+        }
+        return members;
     }
 
     /**

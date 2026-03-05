@@ -215,7 +215,8 @@ describe("CrossChainManager", function () {
         await shareToken.connect(user2).approve(await crossChainManager.getAddress(), ethers.parseEther("10000"));
 
         // Whitelist the CrossChainMananger contract address
-        await crossChainVault.connect(owner).addToWhitelist(await crossChainManager.getAddress());
+        const WHITELISTED_ROLE = ethers.id("WHITELISTED_ROLE");
+        await crossChainVault.connect(owner).grantRole(WHITELISTED_ROLE, await crossChainManager.getAddress());
     });
 
     describe("Initialization", function () {

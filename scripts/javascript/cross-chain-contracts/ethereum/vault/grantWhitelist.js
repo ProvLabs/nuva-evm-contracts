@@ -6,6 +6,8 @@ async function main() {
         throw new Error("VAULT_CROSS_CHAIN_PROXY_ETH is not set.");
     }
 
+    const WHITELISTED_ROLE = ethers.id("WHITELISTED_ROLE");
+
     // const addr = process.env.PUBLIC_KEY;
     // if (!addr) {
     //     throw new Error("PUBLIC_KEY is not set.");
@@ -20,7 +22,7 @@ async function main() {
 
     // Now add the address
     console.log(`Adding ${addr} to allowlist...`);
-    const tx = await vault.addToWhitelist(addr);
+    const tx = await vault.grantRole(WHITELISTED_ROLE, addr);
     const receipt = await tx.wait();
 
     console.log("   ✅ Address added successfully! Transaction hash:", receipt.hash);
