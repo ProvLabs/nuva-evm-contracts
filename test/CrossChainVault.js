@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 const { expect } = require("chai");
 
 // Helper function to create ExecutorArgs
@@ -122,6 +122,32 @@ describe("CrossChainVault", function () {
 
             // Test with 6 decimals
             expect(await harness.exposeNormalizeAmount(amount6, 6)).to.equal(amount6);
+        });
+    });
+
+    describe("CrossChainVault Upgradeability", function () {
+        it("Should upgrade CrossChainVault and preserve state", async function () {
+            const executorBefore = await crossChainVault.executor();
+
+            // Upgrade to V2
+            const CrossChainVaultV2 = await ethers.getContractFactory("CrossChainVaultV2");
+            const upgraded = await upgrades.upgradeProxy(await crossChainVault.getAddress(), CrossChainVaultV2);
+
+            // Verify state is preserved
+            expect(await crossChainVault.executor()).to.equal(executorBefore);
+
+            // 4. Verify new logic works
+            expect(await upgraded.version()).to.equal("V2");
+            expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
+            await upgraded.enableVersion2Functionality();
+            expect(await upgraded.version2FunctionalityEnabled()).to.be.true;
+        });
+
+        it("Should prevent non-owners from upgrading CrossChainVault", async function () {
+            const CrossChainVaultV2 = await ethers.getContractFactory("CrossChainVaultV2");
+            await expect(upgrades.upgradeProxy(await crossChainVault.getAddress(), CrossChainVaultV2.connect(user1)))
+                .to.be.revertedWithCustomError(crossChainVault, "OwnableUnauthorizedAccount")
+                .withArgs(user1.address);
         });
     });
 

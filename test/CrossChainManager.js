@@ -383,17 +383,17 @@ describe("CrossChainManager", function () {
             const shareTokenBefore = await crossChainManager.shareToken();
             const amlSignerBefore = await crossChainManager.amlSigner();
 
-            // 2. Upgrade to V2
+            // Upgrade to V2
             const CrossChainManagerV2 = await ethers.getContractFactory("CrossChainManagerV2");
             const upgraded = await upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2);
 
-            // 3. Verify state is preserved
+            // Verify state is preserved
             expect(await crossChainManager.token()).to.equal(depositTokenBefore);
             expect(await upgraded.crossChainVault()).to.equal(crossChainVaultBefore);
             expect(await upgraded.shareToken()).to.equal(shareTokenBefore);
             expect(await upgraded.amlSigner()).to.equal(amlSignerBefore);
 
-            // 4. Verify new logic works
+            // Verify new logic works
             expect(await upgraded.version()).to.equal("V2");
             expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
             await upgraded.enableVersion2Functionality();
@@ -402,7 +402,9 @@ describe("CrossChainManager", function () {
 
         it("Should prevent non-owners from upgrading CrossChainManager", async function () {
             const CrossChainManagerV2 = await ethers.getContractFactory("CrossChainManagerV2");
-            await expect(upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2.connect(user1)))
+            await expect(
+                upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2.connect(user1)),
+            )
                 .to.be.revertedWithCustomError(crossChainManager, "OwnableUnauthorizedAccount")
                 .withArgs(user1.address);
         });
