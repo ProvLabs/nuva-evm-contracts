@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {
+    Ownable2Step,
+    Ownable
+} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {CustomToken} from "./CustomToken.sol";
 
 /**
@@ -23,7 +26,13 @@ contract TokenFactory is Ownable2Step {
      * @param decimals The number of decimals for the created token.
      * @param owner The owner of the created token.
      */
-    event TokenCreated(address indexed tokenAddress, string name, string symbol, uint8 decimals, address indexed owner);
+    event TokenCreated(
+        address indexed tokenAddress,
+        string name,
+        string symbol,
+        uint8 decimals,
+        address indexed owner
+    );
 
     // --- Constructor ---
 
@@ -38,10 +47,25 @@ contract TokenFactory is Ownable2Step {
      * @param _symbol The symbol of the token.
      * @param _decimals The number of decimals for the token.
      */
-    function createToken(string calldata _name, string calldata _symbol, uint8 _decimals) external onlyOwner {
-        CustomToken token = new CustomToken(_name, _symbol, msg.sender, _decimals);
+    function createToken(
+        string calldata _name,
+        string calldata _symbol,
+        uint8 _decimals
+    ) external onlyOwner {
+        CustomToken token = new CustomToken(
+            _name,
+            _symbol,
+            msg.sender,
+            _decimals
+        );
         allTokens.push(address(token));
-        emit TokenCreated(address(token), _name, _symbol, _decimals, msg.sender);
+        emit TokenCreated(
+            address(token),
+            _name,
+            _symbol,
+            _decimals,
+            msg.sender
+        );
     }
 
     /**

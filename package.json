@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "lint:sol": "npx solhint 'contracts/**/*.sol'",
+    "lint:solfix": "prettier --write 'contracts/**/*.sol'",
+    "lint:solcheck": "prettier --check 'contracts/**/*.sol'",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "test": "hardhat test"
@@ -23,18 +24,22 @@
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@nomicfoundation/hardhat-verify": "^2.1.0",
     "@nomicfoundation/ignition-core": "^0.15.13",
+    "@openzeppelin/contracts-upgradeable": "5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.2.0",
     "@types/mocha": ">=9.1.0",
+    "@wormhole-foundation/sdk": "^4.9.1",
+    "@wormhole-foundation/sdk-connect": "^4.10.0",
+    "axios": "^1.13.4",
     "chai": "^4.2.0",
     "dotenv": "^17.2.3",
     "ethers": "^6.14.0",
     "hardhat": "2.26.3",
     "hardhat-gas-reporter": "^2.3.0",
-    "prettier": "^3.6.2",
-    "prettier-plugin-solidity": "^2.1.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-solidity": "^2.2.1",
     "solhint": "^6.0.1",
     "solidity-coverage": "^0.8.1",
     "ts-node": ">=8.0.0",
@@ -43,7 +48,6 @@
   },
   "dependencies": {
     "@nomicfoundation/solidity-analyzer-darwin-arm64": "^0.1.2",
-    "@openzeppelin/contracts": "^5.4.0",
-    "@openzeppelin/contracts-upgradeable": "^5.4.0"
+    "@openzeppelin/contracts": "^5.4.0"
   }
 }

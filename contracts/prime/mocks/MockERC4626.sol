@@ -19,16 +19,28 @@ contract MockERC4626 is ERC4626, ERC20Permit {
      * @notice Returns the number of decimals used to get its user representation.
      * @return The number of decimals.
      */
-    function decimals() public view virtual override(ERC4626, ERC20) returns (uint8) {
+    function decimals()
+        public
+        view
+        virtual
+        override(ERC4626, ERC20)
+        returns (uint8)
+    {
         return super.decimals();
     }
 
     // Simple 1:1 implementation for testing
-    function _convertToShares(uint256 assets, Math.Rounding) internal pure override returns (uint256) {
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding
+    ) internal pure override returns (uint256) {
         return assets;
     }
 
-    function _convertToAssets(uint256 shares, Math.Rounding) internal pure override returns (uint256) {
+    function _convertToAssets(
+        uint256 shares,
+        Math.Rounding
+    ) internal pure override returns (uint256) {
         return shares;
     }
 }

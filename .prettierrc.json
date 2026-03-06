@@ -1,17 +1,15 @@
 {
-  "tabWidth": 4,
-  "useTabs": false,
-  "printWidth": 120,
   "overrides": [
     {
       "files": "*.sol",
       "options": {
-        "parser": "solidity-parser",
-        "printWidth": 120,
+        "printWidth": 80,
         "tabWidth": 4,
         "useTabs": false,
-        "compiler": "0.8.20"
+        "singleQuote": false,
+        "bracketSpacing": false
       }
     }
-  ]
+  ],
+  "plugins": ["prettier-plugin-solidity"]
 }

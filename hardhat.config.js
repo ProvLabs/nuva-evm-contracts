@@ -1,12 +1,12 @@
-require("dotenv").config();
-require("@openzeppelin/hardhat-upgrades");
+require("dotenv").config({ quiet: true });
 require("@nomicfoundation/hardhat-toolbox");
+require("@openzeppelin/hardhat-upgrades");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks: {
-    sepolia: {
-      url: process.env.RPC_URL || "http://localhost:8545",
+    eth: {
+      url: process.env.RPC_URL_ETH || "http://localhost:8545",
       accounts: [
         process.env.PRIVATE_KEY,
       ],
@@ -21,8 +21,17 @@ module.exports = {
     },
     mainnet: {
       url: process.env.MAINNET_RPC_URL,
-      accounts: [process.env.MAINNET_PRIVATE_KEY],
+      accounts: [
+        process.env.MAINNET_PRIVATE_KEY,
+      ],
       chainId: 1,
+    },
+    base: {
+      url: process.env.RPC_URL_BASE || "http://localhost:8545",
+      accounts: [
+        process.env.PRIVATE_KEY,
+      ],
+      chainId: 84532,
     },
   },
   etherscan: {
@@ -68,4 +77,4 @@ module.exports = {
     artifacts: "./artifacts"
   },
   defaultNetwork: "hardhat",
-};
+}

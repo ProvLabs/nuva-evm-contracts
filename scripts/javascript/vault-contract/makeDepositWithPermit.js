@@ -62,7 +62,7 @@ async function main() {
     console.log(`Destination: ${DESTINATION_ADDRESS}`);
 
     const depositor = await ethers.getContractAt("Depositor", CLONE_ADDRESS);
-    const depositToken = await ethers.getContractAt("IFullERC20", DEPOSIT_TOKEN_ADDRESS);
+    const depositToken = await ethers.getContractAt("IERC20", DEPOSIT_TOKEN_ADDRESS);
     const amountToDeposit = ethers.parseUnits(AMOUNT_TO_DEPOSIT_STRING, TOKEN_DECIMALS);
 
     // 2. Check User Balance

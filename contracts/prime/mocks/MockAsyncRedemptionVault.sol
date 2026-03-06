@@ -9,19 +9,23 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
  * @notice A specialized mock vault that implements an asynchronous requestRedeem function with Permit support.
  */
 contract MockAsyncRedemptionVault is ERC4626, ERC20Permit {
-
     constructor(
         address asset,
         string memory name,
         string memory symbol
-    ) ERC4626(IERC20(asset)) ERC20(name, symbol) ERC20Permit(name) {
-    }
+    ) ERC4626(IERC20(asset)) ERC20(name, symbol) ERC20Permit(name) {}
 
     /**
      * @notice Returns the number of decimals used to get its user representation.
      * @return The number of decimals.
      */
-    function decimals() public view virtual override(ERC4626, ERC20) returns (uint8) {
+    function decimals()
+        public
+        view
+        virtual
+        override(ERC4626, ERC20)
+        returns (uint8)
+    {
         return super.decimals();
     }
 
@@ -36,11 +40,17 @@ contract MockAsyncRedemptionVault is ERC4626, ERC20Permit {
     }
 
     // Simple 1:1 implementation for testing
-    function _convertToShares(uint256 assets, Math.Rounding) internal pure override returns (uint256) {
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding
+    ) internal pure override returns (uint256) {
         return assets;
     }
 
-    function _convertToAssets(uint256 shares, Math.Rounding) internal pure override returns (uint256) {
+    function _convertToAssets(
+        uint256 shares,
+        Math.Rounding
+    ) internal pure override returns (uint256) {
         return shares;
     }
 }

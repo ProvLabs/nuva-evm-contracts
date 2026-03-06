@@ -67,7 +67,11 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param paymentTokenAddress The address of the payment token.
      * @param amlSignerAddress The address of the AML signer.
      */
-    event WithdrawalInitialized(address shareTokenAddress, address paymentTokenAddress, address amlSignerAddress);
+    event WithdrawalInitialized(
+        address shareTokenAddress,
+        address paymentTokenAddress,
+        address amlSignerAddress
+    );
 
     /**
      * @notice Emitted when a user withdraws tokens.
@@ -76,7 +80,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param shareToken The address of the shared token associated with the withdrawal.
      * @param paymentToken The address of the payment token associated with the withdrawal.
      */
-    event Withdraw(address indexed user, uint256 amount, address shareToken, address paymentToken);
+    event Withdraw(
+        address indexed user,
+        uint256 amount,
+        address shareToken,
+        address paymentToken
+    );
 
     // --- Initializer ---
 
@@ -96,9 +105,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
-        if (_shareTokenAddress == address(0)) revert InvalidAddress("Invalid withdrawal token");
-        if (_paymentTokenAddress == address(0)) revert InvalidAddress("Invalid payment token");
-        if (_amlSignerAddress == address(0)) revert InvalidAddress("Invalid AML signer");
+        if (_shareTokenAddress == address(0))
+            revert InvalidAddress("Invalid withdrawal token");
+        if (_paymentTokenAddress == address(0))
+            revert InvalidAddress("Invalid payment token");
+        if (_amlSignerAddress == address(0))
+            revert InvalidAddress("Invalid AML signer");
 
         shareToken = ICustomToken(_shareTokenAddress);
         paymentToken = _paymentTokenAddress;
@@ -107,7 +119,11 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         _setRoleAdmin(BURN_ROLE, BURN_ADMIN_ROLE);
         _grantRole(BURN_ADMIN_ROLE, burnAdminAddress);
 
-        emit WithdrawalInitialized(_shareTokenAddress, _paymentTokenAddress, _amlSignerAddress);
+        emit WithdrawalInitialized(
+            _shareTokenAddress,
+            _paymentTokenAddress,
+            _amlSignerAddress
+        );
     }
 
     // --- Public Functions ---
@@ -119,7 +135,11 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param _amlSignature The signature from the AML signer.
      * @param _amlDeadline The expiration timestamp for the AML signature.
      */
-    function withdraw(uint256 _amount, bytes calldata _amlSignature, uint256 _amlDeadline) external {
+    function withdraw(
+        uint256 _amount,
+        bytes calldata _amlSignature,
+        uint256 _amlDeadline
+    ) external {
         if (_amount == 0) revert AmountMustBeGreaterThanZero();
 
         bytes32 messageHash = _getMessageHash(_amount, _amlDeadline);
@@ -153,7 +173,15 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         bytes32 messageHash = _getMessageHash(_amount, _amlDeadline);
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        shareToken.permit(msg.sender, address(this), _amount, _permitDeadline, _v, _r, _s);
+        shareToken.permit(
+            msg.sender,
+            address(this),
+            _amount,
+            _permitDeadline,
+            _v,
+            _r,
+            _s
+        );
 
         _doWithdraw(_amount);
     }
@@ -177,7 +205,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param burner The address that initiated the burn.
      * @param mintTransactionHash The hash of the mint transaction.
      */
-    event TokensBurned(uint256 amount, address shareToken, address burner, string indexed mintTransactionHash);
+    event TokensBurned(
+        uint256 amount,
+        address shareToken,
+        address burner,
+        string indexed mintTransactionHash
+    );
 
     /**
      * @notice Burns a specified amount of tokens held by this contract.
@@ -192,9 +225,13 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * - `mintTransactionHash` must not be empty
      * - Contract must have sufficient token balance
      */
-    function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
+    function burn(
+        uint256 amount,
+        string calldata mintTransactionHash
+    ) external onlyRole(BURN_ROLE) {
         if (amount == 0) revert AmountMustBeGreaterThanZero();
-        if (bytes(mintTransactionHash).length == 0) revert InvalidMintTransactionHash();
+        if (bytes(mintTransactionHash).length == 0)
+            revert InvalidMintTransactionHash();
 
         // Ensure the contract has enough tokens to burn
         uint256 contractBalance = shareToken.balanceOf(address(this));
@@ -203,7 +240,12 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         // Burn the tokens using the CustomToken's burnAuthorized function
         shareToken.burn(amount);
 
-        emit TokensBurned(amount, address(shareToken), msg.sender, mintTransactionHash);
+        emit TokensBurned(
+            amount,
+            address(shareToken),
+            msg.sender,
+            mintTransactionHash
+        );
     }
 
     /**
@@ -213,11 +255,18 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
      * @param _signature The signature to verify.
      * @param _deadline The expiration timestamp for the signature.
      */
-    function _verifyAML(bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
+    function _verifyAML(
+        bytes32 messageHash,
+        bytes calldata _signature,
+        uint256 _deadline
+    ) private {
         if (block.timestamp > _deadline) revert AmlSignatureExpired();
         if (usedSignatures[messageHash]) revert AmlSignatureAlreadyUsed();
 
-        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(), messageHash);
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(
+            _getDomainSeparator(),
+            messageHash
+        );
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
         if (recoveredSigner == address(0)) revert InvalidAmlSignature();
@@ -233,7 +282,9 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
         return
             keccak256(
                 abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    ),
                     keccak256("Withdrawal"),
                     keccak256("1"),
                     block.chainid,
@@ -245,11 +296,16 @@ contract Withdrawal is Initializable, AccessControlUpgradeable {
     /**
      * @notice Calculates the hash of the struct using abi.encode (standard EIP-712).
      */
-    function _getMessageHash(uint256 _amount, uint256 _deadline) private view returns (bytes32) {
+    function _getMessageHash(
+        uint256 _amount,
+        uint256 _deadline
+    ) private view returns (bytes32) {
         return
             keccak256(
                 abi.encode(
-                    keccak256("Withdraw(address sender,uint256 amount,uint256 deadline)"),
+                    keccak256(
+                        "Withdraw(address sender,uint256 amount,uint256 deadline)"
+                    ),
                     msg.sender,
                     _amount,
                     _deadline

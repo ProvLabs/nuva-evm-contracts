@@ -12,7 +12,7 @@ async function main() {
     console.log("decimals:", decimals);
 
     const to = "0xDd3199E196BbF9A463500d5fB442FB7f78131F7a";
-    const amount = hre.ethers.parseUnits("100000000000000", decimals);
+    const amount = hre.ethers.parseUnits("1000000", decimals);
 
     // Call mint(to, amount)
     const tx = await token.mint(to, amount);

@@ -2,7 +2,10 @@
 pragma solidity ^0.8.20;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {
+    Ownable2Step,
+    Ownable
+} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Withdrawal} from "./Withdrawal.sol";
 
 // Errors
@@ -40,7 +43,11 @@ contract WithdrawalFactory is Ownable2Step {
     /// @param paymentToken The address of the payment token
     /// @param shareToken The address of the shared token
     /// @param withdrawalAddress The address of the newly created withdrawal contract
-    event WithdrawalCreated(address paymentToken, address shareToken, address indexed withdrawalAddress);
+    event WithdrawalCreated(
+        address paymentToken,
+        address shareToken,
+        address indexed withdrawalAddress
+    );
 
     /// @notice Emitted when a withdrawal is migrated to a new implementation
     /// @param paymentToken The address of the payment token
@@ -87,7 +94,8 @@ contract WithdrawalFactory is Ownable2Step {
         if (_amlSignerAddress == address(0)) revert ZeroAddress();
 
         // Check for existence using the nested mapping
-        if (withdrawals[_paymentTokenAddress][_shareTokenAddress] != address(0)) revert WithdrawalAlreadyExists();
+        if (withdrawals[_paymentTokenAddress][_shareTokenAddress] != address(0))
+            revert WithdrawalAlreadyExists();
 
         // 1. Create the cheap EIP-1167 clone
         withdrawalAddress = Clones.clone(implementation);
@@ -101,10 +109,16 @@ contract WithdrawalFactory is Ownable2Step {
         );
 
         // 3. Save it to the nested mapping
-        withdrawals[_paymentTokenAddress][_shareTokenAddress] = withdrawalAddress;
+        withdrawals[_paymentTokenAddress][
+            _shareTokenAddress
+        ] = withdrawalAddress;
 
         // 4. Emit the event
-        emit WithdrawalCreated(_paymentTokenAddress, _shareTokenAddress, withdrawalAddress);
+        emit WithdrawalCreated(
+            _paymentTokenAddress,
+            _shareTokenAddress,
+            withdrawalAddress
+        );
     }
 
     /**
@@ -120,7 +134,9 @@ contract WithdrawalFactory is Ownable2Step {
         address _shareTokenAddress,
         address _amlSignerAddress
     ) external onlyOwner returns (address newWithdrawalAddress) {
-        address oldWithdrawal = withdrawals[_paymentTokenAddress][_shareTokenAddress];
+        address oldWithdrawal = withdrawals[_paymentTokenAddress][
+            _shareTokenAddress
+        ];
 
         // This check ensures we are only migrating pairs that exist
         if (oldWithdrawal == address(0)) revert NoExistingWithdrawalToMigrate();
@@ -137,9 +153,16 @@ contract WithdrawalFactory is Ownable2Step {
         );
 
         // Overwrite the old address with the new one
-        withdrawals[_paymentTokenAddress][_shareTokenAddress] = newWithdrawalAddress;
+        withdrawals[_paymentTokenAddress][
+            _shareTokenAddress
+        ] = newWithdrawalAddress;
 
-        emit WithdrawalMigrated(_paymentTokenAddress, _shareTokenAddress, oldWithdrawal, newWithdrawalAddress);
+        emit WithdrawalMigrated(
+            _paymentTokenAddress,
+            _shareTokenAddress,
+            oldWithdrawal,
+            newWithdrawalAddress
+        );
     }
 
     /**
@@ -148,7 +171,9 @@ contract WithdrawalFactory is Ownable2Step {
      * @dev All *new* clones will use this new address.
      * @param _newImplementation The address of the new implementation contract.
      */
-    function updateImplementation(address _newImplementation) external onlyOwner {
+    function updateImplementation(
+        address _newImplementation
+    ) external onlyOwner {
         if (_newImplementation == address(0)) revert ZeroAddress();
 
         implementation = _newImplementation;
