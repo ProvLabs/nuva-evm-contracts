@@ -385,7 +385,11 @@ describe("CrossChainManager", function () {
 
             // Upgrade to V2
             const CrossChainManagerV2 = await ethers.getContractFactory("CrossChainManagerV2");
-            const upgraded = await upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2);
+            const initialFee = ethers.parseEther("1");
+            const upgraded = await upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2, {
+                call: { fn: "initializeV2", args: [initialFee] },
+                kind: "uups"
+            });
 
             // Verify state is preserved
             expect(await crossChainManager.token()).to.equal(depositTokenBefore);
@@ -395,9 +399,12 @@ describe("CrossChainManager", function () {
 
             // Verify new logic works
             expect(await upgraded.version()).to.equal("V2");
-            expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
-            await upgraded.enableVersion2Functionality();
-            expect(await upgraded.version2FunctionalityEnabled()).to.be.true;
+            expect(await upgraded.processingFee()).to.equal(initialFee);
+            const newFee = ethers.parseEther("2");
+            await expect(upgraded.connect(owner).setProcessingFee(newFee))
+                .to.emit(upgraded, "ProcessingFeeUpdated")
+                .withArgs(initialFee, newFee);
+            expect(await upgraded.processingFee()).to.equal(newFee);
         });
 
         it("Should prevent non-owners from upgrading CrossChainManager", async function () {

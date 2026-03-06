@@ -409,15 +409,24 @@ describe("DedicatedVaultRouter", function () {
 
         // 2. Upgrade to V2
         const RouterV2Factory = await ethers.getContractFactory("DedicatedVaultRouterV2");
-        const upgraded = await upgrades.upgradeProxy(await router.getAddress(), RouterV2Factory);
+        const initialFee = 100n; // 1%
+        const upgraded = await upgrades.upgradeProxy(await router.getAddress(), RouterV2Factory, {
+            call: { fn: "initializeV2", args: [initialFee] },
+            kind: "uups"
+        });
 
         // 3. Verify state is preserved
         expect(await upgraded.amlSigner()).to.equal(amlSignerBefore);
         expect(await upgraded.nuvaVault()).to.equal(nuvaVaultBefore); // NEW: Verify nuvaVault state
 
         // 4. Verify new logic works
-        await upgraded.connect(owner).togglePause();
-        expect(await upgraded.isPaused()).to.be.true;
+        expect(await upgraded.version()).to.equal("V2");
+        expect(await upgraded.routerFee()).to.equal(initialFee);
+        const newFee = 200n; // 2%
+        await expect(upgraded.connect(owner).setRouterFee(newFee))
+            .to.emit(upgraded, "RouterFeeUpdated")
+            .withArgs(initialFee, newFee);
+        expect(await upgraded.routerFee()).to.equal(newFee);
     });
 
     it("Should verify that variables occupy the correct storage slots", async function () {
@@ -878,7 +887,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(requestRedeemTx)
                 .to.emit(router, "RedemptionRequested")
-                .withArgs(user.address, redemptionProxyCloneAddress);
+                .withArgs(user.address, redemptionProxyCloneAddress, amountToRedeem);
             expect(redemptionProxyCloneAddress).to.not.equal(ethers.ZeroAddress);
 
             // Verify the clone's state variables (initialized correctly)
@@ -1138,7 +1147,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(router.connect(owner).sweepRedemptions(proxies, amounts))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs(proxies, amounts, amount * 2n);
+                .withArgs(proxies, [user.address, user2.address], amounts, amount * 2n);
 
             // 5. Verify funds reached users
             expect(await routerAsset.balanceOf(user.address)).to.equal(balanceBefore + amount);
@@ -1148,7 +1157,7 @@ describe("DedicatedVaultRouter", function () {
             // Attempting to sweep again should yield 0 swept
             await expect(router.connect(owner).sweepRedemptions(proxies, amounts))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs(proxies, amounts, 0);
+                .withArgs(proxies, [ethers.ZeroAddress, ethers.ZeroAddress], amounts, 0);
         });
 
         it("Should handle sweeping of non-existent or already swept redemptions", async function () {
@@ -1164,7 +1173,7 @@ describe("DedicatedVaultRouter", function () {
             const nonExistentUser = (await ethers.getSigners())[5].address;
             await expect(router.connect(owner).sweepRedemptions([nonExistentUser], [0n]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([nonExistentUser], [0n], 0);
+                .withArgs([nonExistentUser], [ethers.ZeroAddress], [0n], 0);
         });
 
         it("Should allow partial sweeps (installments)", async function () {
@@ -1248,7 +1257,7 @@ describe("DedicatedVaultRouter", function () {
             // Second Sweep - Should not revert, just emit 0 swept because mapping was cleared
             await expect(router.connect(owner).sweepRedemptions([proxyAddress], [secondHalf]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([proxyAddress], [secondHalf], 0);
+                .withArgs([proxyAddress], [ethers.ZeroAddress], [secondHalf], 0);
         });
 
         it("Should allow a designated keeper to sweep redemptions", async function () {
@@ -1321,7 +1330,7 @@ describe("DedicatedVaultRouter", function () {
             // 2. Keeper Sweep
             await expect(router.connect(keeper).sweepRedemptions([proxyAddress], [amount]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([proxyAddress], [amount], amount);
+                .withArgs([proxyAddress], [user.address], [amount], amount);
 
             expect(await routerAsset.balanceOf(user.address)).to.be.at.least(amount);
         });
@@ -1458,7 +1467,11 @@ describe("DedicatedVaultRouter", function () {
 
             // 2. Upgrade to V2
             const NuvaVaultV2 = await ethers.getContractFactory("NuvaVaultV2");
-            const upgraded = await upgrades.upgradeProxy(await nuvaVault.getAddress(), NuvaVaultV2);
+            const initialLimit = ethers.parseEther("1000");
+            const upgraded = await upgrades.upgradeProxy(await nuvaVault.getAddress(), NuvaVaultV2, {
+                call: { fn: "initializeV2", args: [initialLimit] },
+                kind: "uups"
+            });
 
             // 3. Verify state is preserved
             expect(await upgraded.balanceOf(user.address)).to.equal(balanceBefore);
@@ -1468,9 +1481,12 @@ describe("DedicatedVaultRouter", function () {
 
             // 4. Verify new logic works
             expect(await upgraded.version()).to.equal("V2");
-            expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
-            await upgraded.enableVersion2Functionality();
-            expect(await upgraded.version2FunctionalityEnabled()).to.be.true;
+            expect(await upgraded.withdrawalLimit()).to.equal(initialLimit);
+            const newLimit = ethers.parseEther("2000");
+            await expect(upgraded.connect(owner).setWithdrawalLimit(newLimit))
+                .to.emit(upgraded, "WithdrawalLimitUpdated")
+                .withArgs(initialLimit, newLimit);
+            expect(await upgraded.withdrawalLimit()).to.equal(newLimit);
         });
 
         it("Should prevent non-owners from upgrading NuvaVault", async function () {
@@ -1573,7 +1589,7 @@ describe("DedicatedVaultRouter", function () {
 
             await expect(router.connect(owner).sweepRedemptions([ethers.ZeroAddress], [100n]))
                 .to.emit(router, "RedemptionsSwept")
-                .withArgs([ethers.ZeroAddress], [100n], 0);
+                .withArgs([ethers.ZeroAddress], [ethers.ZeroAddress], [100n], 0);
         });
 
         it("Should NOT delete mapping in sweepRedemptions if amount is zero", async function () {

@@ -131,16 +131,23 @@ describe("CrossChainVault", function () {
 
             // Upgrade to V2
             const CrossChainVaultV2 = await ethers.getContractFactory("CrossChainVaultV2");
-            const upgraded = await upgrades.upgradeProxy(await crossChainVault.getAddress(), CrossChainVaultV2);
+            const initialSize = ethers.parseEther("100");
+            const upgraded = await upgrades.upgradeProxy(await crossChainVault.getAddress(), CrossChainVaultV2, {
+                call: { fn: "initializeV2", args: [initialSize] },
+                kind: "uups"
+            });
 
             // Verify state is preserved
             expect(await crossChainVault.executor()).to.equal(executorBefore);
 
             // 4. Verify new logic works
             expect(await upgraded.version()).to.equal("V2");
-            expect(await upgraded.version2FunctionalityEnabled()).to.be.false;
-            await upgraded.enableVersion2Functionality();
-            expect(await upgraded.version2FunctionalityEnabled()).to.be.true;
+            expect(await upgraded.maxTransactionSize()).to.equal(initialSize);
+            const newSize = ethers.parseEther("200");
+            await expect(upgraded.connect(owner).setMaxTransactionSize(newSize))
+                .to.emit(upgraded, "MaxTransactionSizeUpdated")
+                .withArgs(initialSize, newSize);
+            expect(await upgraded.maxTransactionSize()).to.equal(newSize);
         });
 
         it("Should prevent non-owners from upgrading CrossChainVault", async function () {
