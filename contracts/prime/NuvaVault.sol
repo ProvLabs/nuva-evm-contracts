@@ -83,7 +83,9 @@ contract NuvaVault is
      * @notice Authorizes a contract upgrade. Only callable by the owner.
      * @param newImplementation The address of the new implementation.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     // --- Overrides ---
 
@@ -93,7 +95,10 @@ contract NuvaVault is
      * @param receiver Address to receive the shares.
      * @return shares Amount of shares minted.
      */
-    function deposit(uint256 assets, address receiver) public override whenNotPaused returns (uint256 shares) {
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) public override whenNotPaused returns (uint256 shares) {
         return super.deposit(assets, receiver);
     }
 
@@ -103,7 +108,10 @@ contract NuvaVault is
      * @param receiver Address to receive the shares.
      * @return assets Amount of assets deposited.
      */
-    function mint(uint256 shares, address receiver) public override whenNotPaused returns (uint256 assets) {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) public override whenNotPaused returns (uint256 assets) {
         return super.mint(shares, receiver);
     }
 
@@ -149,7 +157,13 @@ contract NuvaVault is
      * @notice Returns the number of decimals used to get its user representation.
      * @return The number of decimals.
      */
-    function decimals() public view virtual override(ERC4626Upgradeable, ERC20Upgradeable) returns (uint8) {
+    function decimals()
+        public
+        view
+        virtual
+        override(ERC4626Upgradeable, ERC20Upgradeable)
+        returns (uint8)
+    {
         return super.decimals();
     }
 

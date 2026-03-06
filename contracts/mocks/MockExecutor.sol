@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ExecutorArgs, FeeArgs} from "../modules/wormhole/ICCTPv1WithExecutor.sol";
+import {
+    ExecutorArgs,
+    FeeArgs
+} from "../modules/wormhole/ICCTPv1WithExecutor.sol";
 
 /// @title MockExecutor
 /// @notice Mock implementation of the Executor interface for testing
@@ -43,8 +46,15 @@ contract MockExecutor {
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
     ) external payable returns (uint64 nonce) {
-
-        emit MockDepositForBurn(amount, targetChain, targetDomain, targetRecipient, token, executorArgs, feeArgs);
+        emit MockDepositForBurn(
+            amount,
+            targetChain,
+            targetDomain,
+            targetRecipient,
+            token,
+            executorArgs,
+            feeArgs
+        );
         return 1;
     }
 }

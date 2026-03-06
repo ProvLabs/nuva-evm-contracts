@@ -134,7 +134,7 @@ describe("CrossChainVault", function () {
             const initialSize = ethers.parseEther("100");
             const upgraded = await upgrades.upgradeProxy(await crossChainVault.getAddress(), CrossChainVaultV2, {
                 call: { fn: "initializeV2", args: [initialSize] },
-                kind: "uups"
+                kind: "uups",
             });
 
             // Verify state is preserved

@@ -11,7 +11,6 @@ error WithdrawalLimitAlreadySetToThisValue();
 /// @notice V2 Upgrade: Adds the ability for the admin to update a withdrawal limit.
 /// @custom:oz-upgrades-unsafe-allow missing-initializer
 contract NuvaVaultV2 is NuvaVault {
-    
     // --- New V2 State Variables ---
     // (Appended after V1 storage layout to prevent collisions)
     uint256 public withdrawalLimit;
@@ -42,7 +41,8 @@ contract NuvaVaultV2 is NuvaVault {
      */
     function setWithdrawalLimit(uint256 newLimit) external onlyOwner {
         if (newLimit == 0) revert WithdrawalLimitCannotBeZero();
-        if (newLimit == withdrawalLimit) revert WithdrawalLimitAlreadySetToThisValue();
+        if (newLimit == withdrawalLimit)
+            revert WithdrawalLimitAlreadySetToThisValue();
 
         uint256 oldLimit = withdrawalLimit;
         withdrawalLimit = newLimit;

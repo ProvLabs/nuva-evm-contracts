@@ -18,7 +18,10 @@ contract CrossChainVaultHarness is CrossChainVault {
     /// @param amount The amount to normalize
     /// @param decimals The number of decimals
     /// @return The normalized amount
-    function exposeNormalizeAmount(uint256 amount, uint8 decimals) public pure returns (uint256) {
+    function exposeNormalizeAmount(
+        uint256 amount,
+        uint8 decimals
+    ) public pure returns (uint256) {
         return normalizeAmount(amount, decimals);
     }
 }

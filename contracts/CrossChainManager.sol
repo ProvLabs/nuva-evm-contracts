@@ -38,12 +38,12 @@ error InvalidMintTransactionHash(); // dev: The mint transaction hash is invalid
  * It's designed to be cloned by a factory contract for multiple instances.
  * @author NU Blockchain Technologies
  */
-contract CrossChainManager is 
-    Initializable, 
+contract CrossChainManager is
+    Initializable,
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
     AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable 
+    ReentrancyGuardUpgradeable
 {
     using SafeERC20 for CustomToken;
     using SafeERC20 for ICustomToken;
@@ -62,13 +62,22 @@ contract CrossChainManager is
     bytes32 private constant WITHDRAW_HASH = keccak256("Withdraw");
 
     /// @dev EIP-712 Typehash for the Deposit struct. Defines field names and types.
-    bytes32 private constant DEPOSIT_TYPEHASH = keccak256("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+    bytes32 private constant DEPOSIT_TYPEHASH =
+        keccak256(
+            "Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)"
+        );
 
     /// @dev EIP-712 Typehash for the Withdraw struct. Defines field names and types.
-    bytes32 private constant WITHDRAW_TYPEHASH = keccak256("Withdraw(address sender,uint256 amount,address destinationAddress,uint256 deadline)");
+    bytes32 private constant WITHDRAW_TYPEHASH =
+        keccak256(
+            "Withdraw(address sender,uint256 amount,address destinationAddress,uint256 deadline)"
+        );
 
     /// @dev EIP-712 Typehash for the Domain Separator. Used to prevent cross-contract/cross-chain replays.
-    bytes32 private constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 private constant DOMAIN_TYPEHASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     // --- State Variables ---
 
@@ -117,21 +126,15 @@ contract CrossChainManager is
      * @param from The address of the old cross chain vault.
      * @param to The address of the new cross chain vault.
      */
-    event CrossChainConfigUpdated(
-        address indexed from,
-        address indexed to
-    );
+    event CrossChainConfigUpdated(address indexed from, address indexed to);
 
     /**
      * @notice Emitted when aml signer address is updated.
      * @param from The address of the old aml signer.
      * @param to The address of the new aml signer.
      */
-    event AmlSignerUpdated(
-        address indexed from,
-        address indexed to
-    );
-    
+    event AmlSignerUpdated(address indexed from, address indexed to);
+
     /**
      * @notice Emitted when a deposit is made.
      * @param user The address of the user making the deposit.
@@ -167,11 +170,11 @@ contract CrossChainManager is
     /// @notice Emitted when destination addresses are altered.
     /// @param destination The destination address.
     event DestinationAddressAdded(address indexed destination);
-    
+
     /// @notice Emitted when destination addresses are altered.
     /// @param destination The destination address.
     event DestinationAddressRemoved(address indexed destination);
-    
+
     /// @notice Emitted when destination addresses are altered.
     /// @param destination The destination address.
     event DestinationAddressSkipped(address indexed destination);
@@ -183,8 +186,12 @@ contract CrossChainManager is
      * @param burner The address that initiated the burn.
      * @param mintTransactionHash The hash of the mint transaction.
      */
-    event TokensBurned(uint256 amount, address shareToken, address burner, string indexed mintTransactionHash);
-
+    event TokensBurned(
+        uint256 amount,
+        address shareToken,
+        address burner,
+        string indexed mintTransactionHash
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     /// @notice constructor
@@ -214,9 +221,12 @@ contract CrossChainManager is
         __ReentrancyGuard_init();
 
         if (_tokenAddress == address(0)) revert InvalidAddress("token");
-        if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
-        if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
-        if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
+        if (_shareTokenAddress == address(0))
+            revert InvalidAddress("share token");
+        if (_amlSignerAddress == address(0))
+            revert InvalidAddress("aml signer");
+        if (crossChainVaultAddress == address(0))
+            revert InvalidAddress("cross chain vault");
 
         token = CustomToken(_tokenAddress);
         shareToken = ICustomToken(_shareTokenAddress);
@@ -244,12 +254,16 @@ contract CrossChainManager is
     function updateCrossChainConfig(
         address crossChainVaultAddress
     ) external onlyOwner {
-        if (crossChainVaultAddress == address(0)) revert InvalidAddress("cross chain vault");
+        if (crossChainVaultAddress == address(0))
+            revert InvalidAddress("cross chain vault");
 
         address oldcrossChainVaultAddress = address(crossChainVault);
         crossChainVault = CrossChainVault(crossChainVaultAddress);
 
-        emit CrossChainConfigUpdated(oldcrossChainVaultAddress, crossChainVaultAddress);
+        emit CrossChainConfigUpdated(
+            oldcrossChainVaultAddress,
+            crossChainVaultAddress
+        );
     }
 
     /**
@@ -257,9 +271,7 @@ contract CrossChainManager is
      * @dev Can only be called by the destination manager.
      * @param amlSignerAddress The aml signer address.
      */
-    function updateAmlSigner(
-        address amlSignerAddress
-    ) external onlyOwner {
+    function updateAmlSigner(address amlSignerAddress) external onlyOwner {
         if (amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
 
         address oldAmlSigner = amlSigner;
@@ -290,10 +302,22 @@ contract CrossChainManager is
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
     ) external payable nonReentrant {
-        bytes32 messageHash = _getMessageHash("Deposit", _amount, _destinationAddress, _amlDeadline);
+        bytes32 messageHash = _getMessageHash(
+            "Deposit",
+            _amount,
+            _destinationAddress,
+            _amlDeadline
+        );
         _verifyAML("Depositor", messageHash, _amlSignature, _amlDeadline);
 
-        _doDeposit(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
+        _doDeposit(
+            _amount,
+            _destinationAddress,
+            targetChain,
+            targetDomain,
+            executorArgs,
+            feeArgs
+        );
     }
 
     /**
@@ -305,14 +329,19 @@ contract CrossChainManager is
      * @param _amlDeadline The expiration timestamp for the AML signature.
      */
     function withdraw(
-        uint256 _amount, 
+        uint256 _amount,
         address _destinationAddress,
-        bytes calldata _amlSignature, 
+        bytes calldata _amlSignature,
         uint256 _amlDeadline
     ) external nonReentrant {
         if (_amount == 0) revert AmountMustBeGreaterThanZero();
 
-        bytes32 messageHash = _getMessageHash("Withdraw", _amount, _destinationAddress, _amlDeadline);
+        bytes32 messageHash = _getMessageHash(
+            "Withdraw",
+            _amount,
+            _destinationAddress,
+            _amlDeadline
+        );
         _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
 
         _doWithdraw(_amount);
@@ -348,7 +377,12 @@ contract CrossChainManager is
         ExecutorArgs calldata executorArgs,
         FeeArgs calldata feeArgs
     ) external payable nonReentrant {
-        bytes32 messageHash = _getMessageHash("Deposit", _amount, _destinationAddress, _amlDeadline);
+        bytes32 messageHash = _getMessageHash(
+            "Deposit",
+            _amount,
+            _destinationAddress,
+            _amlDeadline
+        );
         _verifyAML("Depositor", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
@@ -362,7 +396,14 @@ contract CrossChainManager is
             _s // The user's signature
         );
 
-        _doDeposit(_amount, _destinationAddress, targetChain, targetDomain, executorArgs, feeArgs);
+        _doDeposit(
+            _amount,
+            _destinationAddress,
+            targetChain,
+            targetDomain,
+            executorArgs,
+            feeArgs
+        );
     }
 
     /**
@@ -387,7 +428,12 @@ contract CrossChainManager is
         bytes32 _r,
         bytes32 _s
     ) external nonReentrant {
-        bytes32 messageHash = _getMessageHash("Withdraw", _amount, _destinationAddress, _amlDeadline);
+        bytes32 messageHash = _getMessageHash(
+            "Withdraw",
+            _amount,
+            _destinationAddress,
+            _amlDeadline
+        );
         _verifyAML("Withdrawal", messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
@@ -419,7 +465,8 @@ contract CrossChainManager is
      * @param _destination The address to attempt to add.
      */
     function addDestinationAddress(address _destination) external onlyOwner {
-        if (_destination == address(0)) revert InvalidAddress("zero destination address");
+        if (_destination == address(0))
+            revert InvalidAddress("zero destination address");
 
         if (isDestination[_destination]) {
             emit DestinationAddressSkipped(_destination);
@@ -430,7 +477,7 @@ contract CrossChainManager is
         destinationAddresses.push(_destination);
 
         // Store the index + 1 (so index 0 is at 1)
-        addressToIndex[_destination] = destinationAddresses.length; 
+        addressToIndex[_destination] = destinationAddresses.length;
 
         emit DestinationAddressAdded(_destination);
     }
@@ -441,7 +488,7 @@ contract CrossChainManager is
      * Note: This changes the order of the array (swap and pop) for gas efficiency.
      * @param _destination The address to remove.
      */
-    function removeDestinationAddress(address _destination) external onlyOwner() {
+    function removeDestinationAddress(address _destination) external onlyOwner {
         if (!isDestination[_destination]) {
             emit DestinationAddressSkipped(_destination);
             return;
@@ -453,10 +500,10 @@ contract CrossChainManager is
 
         if (indexToRemove != lastIndex) {
             address lastAddr = destinationAddresses[lastIndex];
-            
+
             // Move the last element into the gap
             destinationAddresses[indexToRemove] = lastAddr;
-            
+
             // Update the index of the moved element
             addressToIndex[lastAddr] = indexPlusOne;
         }
@@ -482,9 +529,13 @@ contract CrossChainManager is
      * - `mintTransactionHash` must not be empty
      * - Contract must have sufficient token balance
      */
-    function burn(uint256 amount, string calldata mintTransactionHash) external onlyRole(BURN_ROLE) {
+    function burn(
+        uint256 amount,
+        string calldata mintTransactionHash
+    ) external onlyRole(BURN_ROLE) {
         if (amount == 0) revert AmountMustBeGreaterThanZero();
-        if (bytes(mintTransactionHash).length == 0) revert InvalidMintTransactionHash();
+        if (bytes(mintTransactionHash).length == 0)
+            revert InvalidMintTransactionHash();
 
         // Ensure the contract has enough tokens to burn
         uint256 contractBalance = shareToken.balanceOf(address(this));
@@ -493,7 +544,12 @@ contract CrossChainManager is
         // Burn the tokens using the CustomToken's burnAuthorized function
         shareToken.burn(amount);
 
-        emit TokensBurned(amount, address(shareToken), msg.sender, mintTransactionHash);
+        emit TokensBurned(
+            amount,
+            address(shareToken),
+            msg.sender,
+            mintTransactionHash
+        );
     }
 
     // --- Private Helper Functions ---
@@ -509,7 +565,7 @@ contract CrossChainManager is
      * @param feeArgs The fee arguments
      */
     function _doDeposit(
-        uint256 _amount, 
+        uint256 _amount,
         address _destinationAddress,
         uint16 targetChain,
         uint32 targetDomain,
@@ -517,8 +573,10 @@ contract CrossChainManager is
         FeeArgs calldata feeArgs
     ) private {
         if (_amount == 0) revert InvalidAmount();
-        if (_destinationAddress == address(0)) revert InvalidAddress("destination is zero");
-        if (!isDestination[_destinationAddress]) revert InvalidAddress("destination doesn't exist");
+        if (_destinationAddress == address(0))
+            revert InvalidAddress("destination is zero");
+        if (!isDestination[_destinationAddress])
+            revert InvalidAddress("destination doesn't exist");
 
         // Pull tokens from the user to this contract
         token.safeTransferFrom(msg.sender, address(this), _amount);
@@ -528,21 +586,21 @@ contract CrossChainManager is
 
         // Calling the vault
         crossChainVault.sendTokens{value: msg.value}(
-            address(token), 
-            _amount, 
-            targetChain, 
-            targetDomain, 
+            address(token),
+            _amount,
+            targetChain,
+            targetDomain,
             bytes32(uint256(uint160(_destinationAddress))),
             executorArgs,
             feeArgs
         );
 
         emit Deposited(
-            msg.sender, 
-            _amount, 
-            address(token), 
-            address(shareToken), 
-            _destinationAddress, 
+            msg.sender,
+            _amount,
+            address(token),
+            address(shareToken),
+            _destinationAddress,
             targetChain
         );
     }
@@ -558,10 +616,10 @@ contract CrossChainManager is
         shareToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         emit Withdrawn(
-            msg.sender, 
-            _amount, 
-            address(shareToken), 
-            address(token) 
+            msg.sender,
+            _amount,
+            address(shareToken),
+            address(token)
         );
     }
 
@@ -573,11 +631,19 @@ contract CrossChainManager is
      * @param _signature The signature to verify.
      * @param _deadline The expiration timestamp for the signature.
      */
-    function _verifyAML(string memory _name, bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
+    function _verifyAML(
+        string memory _name,
+        bytes32 messageHash,
+        bytes calldata _signature,
+        uint256 _deadline
+    ) private {
         if (block.timestamp > _deadline) revert AmlSignatureExpired();
         if (usedSignatures[messageHash]) revert AmlSignatureAlreadyUsed();
 
-        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(_name), messageHash);
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(
+            _getDomainSeparator(_name),
+            messageHash
+        );
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
         if (recoveredSigner == address(0)) revert InvalidAmlSignature();
@@ -591,7 +657,9 @@ contract CrossChainManager is
      * @param _name The name of the function.
      * @return The domain separator for the current chain.
      */
-    function _getDomainSeparator(string memory _name) private view returns (bytes32) {
+    function _getDomainSeparator(
+        string memory _name
+    ) private view returns (bytes32) {
         return
             keccak256(
                 abi.encode(
@@ -621,9 +689,27 @@ contract CrossChainManager is
         bytes32 nameHash = keccak256(bytes(_name));
 
         if (nameHash == DEPOSIT_HASH) {
-            return keccak256(abi.encode(DEPOSIT_TYPEHASH, msg.sender, _amount, _destinationAddress, _deadline));
+            return
+                keccak256(
+                    abi.encode(
+                        DEPOSIT_TYPEHASH,
+                        msg.sender,
+                        _amount,
+                        _destinationAddress,
+                        _deadline
+                    )
+                );
         } else if (nameHash == WITHDRAW_HASH) {
-            return keccak256(abi.encode(WITHDRAW_TYPEHASH, msg.sender, _amount, _destinationAddress, _deadline));
+            return
+                keccak256(
+                    abi.encode(
+                        WITHDRAW_TYPEHASH,
+                        msg.sender,
+                        _amount,
+                        _destinationAddress,
+                        _deadline
+                    )
+                );
         }
 
         revert InvalidFunctionName();
@@ -639,7 +725,9 @@ contract CrossChainManager is
      * @dev Only callable by the owner.
      * @param newImplementation Address of the new implementation.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {
         // Upgrade authorized
     }
 }

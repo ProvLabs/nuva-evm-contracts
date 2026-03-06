@@ -15,10 +15,7 @@ contract MockERC20 is ERC20 {
      * @param name The name of the token
      * @param symbol The symbol of the token
      */
-    constructor(
-        string memory name,
-        string memory symbol
-    ) ERC20(name, symbol) {}
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
     /**
      * @notice Mints tokens to a specified address

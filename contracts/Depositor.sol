@@ -35,8 +35,10 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     // --- Constants ---
 
     /// @notice Role for managing the destination address allow list.
-    bytes32 public constant DESTINATION_MANAGER_ADMIN_ROLE = keccak256("DESTINATION_MANAGER_ADMIN_ROLE");
-    bytes32 public constant DESTINATION_MANAGER_ROLE = keccak256("DESTINATION_MANAGER_ROLE");
+    bytes32 public constant DESTINATION_MANAGER_ADMIN_ROLE =
+        keccak256("DESTINATION_MANAGER_ADMIN_ROLE");
+    bytes32 public constant DESTINATION_MANAGER_ROLE =
+        keccak256("DESTINATION_MANAGER_ROLE");
 
     // --- State Variables ---
 
@@ -109,10 +111,14 @@ contract Depositor is Initializable, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
-        if (_depositTokenAddress == address(0)) revert InvalidAddress("deposit token");
-        if (_shareTokenAddress == address(0)) revert InvalidAddress("share token");
-        if (_amlSignerAddress == address(0)) revert InvalidAddress("aml signer");
-        if (_destinationManagerAddress == address(0)) revert InvalidAddress("destination manager");
+        if (_depositTokenAddress == address(0))
+            revert InvalidAddress("deposit token");
+        if (_shareTokenAddress == address(0))
+            revert InvalidAddress("share token");
+        if (_amlSignerAddress == address(0))
+            revert InvalidAddress("aml signer");
+        if (_destinationManagerAddress == address(0))
+            revert InvalidAddress("destination manager");
 
         depositToken = CustomToken(_depositTokenAddress);
         shareToken = _shareTokenAddress;
@@ -145,7 +151,11 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         bytes calldata _amlSignature,
         uint256 _amlDeadline
     ) external {
-        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
+        bytes32 messageHash = _getMessageHash(
+            _amount,
+            _destinationAddress,
+            _amlDeadline
+        );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
         _doDeposit(_amount, _destinationAddress);
@@ -173,7 +183,11 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         bytes32 _r,
         bytes32 _s
     ) external {
-        bytes32 messageHash = _getMessageHash(_amount, _destinationAddress, _amlDeadline);
+        bytes32 messageHash = _getMessageHash(
+            _amount,
+            _destinationAddress,
+            _amlDeadline
+        );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
         // This call will fail if the signature is invalid or deadline passed.
@@ -214,8 +228,11 @@ contract Depositor is Initializable, AccessControlUpgradeable {
      * @dev Adds a destination address to the array only if it doesn't already exist.
      * @param _destination The address to attempt to add.
      */
-    function addDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
-        if (_destination == address(0)) revert InvalidAddress("destination address");
+    function addDestinationAddress(
+        address _destination
+    ) external onlyRole(DESTINATION_MANAGER_ROLE) {
+        if (_destination == address(0))
+            revert InvalidAddress("destination address");
 
         // Check if the address already exists by iterating (efficient for small arrays < 5)
         for (uint i = 0; i < destinationAddresses.length; i++) {
@@ -234,11 +251,15 @@ contract Depositor is Initializable, AccessControlUpgradeable {
      * Note: This changes the order of the array (swap and pop) for gas efficiency.
      * @param _destination The address to remove.
      */
-    function removeDestinationAddress(address _destination) external onlyRole(DESTINATION_MANAGER_ROLE) {
+    function removeDestinationAddress(
+        address _destination
+    ) external onlyRole(DESTINATION_MANAGER_ROLE) {
         for (uint i = 0; i < destinationAddresses.length; i++) {
             if (destinationAddresses[i] == _destination) {
                 // Move the last element into the place to delete
-                destinationAddresses[i] = destinationAddresses[destinationAddresses.length - 1];
+                destinationAddresses[i] = destinationAddresses[
+                    destinationAddresses.length - 1
+                ];
                 // Remove the last element
                 destinationAddresses.pop();
 
@@ -260,12 +281,20 @@ contract Depositor is Initializable, AccessControlUpgradeable {
      */
     function _doDeposit(uint256 _amount, address _destinationAddress) private {
         if (_amount == 0) revert InvalidAmount();
-        if (_destinationAddress == address(0)) revert InvalidAddress("destination");
-        if (!isDestination(_destinationAddress)) revert InvalidAddress("destination");
+        if (_destinationAddress == address(0))
+            revert InvalidAddress("destination");
+        if (!isDestination(_destinationAddress))
+            revert InvalidAddress("destination");
 
         depositToken.safeTransferFrom(msg.sender, _destinationAddress, _amount);
 
-        emit Deposit(msg.sender, _amount, address(depositToken), shareToken, _destinationAddress);
+        emit Deposit(
+            msg.sender,
+            _amount,
+            address(depositToken),
+            shareToken,
+            _destinationAddress
+        );
     }
 
     /**
@@ -275,11 +304,18 @@ contract Depositor is Initializable, AccessControlUpgradeable {
      * @param _signature The signature to verify.
      * @param _deadline The expiration timestamp for the signature.
      */
-    function _verifyAML(bytes32 messageHash, bytes calldata _signature, uint256 _deadline) private {
+    function _verifyAML(
+        bytes32 messageHash,
+        bytes calldata _signature,
+        uint256 _deadline
+    ) private {
         if (block.timestamp > _deadline) revert AmlSignatureExpired();
         if (usedSignatures[messageHash]) revert AmlSignatureAlreadyUsed();
 
-        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(), messageHash);
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(
+            _getDomainSeparator(),
+            messageHash
+        );
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
         if (recoveredSigner == address(0)) revert InvalidAmlSignature();
@@ -295,7 +331,9 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         return
             keccak256(
                 abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    ),
                     keccak256("Depositor"),
                     keccak256("1"),
                     block.chainid,
@@ -315,7 +353,9 @@ contract Depositor is Initializable, AccessControlUpgradeable {
         return
             keccak256(
                 abi.encode(
-                    keccak256("Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)"),
+                    keccak256(
+                        "Deposit(address sender,uint256 amount,address destinationAddress,uint256 deadline)"
+                    ),
                     msg.sender,
                     _amount,
                     _destinationAddress,

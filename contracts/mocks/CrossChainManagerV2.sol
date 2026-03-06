@@ -11,7 +11,6 @@ error ManagerFeeAlreadySetToThisValue();
 /// @notice V2 Upgrade: Adds the ability for the admin to update a processing fee.
 /// @custom:oz-upgrades-unsafe-allow missing-initializer
 contract CrossChainManagerV2 is CrossChainManager {
-    
     // --- New V2 State Variables ---
     // (Appended after V1 storage layout to prevent collisions)
     uint256 public processingFee;

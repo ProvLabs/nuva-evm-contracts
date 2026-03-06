@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "lint:sol": "npx solhint 'contracts/**/*.sol'",
+    "lint:solfix": "prettier --write 'contracts/**/*.sol'",
+    "lint:solcheck": "prettier --check 'contracts/**/*.sol'",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "test": "hardhat test"
@@ -37,8 +38,8 @@
     "ethers": "^6.14.0",
     "hardhat": "2.26.3",
     "hardhat-gas-reporter": "^2.3.0",
-    "prettier": "^3.6.2",
-    "prettier-plugin-solidity": "^2.1.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-solidity": "^2.2.1",
     "solhint": "^6.0.1",
     "solidity-coverage": "^0.8.1",
     "ts-node": ">=8.0.0",

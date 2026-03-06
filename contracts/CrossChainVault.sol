@@ -9,7 +9,11 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {BytesLib} from "./modules/utils/BytesLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ICCTPv1WithExecutor, ExecutorArgs, FeeArgs} from "./modules/wormhole/ICCTPv1WithExecutor.sol";
+import {
+    ICCTPv1WithExecutor,
+    ExecutorArgs,
+    FeeArgs
+} from "./modules/wormhole/ICCTPv1WithExecutor.sol";
 
 error InvalidExecutorAddress(); // dev: invalid executor address
 error InvalidTokenAddress(); // dev: invalid token address
@@ -27,12 +31,13 @@ error AddressNotWhitelisted(); // dev: Address not whitelisted
  * cross chain with an aribtrary message payload.
  * @author NU Blockchain Technologies
  */
-contract CrossChainVault is 
-    Initializable, 
+contract CrossChainVault is
+    Initializable,
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
     AccessControlEnumerableUpgradeable,
-    ReentrancyGuardUpgradeable  {
+    ReentrancyGuardUpgradeable
+{
     using BytesLib for bytes;
 
     // --- State Variables ---
@@ -42,7 +47,7 @@ contract CrossChainVault is
 
     /// @notice The role of whitelisted addresses
     bytes32 public constant WHITELISTED_ROLE = keccak256("WHITELISTED_ROLE");
-    
+
     // --- Events ---
 
     /**
@@ -124,14 +129,16 @@ contract CrossChainVault is
         // sanity check function arguments
         if (token == address(0)) revert InvalidTokenAddress();
         if (amount == 0) revert AmountMustBeGreaterThanZero();
-        if (targetRecipient == bytes32(0)) revert TargetRecipientCannotBeBytes32Zero();
+        if (targetRecipient == bytes32(0))
+            revert TargetRecipientCannotBeBytes32Zero();
 
         /**
          * Compute the normalized amount to verify that it's nonzero.
          * The token bridge peforms the same operation before encoding
          * the amount in the `depositForBurn` message.
          */
-        if (normalizeAmount(amount, getDecimals(token)) == 0) revert NormalizedAmountMustBeGreaterThanZero();
+        if (normalizeAmount(amount, getDecimals(token)) == 0)
+            revert NormalizedAmountMustBeGreaterThanZero();
 
         uint256 balanceBefore = getBalance(token);
 
@@ -153,16 +160,23 @@ contract CrossChainVault is
         uint256 amountTransferred = amountReceived - feeArgs.transferTokenFee;
 
         uint64 nonce = executor.depositForBurn{value: msg.value}(
-            amountTransferred, 
-            targetChain, 
-            targetDomain, 
-            targetRecipient, 
-            token, 
-            executorArgs, 
+            amountTransferred,
+            targetChain,
+            targetDomain,
+            targetRecipient,
+            token,
+            executorArgs,
             feeArgs
         );
 
-        emit TokensSent(token, amount, targetChain, targetDomain, targetRecipient, nonce);
+        emit TokensSent(
+            token,
+            amount,
+            targetChain,
+            targetDomain,
+            targetRecipient,
+            nonce
+        );
     }
 
     /**
@@ -211,10 +225,9 @@ contract CrossChainVault is
      */
     function getBalance(address token) internal view returns (uint256 balance) {
         // fetch the specified token balance for this contract
-        (, bytes memory queriedBalance) =
-            token.staticcall(
-                abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
-            );
+        (, bytes memory queriedBalance) = token.staticcall(
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
+        );
         balance = abi.decode(queriedBalance, (uint256));
     }
 
@@ -223,10 +236,8 @@ contract CrossChainVault is
      * @param token Address of the token to check.
      * @return decimals The decimals of the specified token.
      */
-    function getDecimals(
-        address token
-    ) internal view returns (uint8) {
-        (,bytes memory queriedDecimals) = token.staticcall(
+    function getDecimals(address token) internal view returns (uint8) {
+        (, bytes memory queriedDecimals) = token.staticcall(
             abi.encodeWithSignature("decimals()")
         );
         return abi.decode(queriedDecimals, (uint8));
@@ -241,7 +252,7 @@ contract CrossChainVault is
     function normalizeAmount(
         uint256 amount,
         uint8 decimals
-    ) internal pure returns(uint256) {
+    ) internal pure returns (uint256) {
         if (decimals > 8) {
             amount /= 10 ** (decimals - 8);
         }
@@ -257,7 +268,9 @@ contract CrossChainVault is
      * @dev Only callable by the owner.
      * @param newImplementation Address of the new implementation.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {
         // Upgrade authorized
     }
 }

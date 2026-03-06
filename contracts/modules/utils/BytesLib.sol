@@ -27,7 +27,11 @@ library BytesLib {
      */
     uint256 private constant bytes12Bits = 96;
 
-    function slice(bytes memory buffer, uint256 startIndex, uint256 length) internal pure returns (bytes memory) {
+    function slice(
+        bytes memory buffer,
+        uint256 startIndex,
+        uint256 length
+    ) internal pure returns (bytes memory) {
         unchecked {
             require(length + 31 >= length, "slice_overflow");
         }
@@ -55,24 +59,35 @@ library BytesLib {
                 // because when slicing multiples of 32 bytes (lengthmod == 0)
                 // the following copy loop was copying the origin's length
                 // and then ending prematurely not copying everything it should.
-                let startOffset := add(lengthmod, mul(memoryWord, iszero(lengthmod)))
+                let startOffset := add(
+                    lengthmod,
+                    mul(memoryWord, iszero(lengthmod))
+                )
 
                 let dst := add(tempBytes, startOffset)
                 let end := add(dst, length)
 
-                for { let src := add(add(buffer, startOffset), startIndex) } lt(dst, end) {
+                for {
+                    let src := add(add(buffer, startOffset), startIndex)
+                } lt(dst, end) {
                     dst := add(dst, memoryWord)
                     src := add(src, memoryWord)
-                } { mstore(dst, mload(src)) }
+                } {
+                    mstore(dst, mload(src))
+                }
 
                 // Update free-memory pointer
                 // allocating the array padded to 32 bytes like the compiler does now
                 // Note that negating bitwise the `maskModulo32` produces a mask that aligns addressing to 32 bytes.
-                mstore(freeMemoryPtr, and(add(dst, maskModulo32), not(maskModulo32)))
+                mstore(
+                    freeMemoryPtr,
+                    and(add(dst, maskModulo32), not(maskModulo32))
+                )
             }
             //if we want a zero-length slice let's just return a zero-length array
-            default { mstore(freeMemoryPtr, add(tempBytes, memoryWord)) }
-
+            default {
+                mstore(freeMemoryPtr, add(tempBytes, memoryWord))
+            }
             // Store the length of the buffer
             // We need to do it even if the length is zero because Solidity does not garbage collect
             mstore(tempBytes, length)
@@ -81,19 +96,31 @@ library BytesLib {
         return tempBytes;
     }
 
-    function toAddress(bytes memory buffer, uint256 startIndex) internal pure returns (address) {
-        require(buffer.length >= startIndex + addressSize, "toAddress_outOfBounds");
+    function toAddress(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (address) {
+        require(
+            buffer.length >= startIndex + addressSize,
+            "toAddress_outOfBounds"
+        );
         address tempAddress;
 
         assembly ("memory-safe") {
             // We want to shift into the lower 12 bytes and leave the upper 12 bytes clear.
-            tempAddress := shr(bytes12Bits, mload(add(add(buffer, memoryWord), startIndex)))
+            tempAddress := shr(
+                bytes12Bits,
+                mload(add(add(buffer, memoryWord), startIndex))
+            )
         }
 
         return tempAddress;
     }
 
-    function toUint8(bytes memory buffer, uint256 startIndex) internal pure returns (uint8) {
+    function toUint8(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (uint8) {
         require(buffer.length > startIndex, "toUint8_outOfBounds");
 
         // Note that `endIndex == startOffset` for a given buffer due to the 32 bytes at the start that store the length.
@@ -105,7 +132,10 @@ library BytesLib {
         return tempUint;
     }
 
-    function toUint16(bytes memory buffer, uint256 startIndex) internal pure returns (uint16) {
+    function toUint16(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (uint16) {
         uint256 endIndex = startIndex + uint16Size;
         require(buffer.length >= endIndex, "toUint16_outOfBounds");
 
@@ -117,7 +147,10 @@ library BytesLib {
         return tempUint;
     }
 
-    function toUint32(bytes memory buffer, uint256 startIndex) internal pure returns (uint32) {
+    function toUint32(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (uint32) {
         uint256 endIndex = startIndex + uint32Size;
         require(buffer.length >= endIndex, "toUint32_outOfBounds");
 
@@ -129,7 +162,10 @@ library BytesLib {
         return tempUint;
     }
 
-    function toUint64(bytes memory buffer, uint256 startIndex) internal pure returns (uint64) {
+    function toUint64(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (uint64) {
         uint256 endIndex = startIndex + uint64Size;
         require(buffer.length >= endIndex, "toUint64_outOfBounds");
 
@@ -141,7 +177,10 @@ library BytesLib {
         return tempUint;
     }
 
-    function toUint128(bytes memory buffer, uint256 startIndex) internal pure returns (uint128) {
+    function toUint128(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (uint128) {
         uint256 endIndex = startIndex + uint128Size;
         require(buffer.length >= endIndex, "toUint128_outOfBounds");
 
@@ -153,7 +192,10 @@ library BytesLib {
         return tempUint;
     }
 
-    function toUint256(bytes memory buffer, uint256 startIndex) internal pure returns (uint256) {
+    function toUint256(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (uint256) {
         uint256 endIndex = startIndex + uint256Size;
         require(buffer.length >= endIndex, "toUint256_outOfBounds");
 
@@ -165,7 +207,10 @@ library BytesLib {
         return tempUint;
     }
 
-    function toBytes32(bytes memory buffer, uint256 startIndex) internal pure returns (bytes32) {
+    function toBytes32(
+        bytes memory buffer,
+        uint256 startIndex
+    ) internal pure returns (bytes32) {
         uint256 endIndex = startIndex + uint256Size;
         require(buffer.length >= endIndex, "toBytes32_outOfBounds");
 

@@ -11,7 +11,6 @@ error MaxTransactionSizeAlreadySetToThisValue();
 /// @notice V2 Upgrade: Adds the ability for the admin to update a max transaction size.
 /// @custom:oz-upgrades-unsafe-allow missing-initializer
 contract CrossChainVaultV2 is CrossChainVault {
-    
     // --- New V2 State Variables ---
     // (Appended after V1 storage layout to prevent collisions)
     uint256 public maxTransactionSize;
@@ -42,7 +41,8 @@ contract CrossChainVaultV2 is CrossChainVault {
      */
     function setMaxTransactionSize(uint256 newSize) external onlyOwner {
         if (newSize == 0) revert MaxTransactionSizeCannotBeZero();
-        if (newSize == maxTransactionSize) revert MaxTransactionSizeAlreadySetToThisValue();
+        if (newSize == maxTransactionSize)
+            revert MaxTransactionSizeAlreadySetToThisValue();
 
         uint256 oldSize = maxTransactionSize;
         maxTransactionSize = newSize;

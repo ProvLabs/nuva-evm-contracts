@@ -412,7 +412,7 @@ describe("DedicatedVaultRouter", function () {
         const initialFee = 100n; // 1%
         const upgraded = await upgrades.upgradeProxy(await router.getAddress(), RouterV2Factory, {
             call: { fn: "initializeV2", args: [initialFee] },
-            kind: "uups"
+            kind: "uups",
         });
 
         // 3. Verify state is preserved
@@ -1470,7 +1470,7 @@ describe("DedicatedVaultRouter", function () {
             const initialLimit = ethers.parseEther("1000");
             const upgraded = await upgrades.upgradeProxy(await nuvaVault.getAddress(), NuvaVaultV2, {
                 call: { fn: "initializeV2", args: [initialLimit] },
-                kind: "uups"
+                kind: "uups",
             });
 
             // 3. Verify state is preserved

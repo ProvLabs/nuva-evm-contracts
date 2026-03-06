@@ -11,7 +11,6 @@ error RouterFeeAlreadySetToThisValue();
 /// @notice V2 Upgrade: Adds the ability for the admin to update a router fee.
 /// @custom:oz-upgrades-unsafe-allow missing-initializer
 contract DedicatedVaultRouterV2 is DedicatedVaultRouter {
-    
     // --- New V2 State Variables ---
     // (Appended after V1 storage layout to prevent collisions)
     uint256 public routerFee;

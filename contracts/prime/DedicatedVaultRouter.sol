@@ -26,7 +26,12 @@ interface IRedemptionProxy {
      * @param _nuvaVault Address of the Nuva vault.
      * @param _user Address of the user receiving the redeemed assets.
      */
-    function initialize(address _assetVault, address _stakingVault, address _nuvaVault, address _user) external;
+    function initialize(
+        address _assetVault,
+        address _stakingVault,
+        address _nuvaVault,
+        address _user
+    ) external;
 
     /**
      * @notice Triggers the multi-hop redemption process.
@@ -112,21 +117,33 @@ contract DedicatedVaultRouter is
      * @param oldImplementation The previous implementation address.
      * @param newImplementation The new implementation address.
      */
-    event RedemptionProxyImplementationUpdated(address oldImplementation, address newImplementation);
+    event RedemptionProxyImplementationUpdated(
+        address oldImplementation,
+        address newImplementation
+    );
     /**
      * @notice Emitted when a new redemption is requested.
      * @param user The address of the user requesting redemption.
      * @param redemptionProxy The address of the deployed proxy clone.
      * @param amount The Nuva token amount that is being redeemed.
      */
-    event RedemptionRequested(address indexed user, address redemptionProxy, uint256 amount);
+    event RedemptionRequested(
+        address indexed user,
+        address redemptionProxy,
+        uint256 amount
+    );
     /**
      * @notice Emitted when redemptions are swept back to users.
      * @param redemptionProxies The addresses of the deployed proxy clones.
      * @param users The array of user addresses (from proxy addresses).
      * @param totalSweptAmount The total amount of assets swept.
      */
-    event RedemptionsSwept(address[] redemptionProxies, address[] users, uint256[] amounts, uint256 totalSweptAmount);
+    event RedemptionsSwept(
+        address[] redemptionProxies,
+        address[] users,
+        uint256[] amounts,
+        uint256 totalSweptAmount
+    );
 
     // --- Custom Errors ---
     error InvalidVault();
@@ -154,7 +171,9 @@ contract DedicatedVaultRouter is
      * @notice EIP-712 typehash for redemption authorization.
      */
     bytes32 private constant REDEEM_TYPEHASH =
-        keccak256("Redeem(address sender,uint256 amountNuvaShares,uint256 deadline)");
+        keccak256(
+            "Redeem(address sender,uint256 amountNuvaShares,uint256 deadline)"
+        );
 
     /**
      * @custom:oz-upgrades-unsafe-allow constructor
@@ -188,7 +207,11 @@ contract DedicatedVaultRouter is
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
         _grantRole(KEEPER_ROLE, _initialOwner);
 
-        if (_assetVault == address(0) || _stakingVault == address(0) || _nuvaVault == address(0)) revert InvalidVault();
+        if (
+            _assetVault == address(0) ||
+            _stakingVault == address(0) ||
+            _nuvaVault == address(0)
+        ) revert InvalidVault();
         if (_amlSigner == address(0)) revert InvalidAmlSigner();
 
         assetVault = IERC4626(_assetVault);
@@ -233,7 +256,14 @@ contract DedicatedVaultRouter is
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        return _doDeposit(_amount, _receiver, _minVaultSharesOut, _minStakingVaultSharesOut, _minNuvaVaultSharesOut);
+        return
+            _doDeposit(
+                _amount,
+                _receiver,
+                _minVaultSharesOut,
+                _minStakingVaultSharesOut,
+                _minNuvaVaultSharesOut
+            );
     }
 
     /**
@@ -274,13 +304,30 @@ contract DedicatedVaultRouter is
         );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
-        try IERC20Permit(address(asset)).permit(msg.sender, address(this), _amount, _permitDeadline, _v, _r, _s) {
+        try
+            IERC20Permit(address(asset)).permit(
+                msg.sender,
+                address(this),
+                _amount,
+                _permitDeadline,
+                _v,
+                _r,
+                _s
+            )
+        {
             // Permit successful
         } catch {
             // Permit failed or not supported, proceeding with existing allowance
         }
 
-        return _doDeposit(_amount, _receiver, _minVaultSharesOut, _minStakingVaultSharesOut, _minNuvaVaultSharesOut);
+        return
+            _doDeposit(
+                _amount,
+                _receiver,
+                _minVaultSharesOut,
+                _minStakingVaultSharesOut,
+                _minNuvaVaultSharesOut
+            );
     }
 
     /**
@@ -311,25 +358,39 @@ contract DedicatedVaultRouter is
         asset.forceApprove(address(assetVault), _amount);
         uint256 vaultShares = assetVault.deposit(_amount, address(this));
 
-        if (vaultShares < _minVaultSharesOut) revert SlippageExceeded(_minVaultSharesOut, vaultShares);
-        if (asset.balanceOf(address(this)) > assetBalBefore) revert FundsStuck(1);
+        if (vaultShares < _minVaultSharesOut)
+            revert SlippageExceeded(_minVaultSharesOut, vaultShares);
+        if (asset.balanceOf(address(this)) > assetBalBefore)
+            revert FundsStuck(1);
 
         // 2. Staking Vault Hop
         stakingAsset.forceApprove(address(stakingVault), vaultShares);
-        uint256 stakingShares = stakingVault.deposit(vaultShares, address(this));
+        uint256 stakingShares = stakingVault.deposit(
+            vaultShares,
+            address(this)
+        );
 
         if (stakingShares < _minStakingVaultSharesOut)
             revert SlippageExceeded(_minStakingVaultSharesOut, stakingShares);
-        if (stakingAsset.balanceOf(address(this)) > stakingAssetBalBefore) revert FundsStuck(2);
+        if (stakingAsset.balanceOf(address(this)) > stakingAssetBalBefore)
+            revert FundsStuck(2);
 
         // 3. Nuva Vault Hop
         nuvaAsset.forceApprove(address(nuvaVault), stakingShares);
         nuvaShares = nuvaVault.deposit(stakingShares, _receiver);
 
-        if (nuvaShares < _minNuvaVaultSharesOut) revert SlippageExceeded(_minNuvaVaultSharesOut, nuvaShares);
-        if (nuvaAsset.balanceOf(address(this)) > nuvaAssetBalBefore) revert FundsStuck(3);
+        if (nuvaShares < _minNuvaVaultSharesOut)
+            revert SlippageExceeded(_minNuvaVaultSharesOut, nuvaShares);
+        if (nuvaAsset.balanceOf(address(this)) > nuvaAssetBalBefore)
+            revert FundsStuck(3);
 
-        emit Deposited(msg.sender, _amount, vaultShares, stakingShares, nuvaShares);
+        emit Deposited(
+            msg.sender,
+            _amount,
+            vaultShares,
+            stakingShares,
+            nuvaShares
+        );
     }
 
     // --- Redemption Functions ---
@@ -345,7 +406,10 @@ contract DedicatedVaultRouter is
         bytes calldata _amlSignature,
         uint256 _amlDeadline
     ) external nonReentrant {
-        bytes32 messageHash = _getRedeemMessageHash(_amountNuvaShares, _amlDeadline);
+        bytes32 messageHash = _getRedeemMessageHash(
+            _amountNuvaShares,
+            _amlDeadline
+        );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
         _doRequestRedeem(_amountNuvaShares);
@@ -370,7 +434,10 @@ contract DedicatedVaultRouter is
         bytes32 _r,
         bytes32 _s
     ) external nonReentrant {
-        bytes32 messageHash = _getRedeemMessageHash(_amountNuvaShares, _amlDeadline);
+        bytes32 messageHash = _getRedeemMessageHash(
+            _amountNuvaShares,
+            _amlDeadline
+        );
         _verifyAML(messageHash, _amlSignature, _amlDeadline);
 
         try
@@ -398,26 +465,48 @@ contract DedicatedVaultRouter is
      */
     function _doRequestRedeem(uint256 _amountNuvaShares) internal {
         if (_amountNuvaShares == 0) revert InvalidAmount();
-        if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
+        if (redemptionProxyImplementation == address(0))
+            revert InvalidRedemptionProxyImplementation();
 
         uint256 balBefore = nuvaVault.balanceOf(address(this));
 
         // Deploy a minimal proxy clone of RedemptionProxy
-        address redemptionProxyAddress = Clones.clone(redemptionProxyImplementation);
-        IRedemptionProxy redemptionProxy = IRedemptionProxy(redemptionProxyAddress);
+        address redemptionProxyAddress = Clones.clone(
+            redemptionProxyImplementation
+        );
+        IRedemptionProxy redemptionProxy = IRedemptionProxy(
+            redemptionProxyAddress
+        );
 
         // Initialize the clone
-        redemptionProxy.initialize(address(assetVault), address(stakingVault), address(nuvaVault), msg.sender);
+        redemptionProxy.initialize(
+            address(assetVault),
+            address(stakingVault),
+            address(nuvaVault),
+            msg.sender
+        );
 
         // Transfer nuvaVault shares from user to the RedemptionProxy clone
-        IERC20(address(nuvaVault)).safeTransferFrom(msg.sender, address(this), _amountNuvaShares);
-        IERC20(address(nuvaVault)).forceApprove(redemptionProxyAddress, _amountNuvaShares);
+        IERC20(address(nuvaVault)).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _amountNuvaShares
+        );
+        IERC20(address(nuvaVault)).forceApprove(
+            redemptionProxyAddress,
+            _amountNuvaShares
+        );
         redemptionProxy.triggerRedeem(_amountNuvaShares);
 
-        if (nuvaVault.balanceOf(address(this)) > balBefore) revert FundsStuck(1);
+        if (nuvaVault.balanceOf(address(this)) > balBefore)
+            revert FundsStuck(1);
 
         redemptionProxyToUser[redemptionProxyAddress] = msg.sender;
-        emit RedemptionRequested(msg.sender, redemptionProxyAddress, _amountNuvaShares);
+        emit RedemptionRequested(
+            msg.sender,
+            redemptionProxyAddress,
+            _amountNuvaShares
+        );
     }
 
     /**
@@ -429,8 +518,10 @@ contract DedicatedVaultRouter is
         address[] calldata _proxyAddresses,
         uint256[] calldata _amounts
     ) external onlyRole(KEEPER_ROLE) {
-        if (redemptionProxyImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
-        if (_proxyAddresses.length != _amounts.length) revert ArrayLengthMismatch();
+        if (redemptionProxyImplementation == address(0))
+            revert InvalidRedemptionProxyImplementation();
+        if (_proxyAddresses.length != _amounts.length)
+            revert ArrayLengthMismatch();
 
         uint256 totalSwept = 0;
         uint256 length = _proxyAddresses.length;
@@ -443,7 +534,9 @@ contract DedicatedVaultRouter is
             users[i] = user;
 
             if (user != address(0) && amountToSweep > 0) {
-                IRedemptionProxy redemptionProxy = IRedemptionProxy(proxyAddress);
+                IRedemptionProxy redemptionProxy = IRedemptionProxy(
+                    proxyAddress
+                );
                 totalSwept += redemptionProxy.sweep(amountToSweep);
 
                 delete redemptionProxyToUser[proxyAddress];
@@ -468,9 +561,15 @@ contract DedicatedVaultRouter is
      * @notice Sets the master copy implementation for RedemptionProxy clones.
      * @param _newImplementation The address of the new implementation.
      */
-    function setRedemptionProxyImplementation(address _newImplementation) external onlyOwner {
-        if (_newImplementation == address(0)) revert InvalidRedemptionProxyImplementation();
-        emit RedemptionProxyImplementationUpdated(redemptionProxyImplementation, _newImplementation);
+    function setRedemptionProxyImplementation(
+        address _newImplementation
+    ) external onlyOwner {
+        if (_newImplementation == address(0))
+            revert InvalidRedemptionProxyImplementation();
+        emit RedemptionProxyImplementationUpdated(
+            redemptionProxyImplementation,
+            _newImplementation
+        );
         redemptionProxyImplementation = _newImplementation;
     }
 
@@ -482,11 +581,18 @@ contract DedicatedVaultRouter is
      * @param _signature The AML signature.
      * @param _deadline The signature expiration timestamp.
      */
-    function _verifyAML(bytes32 _messageHash, bytes calldata _signature, uint256 _deadline) private {
+    function _verifyAML(
+        bytes32 _messageHash,
+        bytes calldata _signature,
+        uint256 _deadline
+    ) private {
         if (block.timestamp > _deadline) revert AmlSignatureExpired();
         if (usedSignatures[_messageHash]) revert AmlSignatureAlreadyUsed();
 
-        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(_getDomainSeparator(), _messageHash);
+        bytes32 ethSignedHash = MessageHashUtils.toTypedDataHash(
+            _getDomainSeparator(),
+            _messageHash
+        );
         address recoveredSigner = ECDSA.recover(ethSignedHash, _signature);
 
         if (recoveredSigner != amlSigner) revert InvalidAmlSignature();
@@ -532,8 +638,19 @@ contract DedicatedVaultRouter is
      * @param _deadline Signature deadline.
      * @return messageHash The computed EIP-712 message hash.
      */
-    function _getRedeemMessageHash(uint256 _amountNuvaShares, uint256 _deadline) private view returns (bytes32) {
-        return keccak256(abi.encode(REDEEM_TYPEHASH, msg.sender, _amountNuvaShares, _deadline));
+    function _getRedeemMessageHash(
+        uint256 _amountNuvaShares,
+        uint256 _deadline
+    ) private view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    REDEEM_TYPEHASH,
+                    msg.sender,
+                    _amountNuvaShares,
+                    _deadline
+                )
+            );
     }
 
     /**
@@ -544,7 +661,9 @@ contract DedicatedVaultRouter is
         return
             keccak256(
                 abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    ),
                     keccak256(bytes("DedicatedVaultRouter")),
                     keccak256(bytes("1")),
                     block.chainid,
@@ -562,7 +681,9 @@ contract DedicatedVaultRouter is
      * @dev Authorizes a contract upgrade. Only callable by the owner.
      * @param newImplementation Address of the new implementation.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {
         // Upgrade authorized
     }
 }

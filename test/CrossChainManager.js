@@ -388,7 +388,7 @@ describe("CrossChainManager", function () {
             const initialFee = ethers.parseEther("1");
             const upgraded = await upgrades.upgradeProxy(await crossChainManager.getAddress(), CrossChainManagerV2, {
                 call: { fn: "initializeV2", args: [initialFee] },
-                kind: "uups"
+                kind: "uups",
             });
 
             // Verify state is preserved
