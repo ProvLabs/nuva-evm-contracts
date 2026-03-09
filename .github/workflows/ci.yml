@@ -10,6 +10,11 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    # mock required hardhat env vars
+    env:
+      PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
+      MAINNET_PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

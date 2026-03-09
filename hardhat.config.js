@@ -13,14 +13,14 @@ module.exports = {
       chainId: 11155111,
     },
     hoodi: {
-      url: process.env.HOODI_RPC_URL,
+      url: process.env.HOODI_RPC_URL || "http://localhost:8545",
       accounts: [
         process.env.PRIVATE_KEY,
       ],
       chainId: 560048,
     },
     mainnet: {
-      url: process.env.MAINNET_RPC_URL,
+      url: process.env.MAINNET_RPC_URL || "http://localhost:8545",
       accounts: [
         process.env.MAINNET_PRIVATE_KEY,
       ],
@@ -35,7 +35,7 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
   },
   sourcify: {
     enabled: true
