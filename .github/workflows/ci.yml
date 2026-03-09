@@ -1,0 +1,43 @@
+name: Hardhat CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # mock required hardhat env vars
+    env:
+      CI: "true"
+      PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
+      MAINNET_PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile smart contracts
+        run: npx hardhat compile
+
+      - name: Run Hardhat tests
+        run: npx hardhat test
+
+      - name: Publish Test Summary
+        uses: mikepenz/action-junit-report@v4
+        if: success() || failure() 
+        with:
+          report_paths: 'test-results.xml'
+          annotate_only: true

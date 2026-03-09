@@ -38,6 +38,7 @@
     "ethers": "^6.14.0",
     "hardhat": "2.26.3",
     "hardhat-gas-reporter": "^2.3.0",
+    "mocha-junit-reporter": "^2.2.1",
     "prettier": "^3.8.1",
     "prettier-plugin-solidity": "^2.2.1",
     "solhint": "^6.0.1",
