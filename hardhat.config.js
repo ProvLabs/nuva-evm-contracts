@@ -77,4 +77,10 @@ module.exports = {
     artifacts: "./artifacts"
   },
   defaultNetwork: "hardhat",
+  mocha: {
+    reporter: process.env.CI ? "mocha-junit-reporter" : "spec",
+    reporterOptions: {
+      mochaFile: "./test-results.xml",
+    },
+  },
 }

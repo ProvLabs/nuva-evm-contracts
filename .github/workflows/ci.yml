@@ -12,6 +12,7 @@ jobs:
 
     # mock required hardhat env vars
     env:
+      CI: "true"
       PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
       MAINNET_PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -32,9 +33,7 @@ jobs:
         run: npx hardhat compile
 
       - name: Run Hardhat tests
-        run: npx hardhat test --reporter mocha-junit-reporter
-        env:
-          MOCHA_FILE: ./test-results.xml
+        run: npx hardhat test
 
       - name: Publish Test Summary
         uses: mikepenz/action-junit-report@v4
