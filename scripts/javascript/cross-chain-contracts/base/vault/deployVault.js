@@ -1,31 +1,43 @@
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 async function main() {
-    const CrossChainVault = await ethers.getContractFactory("CrossChainVault");
+  const CrossChainVault = await ethers.getContractFactory("CrossChainVault");
+  const executor = "0x96846c31e4f87c0f186a322926c61d4183439f0a";
 
-    const executor = "0x96846c31e4f87c0f186a322926c61d4183439f0a";
+  console.log("Deploying Vault...");
 
-    console.log("Deploying Vault...");
-    const proxy = await upgrades.deployProxy(CrossChainVault, [executor], {
-        initializer: "initialize",
-        kind: "uups",
-    });
+  // 1. Deploy the Proxy
+  const proxy = await upgrades.deployProxy(CrossChainVault, [executor], {
+    initializer: "initialize",
+    kind: "uups",
+  });
 
-    await proxy.waitForDeployment();
+  await proxy.waitForDeployment();
+  const proxyAddress = await proxy.getAddress();
+  console.log(`Proxy deployed to: ${proxyAddress}`);
 
-    const proxyAddress = await proxy.getAddress();
-    const implementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+  // 2. Short delay to allow nodes to sync
+  console.log("Waiting for network sync...");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    console.log("----------------------------------------------");
-    console.log(`Proxy deployed to: ${proxyAddress}`);
-    console.log(`Implementation deployed to: ${implementationAddress}`);
-    console.log("----------------------------------------------");
+  // 3. Check if the address actually has code
+  const code = await ethers.provider.getCode(proxyAddress);
+  if (code === "0x") {
+    throw new Error("Deployment failed: No bytecode found at proxy address.");
+  }
+
+  // 4. Get Implementation
+  const implementationAddress =
+    await upgrades.erc1967.getImplementationAddress(proxyAddress);
+
+  console.log("----------------------------------------------");
+  console.log(`Success!`);
+  console.log(`Proxy: ${proxyAddress}`);
+  console.log(`Logic: ${implementationAddress}`);
+  console.log("----------------------------------------------");
 }
 
-// Standard Hardhat script runner
-main()
-    .then(() => process.exit(0))
-    .catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

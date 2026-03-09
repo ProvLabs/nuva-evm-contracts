@@ -8,35 +8,41 @@ const DEPOSIT_TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 // --- END: Configuration ---
 
 async function main() {
-    console.log(`Querying factory at: ${FACTORY_ADDRESS}`);
-    console.log(`  Share Token: ${SHARE_TOKEN_ADDRESS}`);
-    console.log(`  Deposit Token: ${DEPOSIT_TOKEN_ADDRESS}`);
+  console.log(`Querying factory at: ${FACTORY_ADDRESS}`);
+  console.log(`  Share Token: ${SHARE_TOKEN_ADDRESS}`);
+  console.log(`  Deposit Token: ${DEPOSIT_TOKEN_ADDRESS}`);
 
-    // 1. Get the factory contract instance
-    // We don't need the full ABI, just the part Hardhat
-    // can find in its artifacts.
-    const factory = await ethers.getContractAt("DepositorFactory", FACTORY_ADDRESS);
+  // 1. Get the factory contract instance
+  // We don't need the full ABI, just the part Hardhat
+  // can find in its artifacts.
+  const factory = await ethers.getContractAt(
+    "DepositorFactory",
+    FACTORY_ADDRESS,
+  );
 
-    // 2. Call the 'depositors' getter function
-    // This is a free, read-only call.
-    const cloneAddress = await factory.depositors(SHARE_TOKEN_ADDRESS, DEPOSIT_TOKEN_ADDRESS);
+  // 2. Call the 'depositors' getter function
+  // This is a free, read-only call.
+  const cloneAddress = await factory.depositors(
+    SHARE_TOKEN_ADDRESS,
+    DEPOSIT_TOKEN_ADDRESS,
+  );
 
-    // 3. Log the result
-    if (cloneAddress === ethers.ZeroAddress) {
-        console.log("-----------------------------------------");
-        console.log("❌ Result: No depositor clone found for this pair.");
-        console.log("-----------------------------------------");
-    } else {
-        console.log("-----------------------------------------");
-        console.log("✅ Result: Found clone address!");
-        console.log(`   ${cloneAddress}`);
-        console.log("-----------------------------------------");
-    }
+  // 3. Log the result
+  if (cloneAddress === ethers.ZeroAddress) {
+    console.log("-----------------------------------------");
+    console.log("❌ Result: No depositor clone found for this pair.");
+    console.log("-----------------------------------------");
+  } else {
+    console.log("-----------------------------------------");
+    console.log("✅ Result: Found clone address!");
+    console.log(`   ${cloneAddress}`);
+    console.log("-----------------------------------------");
+  }
 }
 
 main()
-    .then(() => process.exit(0))
-    .catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

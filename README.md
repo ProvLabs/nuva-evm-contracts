@@ -10,6 +10,12 @@ This repository contains a set of smart contracts for the Nuva protocol, includi
 - **Depositor**: Handles token deposits with AML verification.
 - **Withdrawal**: Manages token withdrawals with AML verification.
 - **DepositorFactory/WithdrawalFactory**: Factory contracts for deploying Depositor and Withdrawal instances.
+- **CrossChainVault**: Cross-chain token bridge using Wormhole infrastructure.
+- **CrossChainManager**: AML-compliant cross-chain token management system.
+
+### Cross-Chain Contracts
+- **[CrossChainVault Documentation](docs/CrossChainVault.md)**: Comprehensive guide for the cross-chain token vault contract
+- **[CrossChainManager Documentation](docs/CrossChainManager.md)**: Detailed documentation for the AML-compliant cross-chain manager
 
 ## Prerequisites
 
@@ -56,6 +62,8 @@ npx hardhat test --verbose
 
 - `npm run lint`: Check code style
 - `npm run lint:fix`: Automatically fix code style issues
+- `npm run lint:solfix`: Format Solidity code style
+- `npm run lint:solcheck`: Check Solidity code style
 - `npx hardhat compile`: Compile contracts
 - `npx hardhat clean`: Clean cache and artifacts
 - `npx hardhat node`: Start local Ethereum node
